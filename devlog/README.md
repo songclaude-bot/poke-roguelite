@@ -14,3 +14,8 @@
 ### 1-1. 프로젝트 세팅 (Phaser 3 + Vite + TypeScript)
 - 날짜: 2026-02-23
 - [상세 기록](./01-project-setup.md)
+
+### 1-2. 던전 생성 + DTEF 오토타일링 + 타일맵 렌더링
+- 날짜: 2026-02-23
+- [상세 기록](./02-dungeon-generation.md)
+- 핵심: DTEF MaskCoordinate 룩업 테이블로 47-state 오토타일링 구현

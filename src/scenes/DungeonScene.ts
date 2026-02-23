@@ -1,45 +1,76 @@
 import Phaser from "phaser";
-import { COLORS, GAME_WIDTH, GAME_HEIGHT, TILE_DISPLAY, MAP_WIDTH, MAP_HEIGHT } from "../config";
+import {
+  COLORS,
+  GAME_WIDTH,
+  GAME_HEIGHT,
+  TILE_SIZE,
+  TILE_SCALE,
+  TILE_DISPLAY,
+  MAP_WIDTH,
+  MAP_HEIGHT,
+} from "../config";
+import { generateDungeon, DungeonData } from "../core/dungeon-generator";
+import { getTileIndex } from "../core/autotiler";
 
 export class DungeonScene extends Phaser.Scene {
+  private dungeon!: DungeonData;
+
   constructor() {
     super({ key: "DungeonScene" });
   }
 
+  preload() {
+    // Load BeachCave tileset as image (18×8 grid of 24×24 tiles)
+    this.load.image("beachcave-tiles", "tilesets/BeachCave/tileset_0.png");
+  }
+
   create() {
-    // Placeholder: draw a grid to verify the scene works
-    const graphics = this.add.graphics();
+    // Generate dungeon
+    this.dungeon = generateDungeon();
+    const { width, height, terrain, playerStart, stairsPos } = this.dungeon;
 
-    for (let y = 0; y < MAP_HEIGHT; y++) {
-      for (let x = 0; x < MAP_WIDTH; x++) {
-        const px = x * TILE_DISPLAY;
-        const py = y * TILE_DISPLAY;
-
-        // Checkerboard pattern
-        const isWall = (x === 0 || x === MAP_WIDTH - 1 || y === 0 || y === MAP_HEIGHT - 1);
-        const color = isWall ? 0x1a1a25 : ((x + y) % 2 === 0 ? 0x111118 : 0x0e0e15);
-
-        graphics.fillStyle(color, 1);
-        graphics.fillRect(px, py, TILE_DISPLAY, TILE_DISPLAY);
+    // Build tile data array (2D array of tile indices)
+    const tileData: number[][] = [];
+    for (let y = 0; y < height; y++) {
+      tileData[y] = [];
+      for (let x = 0; x < width; x++) {
+        tileData[y][x] = getTileIndex(terrain, x, y, width, height);
       }
     }
 
-    // Player placeholder (center of map)
-    const playerX = Math.floor(MAP_WIDTH / 2) * TILE_DISPLAY + TILE_DISPLAY / 2;
-    const playerY = Math.floor(MAP_HEIGHT / 2) * TILE_DISPLAY + TILE_DISPLAY / 2;
+    // Create Phaser tilemap from data
+    const map = this.make.tilemap({
+      data: tileData,
+      tileWidth: TILE_SIZE,
+      tileHeight: TILE_SIZE,
+    });
 
-    graphics.fillStyle(COLORS.ACCENT_PINK, 1);
-    graphics.fillCircle(playerX, playerY, 16);
+    const tileset = map.addTilesetImage("beachcave-tiles")!;
+    const layer = map.createLayer(0, tileset, 0, 0)!;
+    layer.setScale(TILE_SCALE);
 
-    // Camera follows player position, centered on screen
-    this.cameras.main.setBounds(
-      0, 0,
-      MAP_WIDTH * TILE_DISPLAY,
-      MAP_HEIGHT * TILE_DISPLAY
-    );
-    this.cameras.main.centerOn(playerX, playerY);
+    // Draw stairs marker (yellow diamond)
+    const stairsGfx = this.add.graphics();
+    const sx = stairsPos.x * TILE_DISPLAY + TILE_DISPLAY / 2;
+    const sy = stairsPos.y * TILE_DISPLAY + TILE_DISPLAY / 2;
+    stairsGfx.fillStyle(0xfbbf24, 0.9);
+    stairsGfx.fillTriangle(sx, sy - 14, sx + 10, sy, sx - 10, sy);
+    stairsGfx.fillTriangle(sx, sy + 14, sx + 10, sy, sx - 10, sy);
 
-    // HUD text
+    // Player placeholder (pink circle)
+    const playerGfx = this.add.graphics();
+    const px = playerStart.x * TILE_DISPLAY + TILE_DISPLAY / 2;
+    const py = playerStart.y * TILE_DISPLAY + TILE_DISPLAY / 2;
+    playerGfx.fillStyle(COLORS.ACCENT_PINK, 1);
+    playerGfx.fillCircle(px, py, 16);
+
+    // Camera setup
+    const mapPixelW = width * TILE_DISPLAY;
+    const mapPixelH = height * TILE_DISPLAY;
+    this.cameras.main.setBounds(0, 0, mapPixelW, mapPixelH);
+    this.cameras.main.centerOn(px, py);
+
+    // ── HUD (fixed to camera) ──
     this.add
       .text(8, 8, "B1F  HP ████████  🍎 100", {
         fontSize: "11px",
@@ -58,7 +89,7 @@ export class DungeonScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(100);
 
-    // Bottom buttons placeholder
+    // Bottom skill buttons
     const btnY = GAME_HEIGHT - 80;
     const btnLabels = ["기술1", "기술2", "기술3", "기술4"];
     btnLabels.forEach((label, i) => {
@@ -74,6 +105,7 @@ export class DungeonScene extends Phaser.Scene {
         .setInteractive();
     });
 
+    // Bottom menu buttons
     const menuY = GAME_HEIGHT - 50;
     const menuLabels = ["가방", "팀", "대기", "💾저장"];
     menuLabels.forEach((label, i) => {
