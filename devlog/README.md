@@ -97,3 +97,10 @@
 - 날짜: 2026-02-23
 - [상세 기록](./15-boss-sound-polish.md)
 - 핵심: 던전별 보스, 보스 HP바, Web Audio 합성 사운드, 스킬 시각 이펙트, 동료 AI 개선, 입력 마스킹 수정
+
+## Phase 8: 함정 + 배고픔 + Mt. Steel
+
+### 8-1~3. 함정 시스템 + 배고픔 + 4번째 던전
+- 날짜: 2026-02-23
+- [상세 기록](./16-traps-hunger-mtsteel.md)
+- 핵심: 7종 함정, Belly 시스템, Apple/Big Apple, Mt. Steel 던전, Aron/Meditite/Machop, Fighting/Steel 타입

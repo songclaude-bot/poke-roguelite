@@ -91,6 +91,28 @@ export const DUNGEONS: Record<string, DungeonDef> = {
     description: "B1F~B4F. Bug and Flying. Easy!",
     boss: { speciesId: "pidgey", name: "Fierce Pidgey", statMultiplier: 2.0 },
   },
+  mtSteel: {
+    id: "mtSteel",
+    name: "Mt. Steel",
+    tilesetPath: "tilesets/ThunderwaveCave/tileset_0.png",
+    tilesetKey: "thunderwave-tiles",
+    floors: 7,
+    enemySpeciesIds: ["aron", "meditite", "machop"],
+    floorEnemies: {
+      1: ["aron"],
+      2: ["aron", "meditite"],
+      3: ["meditite", "aron"],
+      4: ["meditite", "machop"],
+      5: ["machop", "aron"],
+      6: ["machop", "meditite"],
+      7: ["machop"],
+    },
+    difficulty: 1.5,
+    itemsPerFloor: 3,
+    unlockClears: 2,
+    description: "B1F~B7F. Steel and Fighting. Very tough!",
+    boss: { speciesId: "machop", name: "Champion Machop", statMultiplier: 3.5 },
+  },
 };
 
 /** Get dungeon by ID */

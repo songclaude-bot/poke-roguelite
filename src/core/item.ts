@@ -104,6 +104,22 @@ export const ITEM_DB: Record<string, ItemDef> = {
     description: "Boosts ATK and DEF for 10 turns.",
     stackable: false,
   },
+  apple: {
+    id: "apple",
+    name: "Apple",
+    category: ItemCategory.Berry,
+    target: ItemTarget.Self,
+    description: "Restores 50 Belly.",
+    stackable: true,
+  },
+  bigApple: {
+    id: "bigApple",
+    name: "Big Apple",
+    category: ItemCategory.Berry,
+    target: ItemTarget.Self,
+    description: "Fully restores Belly.",
+    stackable: true,
+  },
 };
 
 /** Items that can spawn on dungeon floors, with relative weights */
@@ -114,6 +130,8 @@ export const FLOOR_ITEM_TABLE: { itemId: string; weight: number }[] = [
   { itemId: "sleepSeed", weight: 10 },
   { itemId: "sitrusBerry", weight: 8 },
   { itemId: "reviveSeed", weight: 5 },
+  { itemId: "apple", weight: 20 },
+  { itemId: "bigApple", weight: 5 },
   { itemId: "escapeOrb", weight: 3 },
   { itemId: "luminousOrb", weight: 5 },
   { itemId: "allPowerOrb", weight: 4 },

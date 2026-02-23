@@ -28,13 +28,9 @@ import {
   deserializeSkills as deserializeSkillsFn,
   goldFromRun, loadMeta, saveMeta,
 } from "../core/save-system";
+import { TrapDef, TrapType, rollTrap, trapsPerFloor } from "../core/trap";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
-import {
-  initAudio, startBgm, stopBgm,
-  sfxHit, sfxSuperEffective, sfxNotEffective, sfxMove, sfxPickup,
-  sfxLevelUp, sfxRecruit, sfxStairs, sfxDeath, sfxBossDefeat,
-  sfxHeal, sfxSkill, sfxMenuOpen, sfxMenuClose,
-} from "../core/sound-manager";
+// Sound system removed — will use PokeAutoChess resources later
 
 interface AllyData {
   speciesId: string;
@@ -115,6 +111,14 @@ export class DungeonScene extends Phaser.Scene {
   private gameOver = false;
   private enemiesDefeated = 0;
 
+  // Trap state
+  private floorTraps: { x: number; y: number; trap: TrapDef; sprite: Phaser.GameObjects.Text; revealed: boolean }[] = [];
+
+  // Belly (hunger) state
+  private belly = 100;
+  private maxBelly = 100;
+  private persistentBelly: number | null = null;
+
   // Boss state
   private bossEntity: Entity | null = null;
   private bossHpBar: Phaser.GameObjects.Graphics | null = null;
@@ -127,7 +131,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private persistentAllies: AllyData[] | null = null;
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number }) {
     // Apply upgrade bonuses on fresh run start (floor 1 from hub)
     const meta = loadMeta();
     const hpBonus = getUpgradeBonus(meta, "maxHp") * 5;
@@ -161,6 +165,9 @@ export class DungeonScene extends Phaser.Scene {
     this.enemiesDefeated = 0;
     this.turnManager = new TurnManager();
     this.persistentAllies = data?.allies ?? null;
+    this.floorTraps = [];
+    this.belly = data?.belly ?? 100;
+    this.maxBelly = 100;
 
     // Give starter items on new run
     if (isNewRun) {
@@ -180,6 +187,7 @@ export class DungeonScene extends Phaser.Scene {
       mudkip: "0258", zubat: "0041", shellos: "0422", corsola: "0222", geodude: "0074",
       pikachu: "0025", voltorb: "0100", magnemite: "0081",
       caterpie: "0010", pidgey: "0016",
+      aron: "0304", meditite: "0307", machop: "0066",
     };
 
     // Load player + all enemy species + ally species for this dungeon
@@ -403,17 +411,33 @@ export class DungeonScene extends Phaser.Scene {
       this.floorItems.push({ x: ix, y: iy, item, sprite });
     }
 
+    // ── Spawn floor traps (hidden) ──
+    const trapCount = trapsPerFloor(this.currentFloor);
+    for (let i = 0; i < trapCount; i++) {
+      const room = rooms[Math.floor(Math.random() * rooms.length)];
+      const tx = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
+      const ty = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
+      if (terrain[ty][tx] !== TerrainType.GROUND) continue;
+      if (tx === stairsPos.x && ty === stairsPos.y) continue;
+      if (tx === playerStart.x && ty === playerStart.y) continue;
+      // Don't overlap with items
+      if (this.floorItems.some(fi => fi.x === tx && fi.y === ty)) continue;
+
+      const trap = rollTrap();
+      const sprite = this.add.text(
+        tx * TILE_DISPLAY + TILE_DISPLAY / 2,
+        ty * TILE_DISPLAY + TILE_DISPLAY / 2,
+        trap.symbol, { fontSize: "14px", color: trap.color, fontFamily: "monospace" }
+      ).setOrigin(0.5).setDepth(5).setAlpha(0); // hidden initially
+
+      this.floorTraps.push({ x: tx, y: ty, trap, sprite, revealed: false });
+    }
+
     // ── Camera ──
     const mapPixelW = width * TILE_DISPLAY;
     const mapPixelH = height * TILE_DISPLAY;
     this.cameras.main.setBounds(0, 0, mapPixelW, mapPixelH);
     this.cameras.main.startFollow(this.player.sprite!, true, 0.15, 0.15);
-
-    // ── Audio ──
-    this.input.once("pointerdown", () => {
-      initAudio();
-      startBgm();
-    });
 
     // ── Input ──
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
@@ -693,6 +717,14 @@ export class DungeonScene extends Phaser.Scene {
       this.minimapGfx.fillRect(mx + fi.x * t, my + fi.y * t, t, t);
     }
 
+    // Revealed traps (purple dots)
+    this.minimapGfx.fillStyle(0xa855f7, 1);
+    for (const tr of this.floorTraps) {
+      if (tr.revealed) {
+        this.minimapGfx.fillRect(mx + tr.x * t, my + tr.y * t, t, t);
+      }
+    }
+
     // Enemies (red dots, boss = larger)
     for (const e of this.enemies) {
       if (e.alive) {
@@ -741,7 +773,8 @@ export class DungeonScene extends Phaser.Scene {
     // Show active buffs
     const buffs = this.player.statusEffects.map(s => `${s.type}(${s.turnsLeft})`).join(" ");
     const buffStr = buffs ? `  ${buffs}` : "";
-    this.turnText.setText(`Lv.${p.level}  EXP:${this.totalExp}  T${this.turnManager.turn}${buffStr}`);
+    const bellyColor = this.belly > 30 ? "" : this.belly > 0 ? " ⚠" : " ☠";
+    this.turnText.setText(`Lv.${p.level} EXP:${this.totalExp} Belly:${this.belly}${bellyColor} T${this.turnManager.turn}${buffStr}`);
 
     // Boss HP bar update
     if (this.bossEntity && this.bossHpBar) {
@@ -808,7 +841,6 @@ export class DungeonScene extends Phaser.Scene {
 
     fi.sprite.destroy();
     this.floorItems.splice(idx, 1);
-    sfxPickup();
     this.showLog(`Picked up ${fi.item.name}!`);
   }
 
@@ -823,7 +855,6 @@ export class DungeonScene extends Phaser.Scene {
   private openBag() {
     if (this.turnManager.isBusy || this.gameOver) return;
     this.bagOpen = true;
-    sfxMenuOpen();
 
     // Dark overlay
     const overlay = this.add.rectangle(
@@ -884,7 +915,6 @@ export class DungeonScene extends Phaser.Scene {
 
   private closeBag() {
     this.bagOpen = false;
-    sfxMenuClose();
     this.bagUI.forEach(obj => obj.destroy());
     this.bagUI = [];
   }
@@ -975,6 +1005,17 @@ export class DungeonScene extends Phaser.Scene {
         this.showLog("Used All-Power Orb! ATK & DEF boosted!");
         break;
       }
+      case "apple": {
+        const restore = Math.min(50, this.maxBelly - this.belly);
+        this.belly += restore;
+        this.showLog(`Ate an Apple! Belly +${restore}. (${this.belly}/${this.maxBelly})`);
+        break;
+      }
+      case "bigApple": {
+        this.belly = this.maxBelly;
+        this.showLog(`Ate a Big Apple! Belly fully restored!`);
+        break;
+      }
     }
 
     // Consume item
@@ -1031,6 +1072,121 @@ export class DungeonScene extends Phaser.Scene {
 
   // ── Stairs ──
 
+  // ── Traps ──
+
+  private checkTraps() {
+    const idx = this.floorTraps.findIndex(
+      t => t.x === this.player.tileX && t.y === this.player.tileY
+    );
+    if (idx === -1) return;
+
+    const ft = this.floorTraps[idx];
+    // Reveal the trap
+    if (!ft.revealed) {
+      ft.revealed = true;
+      ft.sprite.setAlpha(1);
+    }
+
+    this.showLog(`Stepped on a ${ft.trap.name}! ${ft.trap.description}`);
+
+    switch (ft.trap.type) {
+      case TrapType.Spike: {
+        const dmg = 15;
+        this.player.stats.hp = Math.max(0, this.player.stats.hp - dmg);
+        if (this.player.sprite) this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, dmg, 1.0);
+        this.cameras.main.shake(150, 0.005);
+        this.checkPlayerDeath();
+        break;
+      }
+      case TrapType.Poison:
+        if (!this.player.statusEffects.some(s => s.type === SkillEffect.Burn)) {
+          this.player.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
+        }
+        if (this.player.sprite) this.player.sprite.setTint(0xa855f7);
+        this.time.delayedCall(300, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
+        break;
+      case TrapType.Slow:
+        if (!this.player.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
+          this.player.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 3 });
+        }
+        if (this.player.sprite) this.player.sprite.setTint(0xfbbf24);
+        this.time.delayedCall(300, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
+        break;
+      case TrapType.Warp: {
+        // Teleport to random ground tile
+        const { terrain, width, height } = this.dungeon;
+        let wx: number, wy: number;
+        let tries = 0;
+        do {
+          wx = Math.floor(Math.random() * width);
+          wy = Math.floor(Math.random() * height);
+          tries++;
+        } while (tries < 200 && (terrain[wy][wx] !== TerrainType.GROUND ||
+          this.allEntities.some(e => e !== this.player && e.alive && e.tileX === wx && e.tileY === wy)));
+        this.player.tileX = wx;
+        this.player.tileY = wy;
+        if (this.player.sprite) {
+          this.player.sprite.setPosition(this.tileToPixelX(wx), this.tileToPixelY(wy));
+        }
+        this.cameras.main.flash(200, 100, 100, 255);
+        break;
+      }
+      case TrapType.Spin:
+        // Confusion: treated as paralyze for simplicity
+        if (!this.player.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
+          this.player.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 3 });
+        }
+        this.cameras.main.shake(200, 0.01);
+        break;
+      case TrapType.Sticky:
+        if (this.inventory.length > 0) {
+          const lostIdx = Math.floor(Math.random() * this.inventory.length);
+          const lost = this.inventory[lostIdx];
+          this.showLog(`Lost ${lost.item.name}!`);
+          lost.count--;
+          if (lost.count <= 0) this.inventory.splice(lostIdx, 1);
+        }
+        break;
+      case TrapType.Hunger:
+        this.belly = Math.max(0, this.belly - 20);
+        this.showLog(`Belly drained to ${this.belly}!`);
+        break;
+    }
+
+    // Remove trap after triggering
+    ft.sprite.destroy();
+    this.floorTraps.splice(idx, 1);
+    this.updateHUD();
+  }
+
+  // ── Belly (Hunger) ──
+
+  private tickBelly() {
+    if (this.belly > 0) {
+      this.belly = Math.max(0, this.belly - 1);
+      if (this.belly === 0) {
+        this.showLog("You're starving! HP will drain each turn.");
+      } else if (this.belly === 20) {
+        this.showLog("Getting hungry...");
+      }
+    } else {
+      // Starving: lose HP each turn
+      this.player.stats.hp = Math.max(0, this.player.stats.hp - 2);
+      if (this.player.sprite) this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, 2, 0.5);
+      this.checkPlayerDeath();
+    }
+  }
+
+  private checkPlayerDeath() {
+    if (this.player.stats.hp <= 0 && this.player.alive) {
+      if (this.tryRevive()) return;
+      this.player.alive = false;
+      this.showGameOver();
+    }
+  }
+
+  // ── Stairs ──
+
   private checkStairs() {
     const { stairsPos } = this.dungeon;
     if (this.player.tileX === stairsPos.x && this.player.tileY === stairsPos.y) {
@@ -1050,7 +1206,6 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     this.gameOver = true;
-    sfxStairs();
     this.showLog(`Went to B${this.currentFloor + 1}F!`);
 
     this.cameras.main.fadeOut(500, 0, 0, 0);
@@ -1067,13 +1222,13 @@ export class DungeonScene extends Phaser.Scene {
         exp: this.totalExp,
         dungeonId: this.dungeonDef.id,
         allies: this.serializeAllies(),
+        belly: this.belly,
       });
     });
   }
 
   private showDungeonClear() {
     this.gameOver = true;
-    stopBgm();
     clearDungeonSave();
 
     // Boss bonus: +50% gold if dungeon has a boss
@@ -1115,7 +1270,6 @@ export class DungeonScene extends Phaser.Scene {
 
   private showGameOver() {
     this.gameOver = true;
-    stopBgm();
     clearDungeonSave();
 
     const gold = goldFromRun(this.currentFloor, this.enemiesDefeated, false);
@@ -1186,8 +1340,12 @@ export class DungeonScene extends Phaser.Scene {
         this.showLog(`There's a ${itemHere.item.name} here. [줍기] to pick up.`);
       }
 
+      this.checkTraps();
       this.checkStairs();
     }
+
+    // Belly drain per turn (movement or attack)
+    this.tickBelly();
 
     // Tick status effects
     tickStatusEffects(this.player);
@@ -1233,7 +1391,6 @@ export class DungeonScene extends Phaser.Scene {
       entity.tileX += DIR_DX[dir];
       entity.tileY += DIR_DY[dir];
       entity.sprite!.play(`${entity.spriteKey}-walk-${dir}`);
-      if (entity === this.player) sfxMove();
 
       this.tweens.add({
         targets: entity.sprite,
@@ -1297,7 +1454,6 @@ export class DungeonScene extends Phaser.Scene {
     return new Promise((resolve) => {
       user.facing = dir;
       user.sprite!.play(`${user.spriteKey}-idle-${dir}`);
-      sfxSkill();
 
       // Self-targeting (buff/heal)
       if (skill.range === SkillRange.Self) {
@@ -1430,14 +1586,9 @@ export class DungeonScene extends Phaser.Scene {
       if (entity.sprite) entity.sprite.clearTint();
     });
 
-    // Sound effect based on effectiveness
+    // Screen shake for super effective
     if (effectiveness >= 2.0) {
-      sfxSuperEffective();
       this.cameras.main.shake(200, 0.008);
-    } else if (effectiveness < 1.0) {
-      sfxNotEffective();
-    } else {
-      sfxHit();
     }
   }
 
@@ -1453,6 +1604,8 @@ export class DungeonScene extends Phaser.Scene {
       Rock: { color: 0x92400e, symbol: "◆" },
       Ground: { color: 0xd97706, symbol: "▲" },
       Bug: { color: 0x84cc16, symbol: "●" },
+      Fighting: { color: 0xdc2626, symbol: "✊" },
+      Steel: { color: 0x94a3b8, symbol: "⬡" },
       Normal: { color: 0xd1d5db, symbol: "✦" },
     };
     const tc = typeColors[skill.type] ?? typeColors.Normal;
@@ -1504,7 +1657,6 @@ export class DungeonScene extends Phaser.Scene {
 
   /** Heal number popup (green) */
   private showHealPopup(x: number, y: number, amount: number) {
-    sfxHeal();
     const popup = this.add.text(x, y - 10, `+${amount}`, {
       fontSize: "11px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
       stroke: "#000000", strokeThickness: 3,
@@ -1541,7 +1693,6 @@ export class DungeonScene extends Phaser.Scene {
       });
     }
     if (entity === this.player) {
-      sfxDeath();
       this.showLog(`${this.player.name} fainted!`);
     } else if (entity.isAlly) {
       // Ally fainted
@@ -1558,7 +1709,6 @@ export class DungeonScene extends Phaser.Scene {
 
       if (isBossKill) {
         // Boss defeat: big screen shake + special message
-        sfxBossDefeat();
         this.cameras.main.shake(500, 0.015);
         this.showLog(`★ BOSS DEFEATED! ${entity.name} fell! +${expGain} EXP ★`);
         this.bossEntity = null;
@@ -1577,7 +1727,6 @@ export class DungeonScene extends Phaser.Scene {
 
       for (const r of results) {
         this.time.delayedCall(500, () => {
-          sfxLevelUp();
           this.showLog(`Level up! Lv.${r.newLevel}! HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
           if (this.player.sprite) {
             this.player.sprite.setTint(0xffff44);
@@ -1641,7 +1790,6 @@ export class DungeonScene extends Phaser.Scene {
 
     this.allies.push(ally);
     this.allEntities.push(ally);
-    sfxRecruit();
     this.showLog(`${sp.name} joined your team!`);
     this.updateHUD();
   }

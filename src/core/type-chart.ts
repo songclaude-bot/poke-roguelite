@@ -14,6 +14,8 @@ export enum PokemonType {
   Ground = "Ground",
   Rock = "Rock",
   Bug = "Bug",
+  Fighting = "Fighting",
+  Steel = "Steel",
 }
 
 /**
@@ -87,6 +89,23 @@ const EFFECTIVENESS: Partial<Record<PokemonType, Partial<Record<PokemonType, num
     [PokemonType.Poison]: 0.5,
     [PokemonType.Flying]: 0.5,
     [PokemonType.Fire]: 0.5,
+    [PokemonType.Steel]: 0.5,
+  },
+  [PokemonType.Fighting]: {
+    [PokemonType.Normal]: 2.0,
+    [PokemonType.Rock]: 2.0,
+    [PokemonType.Steel]: 2.0,
+    [PokemonType.Flying]: 0.5,
+    [PokemonType.Poison]: 0.5,
+    [PokemonType.Bug]: 0.5,
+  },
+  [PokemonType.Steel]: {
+    [PokemonType.Rock]: 2.0,
+    [PokemonType.Bug]: 2.0,
+    [PokemonType.Fire]: 0.5,
+    [PokemonType.Water]: 0.5,
+    [PokemonType.Electric]: 0.5,
+    [PokemonType.Steel]: 0.5,
   },
 };
 
