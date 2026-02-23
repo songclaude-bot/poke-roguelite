@@ -16,29 +16,25 @@ import {
 } from "../core/entity";
 import { getEnemyMoveDirection, isAdjacentToPlayer, directionToPlayer } from "../core/enemy-ai";
 import { PokemonType, getEffectiveness, effectivenessText } from "../core/type-chart";
-import { Skill, SkillRange, SkillEffect, getDefaultSkills } from "../core/skill";
+import { Skill, SkillRange, SkillEffect } from "../core/skill";
 import { getSkillTargetTiles } from "../core/skill-targeting";
 import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY } from "../core/item";
+import { SPECIES, PokemonSpecies, getFloorEnemies, createSpeciesSkills } from "../core/pokemon-data";
 
 const MOVE_DURATION = 150; // ms per tile movement
 const ENEMIES_PER_ROOM = 1; // base enemies per room (except player's room)
 const MAX_FLOOR = 5; // B5F is the last floor
 const ITEMS_PER_FLOOR = 3; // items spawned per floor
 
-// Sprite frame counts (from AnimData.xml)
-const MUDKIP_WALK_FRAMES = 6;
-const MUDKIP_IDLE_FRAMES = 7;
-const ZUBAT_WALK_FRAMES = 8;
-const ZUBAT_IDLE_FRAMES = 8;
-
-// Per-floor enemy scaling
-function getEnemyStats(floor: number) {
+// Per-floor enemy scaling (uses species base stats)
+function getEnemyStats(floor: number, species?: PokemonSpecies) {
   const scale = 1 + (floor - 1) * 0.25;
+  const base = species?.baseStats ?? { hp: 20, atk: 8, def: 3 };
   return {
-    hp: Math.floor(20 * scale),
-    maxHp: Math.floor(20 * scale),
-    atk: Math.floor(8 * scale),
-    def: Math.floor(3 * scale),
+    hp: Math.floor(base.hp * scale),
+    maxHp: Math.floor(base.hp * scale),
+    atk: Math.floor(base.atk * scale),
+    def: Math.floor(base.def * scale),
     level: 2 + floor,
   };
 }
@@ -100,18 +96,21 @@ export class DungeonScene extends Phaser.Scene {
 
   preload() {
     this.load.image("beachcave-tiles", "tilesets/BeachCave/tileset_0.png");
-    this.load.spritesheet("mudkip-walk", "sprites/0258/Walk-Anim.png", {
-      frameWidth: 32, frameHeight: 40,
-    });
-    this.load.spritesheet("mudkip-idle", "sprites/0258/Idle-Anim.png", {
-      frameWidth: 24, frameHeight: 40,
-    });
-    this.load.spritesheet("zubat-walk", "sprites/0041/Walk-Anim.png", {
-      frameWidth: 32, frameHeight: 56,
-    });
-    this.load.spritesheet("zubat-idle", "sprites/0041/Idle-Anim.png", {
-      frameWidth: 32, frameHeight: 56,
-    });
+
+    // Load all pokemon sprites dynamically from SPECIES data
+    const spriteMap: Record<string, string> = {
+      mudkip: "0258", zubat: "0041", shellos: "0422", corsola: "0222", geodude: "0074",
+    };
+    for (const [key, dexNum] of Object.entries(spriteMap)) {
+      const sp = SPECIES[key];
+      if (!sp) continue;
+      this.load.spritesheet(`${key}-walk`, `sprites/${dexNum}/Walk-Anim.png`, {
+        frameWidth: sp.walkFrameWidth, frameHeight: sp.walkFrameHeight,
+      });
+      this.load.spritesheet(`${key}-idle`, `sprites/${dexNum}/Idle-Anim.png`, {
+        frameWidth: sp.idleFrameWidth, frameHeight: sp.idleFrameHeight,
+      });
+    }
   }
 
   create() {
@@ -141,14 +140,16 @@ export class DungeonScene extends Phaser.Scene {
     stairsGfx.fillTriangle(sx, sy + 14, sx + 10, sy, sx - 10, sy);
     stairsGfx.setDepth(5);
 
-    // ── Create animations ──
+    // ── Create animations for all species ──
     if (!this.anims.exists("mudkip-walk-0")) {
-      this.createAnimations("mudkip", MUDKIP_WALK_FRAMES, MUDKIP_IDLE_FRAMES);
-      this.createAnimations("zubat", ZUBAT_WALK_FRAMES, ZUBAT_IDLE_FRAMES);
+      for (const sp of Object.values(SPECIES)) {
+        this.createAnimations(sp.spriteKey, sp.walkFrames, sp.idleFrames);
+      }
     }
 
     // ── Player entity ──
-    const playerSkills = this.persistentSkills ?? getDefaultSkills("mudkip");
+    const playerSp = SPECIES.mudkip;
+    const playerSkills = this.persistentSkills ?? createSpeciesSkills(playerSp);
     this.player = {
       tileX: playerStart.x,
       tileY: playerStart.y,
@@ -156,13 +157,13 @@ export class DungeonScene extends Phaser.Scene {
       stats: {
         hp: this.persistentHp,
         maxHp: this.persistentMaxHp,
-        atk: 12, def: 6, level: 5,
+        atk: playerSp.baseStats.atk, def: playerSp.baseStats.def, level: 5,
       },
       alive: true,
-      spriteKey: "mudkip",
-      name: "Mudkip",
-      types: [PokemonType.Water],
-      attackType: PokemonType.Water,
+      spriteKey: playerSp.spriteKey,
+      name: playerSp.name,
+      types: playerSp.types,
+      attackType: playerSp.attackType,
       skills: playerSkills,
       statusEffects: [],
     };
@@ -175,9 +176,11 @@ export class DungeonScene extends Phaser.Scene {
     this.player.sprite.play(`mudkip-idle-${Direction.Down}`);
     this.allEntities.push(this.player);
 
-    // ── Spawn enemies ──
+    // ── Spawn enemies (floor-specific species) ──
     const rooms = this.dungeon.rooms;
-    const enemyStats = getEnemyStats(this.currentFloor);
+    const floorSpecies = getFloorEnemies(this.currentFloor);
+    if (floorSpecies.length === 0) floorSpecies.push(SPECIES.zubat); // fallback
+
     for (let i = 1; i < rooms.length; i++) {
       const room = rooms[i];
       for (let e = 0; e < ENEMIES_PER_ROOM; e++) {
@@ -186,23 +189,27 @@ export class DungeonScene extends Phaser.Scene {
         if (terrain[ey][ex] !== TerrainType.GROUND) continue;
         if (ex === stairsPos.x && ey === stairsPos.y) continue;
 
+        // Pick random species from floor pool
+        const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
+        const enemyStats = getEnemyStats(this.currentFloor, sp);
+
         const enemy: Entity = {
           tileX: ex, tileY: ey,
           facing: Direction.Down,
           stats: { ...enemyStats },
           alive: true,
-          spriteKey: "zubat",
-          name: "Zubat",
-          types: [PokemonType.Poison, PokemonType.Flying],
-          attackType: PokemonType.Flying,
-          skills: getDefaultSkills("zubat"),
+          spriteKey: sp.spriteKey,
+          name: sp.name,
+          types: sp.types,
+          attackType: sp.attackType,
+          skills: createSpeciesSkills(sp),
           statusEffects: [],
         };
         enemy.sprite = this.add.sprite(
-          this.tileToPixelX(ex), this.tileToPixelY(ey), "zubat-idle"
+          this.tileToPixelX(ex), this.tileToPixelY(ey), `${sp.spriteKey}-idle`
         );
         enemy.sprite.setScale(TILE_SCALE).setDepth(9);
-        enemy.sprite.play(`zubat-idle-${Direction.Down}`);
+        enemy.sprite.play(`${sp.spriteKey}-idle-${Direction.Down}`);
         this.enemies.push(enemy);
         this.allEntities.push(enemy);
       }
