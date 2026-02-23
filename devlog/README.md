@@ -24,3 +24,8 @@
 - 날짜: 2026-02-23
 - [상세 기록](./03-sprite-movement.md)
 - 핵심: Mudkip PMD 스프라이트, 탭 기반 8방향 타일 이동, 부드러운 카메라 추적
+
+### 1-4. 턴 시스템 + 적 AI + 기본 전투
+- 날짜: 2026-02-23
+- [상세 기록](./04-turn-system.md)
+- 핵심: TurnManager, Zubat 적 스폰, 추적 AI, ATK-DEF/2 전투
