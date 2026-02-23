@@ -252,3 +252,30 @@ export function createSpeciesSkills(species: PokemonSpecies): Skill[] {
     .filter(id => SKILL_DB[id])
     .map(id => createSkill(SKILL_DB[id]));
 }
+
+/** Level-up skill learning: speciesId → { level: skillId } */
+export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
+  mudkip: { 8: "rockThrow", 12: "ironDefense" },
+  pikachu: { 7: "quickAttack", 10: "thunderWave" },
+  machop: { 8: "lowKick", 12: "focusPunch" },
+  caterpie: { 6: "stringShot", 9: "bugBite" },
+  geodude: { 7: "rockThrow", 11: "ironDefense" },
+  magnemite: { 8: "thunderWave", 11: "sonicBoom" },
+  zubat: { 7: "poisonSting", 10: "wingAttack" },
+  shellos: { 7: "waterPulse" },
+  corsola: { 8: "waterPulse", 12: "ironDefense" },
+  voltorb: { 8: "sonicBoom", 11: "selfDestruct" },
+  pidgey: { 7: "gust", 10: "quickAttack" },
+  aron: { 8: "metalClaw", 11: "ironDefense" },
+  meditite: { 8: "meditate", 11: "focusPunch" },
+  gastly: { 7: "nightShade", 10: "hypnosis" },
+  drowzee: { 7: "confusion", 10: "hypnosis" },
+  snorunt: { 7: "iceBeam", 10: "iceShard" },
+};
+
+/** Check if a species learns a new skill at this level */
+export function getLearnableSkill(speciesId: string, level: number): string | null {
+  const map = LEVELUP_SKILLS[speciesId];
+  if (!map) return null;
+  return map[level] ?? null;
+}

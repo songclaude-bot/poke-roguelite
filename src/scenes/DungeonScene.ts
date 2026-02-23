@@ -21,7 +21,7 @@ import { Skill, SkillRange, SkillEffect, SKILL_DB, createSkill } from "../core/s
 import { getSkillTargetTiles } from "../core/skill-targeting";
 import { getEvolution } from "../core/evolution";
 import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY, ITEM_DB } from "../core/item";
-import { SPECIES, PokemonSpecies, createSpeciesSkills } from "../core/pokemon-data";
+import { SPECIES, PokemonSpecies, createSpeciesSkills, getLearnableSkill } from "../core/pokemon-data";
 import { DungeonDef, BossDef, getDungeon, getDungeonFloorEnemies } from "../core/dungeon-data";
 import { expFromEnemy, processLevelUp } from "../core/leveling";
 import {
@@ -2213,6 +2213,24 @@ export class DungeonScene extends Phaser.Scene {
             });
           }
           this.updateHUD();
+
+          // ── Level-up skill learning ──
+          const newSkillId = getLearnableSkill(this.player.speciesId ?? this.starterId, r.newLevel);
+          if (newSkillId && SKILL_DB[newSkillId] && !this.player.skills.some(s => s.id === newSkillId)) {
+            if (this.player.skills.length < 4) {
+              this.player.skills.push(createSkill(SKILL_DB[newSkillId]));
+              this.showLog(`Learned ${SKILL_DB[newSkillId].name}!`);
+            } else {
+              // Replace weakest skill (lowest power)
+              const weakest = this.player.skills.reduce((min, s, i) =>
+                s.power < this.player.skills[min].power ? i : min, 0
+              );
+              const old = this.player.skills[weakest];
+              this.player.skills[weakest] = createSkill(SKILL_DB[newSkillId]);
+              this.showLog(`Learned ${SKILL_DB[newSkillId].name}! (Forgot ${old.name})`);
+            }
+            this.createSkillButtons();
+          }
 
           // ── Evolution check ──
           const evo = getEvolution(this.player.speciesId ?? this.starterId, r.newLevel);
