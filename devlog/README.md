@@ -111,3 +111,10 @@
 - 날짜: 2026-02-23
 - [상세 기록](./17-abilities.md)
 - 핵심: 12종 패시브 능력, Torrent/Sturdy/Static/Pickup/Guts/Pure Power 등
+
+## Phase 10: 날씨 + 상점 + Sky Tower
+
+### 10-1~3. 날씨 시스템 + 켈레온 상점 + 5번째 던전
+- 날짜: 2026-02-23
+- [상세 기록](./18-weather-shop-skytower.md)
+- 핵심: Rain/Sandstorm/Hail 날씨, 켈레온 상점, Sky Tower 던전, Ghost/Psychic/Ice 타입, Gastly/Drowzee/Snorunt

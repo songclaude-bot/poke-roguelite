@@ -31,7 +31,7 @@ export class BootScene extends Phaser.Scene {
       fontSize: "14px", color: hasSave ? "#4ade80" : "#667eea", fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    this.add.text(cx, cy + 60, "v0.9.0 — Phase 9: Passive Abilities", {
+    this.add.text(cx, cy + 60, "v0.10.0 — Phase 10: Weather + Shop + Sky Tower", {
       fontSize: "9px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 

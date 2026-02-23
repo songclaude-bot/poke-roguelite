@@ -102,4 +102,7 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   aron: AbilityId.Sturdy,
   meditite: AbilityId.PurePower,
   machop: AbilityId.Guts,
+  gastly: AbilityId.Levitate,
+  drowzee: AbilityId.NoGuard,
+  snorunt: AbilityId.ShieldDust,
 };

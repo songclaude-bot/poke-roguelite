@@ -113,6 +113,29 @@ export const DUNGEONS: Record<string, DungeonDef> = {
     description: "B1F~B7F. Steel and Fighting. Very tough!",
     boss: { speciesId: "machop", name: "Champion Machop", statMultiplier: 3.5 },
   },
+  skyTower: {
+    id: "skyTower",
+    name: "Sky Tower",
+    tilesetPath: "tilesets/BeachCave/tileset_0.png",
+    tilesetKey: "beachcave-tiles",
+    floors: 8,
+    enemySpeciesIds: ["gastly", "drowzee", "snorunt"],
+    floorEnemies: {
+      1: ["gastly"],
+      2: ["gastly", "drowzee"],
+      3: ["drowzee", "gastly"],
+      4: ["drowzee", "snorunt"],
+      5: ["snorunt", "gastly"],
+      6: ["gastly", "drowzee", "snorunt"],
+      7: ["snorunt", "drowzee"],
+      8: ["gastly", "snorunt"],
+    },
+    difficulty: 1.8,
+    itemsPerFloor: 3,
+    unlockClears: 3,
+    description: "B1F~B8F. Ghost, Psychic, Ice. Dangerous!",
+    boss: { speciesId: "gastly", name: "Phantom Gastly", statMultiplier: 4.0 },
+  },
 };
 
 /** Get dungeon by ID */

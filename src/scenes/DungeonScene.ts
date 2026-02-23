@@ -44,7 +44,10 @@ interface AllyData {
 }
 
 const MOVE_DURATION = 150; // ms per tile movement
-const ENEMIES_PER_ROOM = 1; // base enemies per room (except player's room)
+/** Enemies per room scales with floor */
+function enemiesPerRoom(floor: number): number {
+  return Math.min(3, 1 + Math.floor((floor - 1) / 3)); // 1→2→3
+}
 const MAX_ALLIES = 2; // max party members (excluding player)
 
 // Per-floor enemy scaling (uses species base stats + dungeon difficulty)
@@ -128,9 +131,14 @@ export class DungeonScene extends Phaser.Scene {
   private shopUI: Phaser.GameObjects.GameObject[] = [];
   private shopOpen = false;
   private gold = 0;
+  private shopTiles: { x: number; y: number; shopIdx: number; sprite: Phaser.GameObjects.Text }[] = [];
 
   // Starter species
   private starterId = "mudkip";
+
+  // Weather
+  private currentWeather = WeatherType.None;
+  private weatherText!: Phaser.GameObjects.Text;
 
   // Boss state
   private bossEntity: Entity | null = null;
@@ -182,6 +190,12 @@ export class DungeonScene extends Phaser.Scene {
     this.belly = data?.belly ?? 100;
     this.maxBelly = 100;
     this.starterId = data?.starter ?? "mudkip";
+    this.shopItems = [];
+    this.shopRoom = null;
+    this.shopUI = [];
+    this.shopOpen = false;
+    this.shopTiles = [];
+    this.gold = meta.gold;
 
     // Give starter items on new run
     if (isNewRun) {
@@ -202,6 +216,7 @@ export class DungeonScene extends Phaser.Scene {
       pikachu: "0025", voltorb: "0100", magnemite: "0081",
       caterpie: "0010", pidgey: "0016",
       aron: "0304", meditite: "0307", machop: "0066",
+      gastly: "0092", drowzee: "0096", snorunt: "0361",
     };
 
     // Load player + all enemy species + ally species for this dungeon
@@ -324,7 +339,7 @@ export class DungeonScene extends Phaser.Scene {
 
     for (let i = 1; i < rooms.length; i++) {
       const room = rooms[i];
-      for (let e = 0; e < ENEMIES_PER_ROOM; e++) {
+      for (let e = 0; e < enemiesPerRoom(this.currentFloor); e++) {
         const ex = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
         const ey = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
         if (terrain[ey][ex] !== TerrainType.GROUND) continue;
@@ -452,6 +467,58 @@ export class DungeonScene extends Phaser.Scene {
       this.floorTraps.push({ x: tx, y: ty, trap, sprite, revealed: false });
     }
 
+    // ── Kecleon Shop (20% chance, not on boss floors) ──
+    const isBossFloor = this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors;
+    if (!isBossFloor && shouldSpawnShop() && rooms.length > 2) {
+      // Pick a room that isn't the player's or stairs room
+      const shopCandidates = rooms.filter(r =>
+        // Not the player's room
+        !(playerStart.x >= r.x && playerStart.x < r.x + r.w &&
+          playerStart.y >= r.y && playerStart.y < r.y + r.h) &&
+        // Not the stairs room
+        !(stairsPos.x >= r.x && stairsPos.x < r.x + r.w &&
+          stairsPos.y >= r.y && stairsPos.y < r.y + r.h)
+      );
+      if (shopCandidates.length > 0) {
+        const shopRm = shopCandidates[Math.floor(Math.random() * shopCandidates.length)];
+        this.shopRoom = shopRm;
+        this.shopItems = generateShopItems(this.currentFloor);
+
+        // Place shop items on the floor in the room
+        for (let si = 0; si < this.shopItems.length; si++) {
+          const sx = shopRm.x + 1 + (si % Math.max(1, shopRm.w - 2));
+          const sy = shopRm.y + 1 + Math.floor(si / Math.max(1, shopRm.w - 2));
+          if (sy >= shopRm.y + shopRm.h - 1) break;
+          if (terrain[sy][sx] !== TerrainType.GROUND) continue;
+
+          const shopItem = this.shopItems[si];
+          const sprite = this.add.text(
+            sx * TILE_DISPLAY + TILE_DISPLAY / 2,
+            sy * TILE_DISPLAY + TILE_DISPLAY / 2,
+            "💰", { fontSize: "14px", fontFamily: "monospace" }
+          ).setOrigin(0.5).setDepth(7);
+          this.shopTiles.push({ x: sx, y: sy, shopIdx: si, sprite });
+
+          // Price tag
+          this.add.text(
+            sx * TILE_DISPLAY + TILE_DISPLAY / 2,
+            sy * TILE_DISPLAY + TILE_DISPLAY + 2,
+            `${shopItem.price}G`, { fontSize: "7px", color: "#fbbf24", fontFamily: "monospace" }
+          ).setOrigin(0.5).setDepth(7);
+        }
+
+        // Kecleon shopkeeper sign
+        const kcX = shopRm.x * TILE_DISPLAY + (shopRm.w * TILE_DISPLAY) / 2;
+        const kcY = shopRm.y * TILE_DISPLAY + 4;
+        this.add.text(kcX, kcY, "🦎 Kecleon Shop", {
+          fontSize: "8px", color: "#4ade80", fontFamily: "monospace",
+          backgroundColor: "#1a1a2ecc", padding: { x: 4, y: 2 },
+        }).setOrigin(0.5).setDepth(8);
+
+        this.showLog("There's a Kecleon Shop on this floor!");
+      }
+    }
+
     // ── Camera ──
     const mapPixelW = width * TILE_DISPLAY;
     const mapPixelH = height * TILE_DISPLAY;
@@ -462,9 +529,11 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── HUD ──
     // Portrait sprite (small idle frame)
-    this.portraitSprite = this.add.sprite(20, 20, "mudkip-idle")
+    this.portraitSprite = this.add.sprite(20, 20, `${this.starterId}-idle`)
       .setScrollFactor(0).setDepth(101).setScale(1.2);
-    this.portraitSprite.play("mudkip-idle-0");
+    if (this.anims.exists(`${this.starterId}-idle-0`)) {
+      this.portraitSprite.play(`${this.starterId}-idle-0`);
+    }
 
     // HP Bar background
     this.hpBarBg = this.add.graphics().setScrollFactor(0).setDepth(100);
@@ -493,6 +562,19 @@ export class DungeonScene extends Phaser.Scene {
         padding: { x: 6, y: 4 },
       })
       .setScrollFactor(0).setDepth(100);
+
+    // ── Weather ──
+    this.currentWeather = rollFloorWeather(this.dungeonDef.id, this.currentFloor);
+    this.weatherText = this.add.text(GAME_WIDTH / 2, 24, "", {
+      fontSize: "9px", color: "#94a3b8", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
+
+    if (this.currentWeather !== WeatherType.None) {
+      const wd = WEATHERS[this.currentWeather];
+      this.weatherText.setText(`${wd.symbol} ${wd.name}: ${wd.description}`);
+      this.weatherText.setColor(wd.color);
+      this.showLog(`The weather is ${wd.name}!`);
+    }
 
     // ── Minimap ──
     this.minimapBg = this.add.graphics().setScrollFactor(0).setDepth(100);
@@ -539,6 +621,7 @@ export class DungeonScene extends Phaser.Scene {
         ).then(() => {
           this.recoverPP(this.player);
           this.tickBelly();
+          this.tickWeather();
           tickStatusEffects(this.player);
           this.updateHUD();
         });
@@ -547,6 +630,26 @@ export class DungeonScene extends Phaser.Scene {
     this.add.text(menuCX + 22, menuCY + 15, "💾", iconStyle)
       .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
       .on("pointerdown", () => this.saveGame());
+
+    // Shop button (only visible when shop exists on floor)
+    if (this.shopRoom) {
+      this.add.text(menuCX + 65, menuCY - 5, "🛒", iconStyle)
+        .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
+        .on("pointerdown", () => {
+          if (!this.shopRoom || this.shopItems.length === 0) {
+            this.showLog("No shop here!");
+            return;
+          }
+          // Check if player is in shop room
+          const r = this.shopRoom;
+          if (this.player.tileX >= r.x && this.player.tileX < r.x + r.w &&
+              this.player.tileY >= r.y && this.player.tileY < r.y + r.h) {
+            this.openShopUI();
+          } else {
+            this.showLog("Go to the shop room first!");
+          }
+        });
+    }
 
     // ── Boss HP Bar (fixed UI, hidden until boss floor) ──
     if (this.bossEntity) {
@@ -819,7 +922,8 @@ export class DungeonScene extends Phaser.Scene {
     const bellyColor = this.belly > 30 ? "" : this.belly > 0 ? " ⚠" : " ☠";
     const abilityName = this.player.ability ? ABILITIES[this.player.ability]?.name ?? "" : "";
     const abilityStr = abilityName ? ` [${abilityName}]` : "";
-    this.turnText.setText(`Lv.${p.level} Belly:${this.belly}${bellyColor} T${this.turnManager.turn}${abilityStr}${buffStr}`);
+    const goldStr = this.gold > 0 ? ` ${this.gold}G` : "";
+    this.turnText.setText(`Lv.${p.level} Belly:${this.belly}${bellyColor}${goldStr} T${this.turnManager.turn}${abilityStr}${buffStr}`);
 
     // Boss HP bar update
     if (this.bossEntity && this.bossHpBar) {
@@ -1260,6 +1364,29 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
+  // ── Weather Tick ──
+
+  private tickWeather() {
+    if (this.currentWeather === WeatherType.None || this.currentWeather === WeatherType.Rain) return;
+    const WEATHER_DMG = 5;
+
+    // Apply chip damage to all entities not immune
+    for (const entity of this.allEntities) {
+      if (!entity.alive) continue;
+      if (isWeatherImmune(this.currentWeather, entity.types)) continue;
+
+      entity.stats.hp = Math.max(0, entity.stats.hp - WEATHER_DMG);
+      if (entity.sprite) {
+        this.showDamagePopup(entity.sprite.x, entity.sprite.y, WEATHER_DMG, 0.5);
+      }
+      if (entity === this.player) {
+        this.checkPlayerDeath();
+      } else if (entity.stats.hp <= 0) {
+        this.checkDeath(entity);
+      }
+    }
+  }
+
   private checkPlayerDeath() {
     if (this.player.stats.hp <= 0 && this.player.alive) {
       if (this.tryRevive()) return;
@@ -1280,6 +1407,111 @@ export class DungeonScene extends Phaser.Scene {
       }
       this.advanceFloor();
     }
+  }
+
+  private checkShop() {
+    if (!this.shopRoom || this.shopOpen) return;
+    const r = this.shopRoom;
+    const px = this.player.tileX;
+    const py = this.player.tileY;
+    if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h) {
+      if (this.shopItems.length > 0) {
+        this.showLog(`Kecleon Shop! Gold: ${this.gold}G. Tap [Shop] to browse.`);
+      }
+    }
+  }
+
+  private openShopUI() {
+    if (this.shopOpen || this.shopItems.length === 0) return;
+    this.shopOpen = true;
+
+    // Dim overlay
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
+      .setScrollFactor(0).setDepth(200).setInteractive();
+    this.shopUI.push(overlay);
+
+    // Title
+    const title = this.add.text(GAME_WIDTH / 2, 40, `🦎 Kecleon Shop  Gold: ${this.gold}G`, {
+      fontSize: "12px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    this.shopUI.push(title);
+
+    // Item list
+    const startY = 70;
+    for (let i = 0; i < this.shopItems.length; i++) {
+      const si = this.shopItems[i];
+      const y = startY + i * 32;
+      const canBuy = this.gold >= si.price;
+      const label = `${si.item.name} — ${si.price}G`;
+      const color = canBuy ? "#e0e0e0" : "#666666";
+
+      const itemBtn = this.add.text(GAME_WIDTH / 2 - 80, y, label, {
+        fontSize: "11px", color, fontFamily: "monospace",
+        backgroundColor: "#1a1a2eee", padding: { x: 6, y: 4 },
+      }).setScrollFactor(0).setDepth(201).setInteractive();
+      this.shopUI.push(itemBtn);
+
+      if (canBuy) {
+        const buyBtn = this.add.text(GAME_WIDTH / 2 + 80, y, "[Buy]", {
+          fontSize: "11px", color: "#fbbf24", fontFamily: "monospace",
+          backgroundColor: "#333344ee", padding: { x: 4, y: 4 },
+        }).setScrollFactor(0).setDepth(201).setInteractive();
+        this.shopUI.push(buyBtn);
+
+        buyBtn.on("pointerdown", () => this.buyShopItem(i));
+      }
+
+      // Description
+      const desc = this.add.text(GAME_WIDTH / 2 - 80, y + 15, si.item.description, {
+        fontSize: "8px", color: "#888888", fontFamily: "monospace",
+      }).setScrollFactor(0).setDepth(201);
+      this.shopUI.push(desc);
+    }
+
+    // Close button
+    const closeBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 60, "[Close Shop]", {
+      fontSize: "12px", color: "#ef4444", fontFamily: "monospace",
+      backgroundColor: "#1a1a2eee", padding: { x: 10, y: 6 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
+    this.shopUI.push(closeBtn);
+
+    closeBtn.on("pointerdown", () => this.closeShopUI());
+  }
+
+  private buyShopItem(index: number) {
+    const si = this.shopItems[index];
+    if (!si || this.gold < si.price) return;
+
+    // Deduct gold
+    this.gold -= si.price;
+
+    // Add to inventory
+    if (this.inventory.length < MAX_INVENTORY) {
+      const existing = this.inventory.find(s => s.item.id === si.item.id && si.item.stackable);
+      if (existing) existing.count++;
+      else this.inventory.push({ item: si.item, count: 1 });
+      this.showLog(`Bought ${si.item.name} for ${si.price}G!`);
+    } else {
+      this.showLog("Bag is full! Can't buy.");
+      this.gold += si.price; // refund
+      return;
+    }
+
+    // Remove from shop
+    this.shopItems.splice(index, 1);
+
+    // Refresh UI
+    this.closeShopUI();
+    if (this.shopItems.length > 0) {
+      this.openShopUI();
+    }
+    this.updateHUD();
+  }
+
+  private closeShopUI() {
+    for (const obj of this.shopUI) obj.destroy();
+    this.shopUI = [];
+    this.shopOpen = false;
   }
 
   private advanceFloor() {
@@ -1426,10 +1658,12 @@ export class DungeonScene extends Phaser.Scene {
 
       this.checkTraps();
       this.checkStairs();
+      this.checkShop();
     }
 
     // Belly drain per turn (movement or attack)
     this.tickBelly();
+    this.tickWeather();
 
     // Tick status effects
     tickStatusEffects(this.player);
@@ -1452,6 +1686,8 @@ export class DungeonScene extends Phaser.Scene {
       this.getEnemyActions()
     );
 
+    this.tickBelly();
+    this.tickWeather();
     tickStatusEffects(this.player);
     this.updateHUD();
 
@@ -1523,7 +1759,8 @@ export class DungeonScene extends Phaser.Scene {
           attacker.stats.hp < attacker.stats.maxHp / 3) {
         abilityMult = 1.5;
       }
-      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult));
+      const wMult = weatherDamageMultiplier(this.currentWeather, attacker.attackType);
+      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * wMult));
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
       this.flashEntity(defender, effectiveness);
@@ -1534,6 +1771,7 @@ export class DungeonScene extends Phaser.Scene {
       let logMsg = `${attacker.name} attacks ${defender.name}! ${dmg} dmg!`;
       if (effText) logMsg += `\n${effText}`;
       if (abilityMult > 1) logMsg += " (Torrent!)";
+      if (wMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
       this.showLog(logMsg);
 
       // Ability: Static — 30% chance to paralyze attacker on contact
@@ -1604,7 +1842,8 @@ export class DungeonScene extends Phaser.Scene {
           const atk = getEffectiveAtk(user);
           const def = getEffectiveDef(target);
           const baseDmg = Math.max(1, Math.floor(skill.power * atk / 10) - Math.floor(def / 2));
-          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness));
+          const wMult = weatherDamageMultiplier(this.currentWeather, skill.type);
+          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * wMult));
           target.stats.hp = Math.max(0, target.stats.hp - dmg);
 
           this.flashEntity(target, effectiveness);
@@ -1614,6 +1853,7 @@ export class DungeonScene extends Phaser.Scene {
 
           let logMsg = `${user.name}'s ${skill.name} hit ${target.name}! ${dmg} dmg!`;
           if (effText) logMsg += ` ${effText}`;
+          if (wMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
           this.showLog(logMsg);
           totalHits++;
         }
@@ -1714,6 +1954,9 @@ export class DungeonScene extends Phaser.Scene {
       Bug: { color: 0x84cc16, symbol: "●" },
       Fighting: { color: 0xdc2626, symbol: "✊" },
       Steel: { color: 0x94a3b8, symbol: "⬡" },
+      Ghost: { color: 0x7c3aed, symbol: "👻" },
+      Psychic: { color: 0xec4899, symbol: "🔮" },
+      Ice: { color: 0x67e8f9, symbol: "❄" },
       Normal: { color: 0xd1d5db, symbol: "✦" },
     };
     const tc = typeColors[skill.type] ?? typeColors.Normal;
