@@ -135,7 +135,7 @@ export class HubScene extends Phaser.Scene {
     );
 
     // Version
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 15, "v0.10.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 15, "v0.12.0", {
       fontSize: "9px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 
@@ -250,10 +250,12 @@ export class HubScene extends Phaser.Scene {
     const starters: { id: string; name: string; unlock: number }[] = [
       { id: "mudkip", name: "Mudkip", unlock: 0 },
       { id: "pikachu", name: "Pikachu", unlock: 1 },
-      { id: "machop", name: "Machop", unlock: 3 },
       { id: "caterpie", name: "Caterpie", unlock: 0 },
       { id: "geodude", name: "Geodude", unlock: 2 },
+      { id: "machop", name: "Machop", unlock: 3 },
       { id: "magnemite", name: "Magnemite", unlock: 4 },
+      { id: "gastly", name: "Gastly", unlock: 5 },
+      { id: "snorunt", name: "Snorunt", unlock: 6 },
     ];
 
     const current = this.meta.starter ?? "mudkip";
