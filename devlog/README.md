@@ -104,3 +104,10 @@
 - 날짜: 2026-02-23
 - [상세 기록](./16-traps-hunger-mtsteel.md)
 - 핵심: 7종 함정, Belly 시스템, Apple/Big Apple, Mt. Steel 던전, Aron/Meditite/Machop, Fighting/Steel 타입
+
+## Phase 9: 패시브 능력
+
+### 9-1. 패시브 능력(Abilities) 시스템
+- 날짜: 2026-02-23
+- [상세 기록](./17-abilities.md)
+- 핵심: 12종 패시브 능력, Torrent/Sturdy/Static/Pickup/Guts/Pure Power 등
