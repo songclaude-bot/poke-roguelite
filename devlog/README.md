@@ -68,3 +68,10 @@
 - 날짜: 2026-02-23
 - [상세 기록](./11-meta-progression.md)
 - 핵심: localStorage 세이브, Pokemon Square 허브, 골드 보상, 5종 영구 업그레이드
+
+## Phase 4: 다중 던전
+
+### 4-1. 3개 던전 + 5종 포켓몬 + 9종 기술
+- 날짜: 2026-02-23
+- [상세 기록](./12-multi-dungeon.md)
+- 핵심: Beach Cave/Thunderwave Cave/Tiny Woods, 던전별 타일셋, 10종 포켓몬

@@ -5,10 +5,11 @@ import {
   hasDungeonSave, deserializeSkills, deserializeInventory,
   MetaSaveData,
 } from "../core/save-system";
+import { DUNGEONS, DungeonDef, getUnlockedDungeons } from "../core/dungeon-data";
 
 /**
  * HubScene — the town between dungeon runs.
- * Facilities: Dungeon entrance, Storage, Records, Upgrades.
+ * Now supports multiple dungeon selection.
  */
 export class HubScene extends Phaser.Scene {
   private meta!: MetaSaveData;
@@ -20,7 +21,6 @@ export class HubScene extends Phaser.Scene {
   init(data?: { gold?: number; cleared?: boolean; bestFloor?: number }) {
     this.meta = loadMeta();
 
-    // Apply rewards from completed run
     if (data?.gold !== undefined) {
       this.meta.gold += data.gold;
       this.meta.totalGold += data.gold;
@@ -36,21 +36,13 @@ export class HubScene extends Phaser.Scene {
   create() {
     // Background
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x1a2744);
-
-    // Ground
-    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 120, GAME_WIDTH, 240, 0x2d5a27);
-
-    // Sky gradient effect (top)
-    const skyGrad = this.add.graphics();
-    skyGrad.fillGradientStyle(0x0a1628, 0x0a1628, 0x1a3a5c, 0x1a3a5c, 1);
-    skyGrad.fillRect(0, 0, GAME_WIDTH, 200);
+    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 100, GAME_WIDTH, 200, 0x2d5a27);
 
     // Stars
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 25; i++) {
       const sx = Math.random() * GAME_WIDTH;
-      const sy = Math.random() * 180;
-      const size = Math.random() * 2 + 1;
-      const star = this.add.circle(sx, sy, size, 0xffffff, Math.random() * 0.5 + 0.3);
+      const sy = Math.random() * 160;
+      const star = this.add.circle(sx, sy, Math.random() * 2 + 1, 0xffffff, Math.random() * 0.5 + 0.3);
       this.tweens.add({
         targets: star,
         alpha: { from: star.alpha, to: star.alpha * 0.3 },
@@ -60,146 +52,131 @@ export class HubScene extends Phaser.Scene {
     }
 
     // Title
-    this.add.text(GAME_WIDTH / 2, 40, "Pokemon Square", {
-      fontSize: "18px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+    this.add.text(GAME_WIDTH / 2, 30, "Pokemon Square", {
+      fontSize: "16px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5);
 
-    // Gold display
-    this.add.text(GAME_WIDTH / 2, 70, `Gold: ${this.meta.gold}`, {
+    // Gold + Records
+    this.add.text(GAME_WIDTH / 2, 55, `Gold: ${this.meta.gold}`, {
       fontSize: "12px", color: "#fde68a", fontFamily: "monospace",
     }).setOrigin(0.5);
-
-    // Records
-    this.add.text(GAME_WIDTH / 2, 90, `Runs: ${this.meta.totalRuns}  Clears: ${this.meta.totalClears}  Best: B${this.meta.bestFloor}F`, {
+    this.add.text(GAME_WIDTH / 2, 72, `Runs: ${this.meta.totalRuns}  Clears: ${this.meta.totalClears}`, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    // ── Facility Buttons ──
-    const btnWidth = 300;
-    const btnStartY = 160;
-    const btnGap = 70;
-
-    // 1. Dungeon entrance
+    // ── Dungeon Selection ──
+    const unlocked = getUnlockedDungeons(this.meta.totalClears);
     const hasSave = hasDungeonSave();
-    this.createFacilityButton(
-      GAME_WIDTH / 2, btnStartY,
-      "Beach Cave",
-      hasSave ? "Continue from saved floor" : "Enter the dungeon (B1F~B5F)",
-      "🏔️",
-      () => this.enterDungeon(),
-      btnWidth
-    );
+    let y = 105;
+    const btnW = 320;
 
-    // 2. Continue from save (if exists)
+    // Continue saved run (if exists)
     if (hasSave) {
-      this.createFacilityButton(
-        GAME_WIDTH / 2, btnStartY + btnGap,
-        "Continue Saved Run",
-        "Resume where you left off",
-        "💾",
-        () => this.continueSave(),
-        btnWidth
+      const save = loadDungeon();
+      const saveName = save ? (DUNGEONS[save.dungeonId]?.name ?? save.dungeonId) : "Unknown";
+      this.createButton(GAME_WIDTH / 2, y, btnW, 42,
+        `Continue: ${saveName} B${save?.floor ?? "?"}F`,
+        "Resume your saved run",
+        "#4ade80",
+        () => this.continueSave()
       );
+      y += 52;
     }
 
-    // 3. Upgrades
-    const upgradeY = hasSave ? btnStartY + btnGap * 2 : btnStartY + btnGap;
-    this.createFacilityButton(
-      GAME_WIDTH / 2, upgradeY,
+    // Dungeon list
+    this.add.text(15, y, "── Dungeons ──", {
+      fontSize: "10px", color: "#94a3b8", fontFamily: "monospace",
+    });
+    y += 20;
+
+    for (const dg of Object.values(DUNGEONS)) {
+      const isUnlocked = dg.unlockClears <= this.meta.totalClears;
+      const color = isUnlocked ? "#e0e0e0" : "#444460";
+      const desc = isUnlocked ? dg.description : `Unlock: ${dg.unlockClears} clears needed`;
+
+      this.createButton(GAME_WIDTH / 2, y, btnW, 42,
+        dg.name,
+        desc,
+        color,
+        isUnlocked ? () => this.enterDungeon(dg.id) : undefined
+      );
+      y += 52;
+    }
+
+    // ── Bottom Buttons ──
+    y += 5;
+
+    this.createButton(GAME_WIDTH / 2, y, btnW, 38,
       "Upgrade Shop",
-      "Spend gold on permanent upgrades",
-      "⚒️",
-      () => this.openUpgradeShop(),
-      btnWidth
+      `Gold: ${this.meta.gold}`,
+      "#fbbf24",
+      () => this.scene.start("UpgradeScene")
     );
+    y += 48;
 
-    // 4. Storage
-    this.createFacilityButton(
-      GAME_WIDTH / 2, upgradeY + btnGap,
-      "Storage",
-      "Store items between runs",
-      "📦",
-      () => this.openStorage(),
-      btnWidth
-    );
-
-    // 5. Records
-    this.createFacilityButton(
-      GAME_WIDTH / 2, upgradeY + btnGap * 2,
+    this.createButton(GAME_WIDTH / 2, y, btnW, 38,
       "Records",
-      "View your adventure log",
-      "📖",
-      () => this.showRecords(),
-      btnWidth
+      `Best: B${this.meta.bestFloor}F  Total Gold: ${this.meta.totalGold}`,
+      "#60a5fa",
+      () => this.showNotice(
+        `Total Runs: ${this.meta.totalRuns}\nClears: ${this.meta.totalClears}\nBest Floor: B${this.meta.bestFloor}F\nTotal Gold: ${this.meta.totalGold}`
+      )
     );
 
-    // Version info
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 20, "v0.3.0 — Phase 3", {
+    // Version
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 15, "v0.4.0 — Phase 4", {
       fontSize: "9px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    // Mudkip sprite at the hub (if loaded)
-    this.load.once("complete", () => this.addHubMudkip());
+    // Mudkip sprite
     if (this.textures.exists("mudkip-idle")) {
-      this.addHubMudkip();
+      const sprite = this.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT - 140, "mudkip-idle");
+      sprite.setScale(2.5);
+      if (this.anims.exists("mudkip-idle-0")) sprite.play("mudkip-idle-0");
+      this.tweens.add({
+        targets: sprite, y: sprite.y - 3,
+        duration: 1200, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
+      });
     }
   }
 
-  private addHubMudkip() {
-    if (!this.textures.exists("mudkip-idle")) return;
-    const sprite = this.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT - 170, "mudkip-idle");
-    sprite.setScale(3);
-    if (this.anims.exists("mudkip-idle-0")) {
-      sprite.play("mudkip-idle-0");
-    }
-    // Gentle bobbing
-    this.tweens.add({
-      targets: sprite,
-      y: sprite.y - 4,
-      duration: 1200, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
-    });
-  }
-
-  private createFacilityButton(
-    x: number, y: number,
-    title: string, desc: string, icon: string,
-    callback: () => void, width: number
+  private createButton(
+    x: number, y: number, w: number, h: number,
+    title: string, desc: string, color: string,
+    callback?: () => void
   ) {
-    const bg = this.add.rectangle(x, y, width, 50, 0x1a1a2e, 0.9)
-      .setStrokeStyle(1, 0x334155)
-      .setInteractive({ useHandCursor: true });
+    const bg = this.add.rectangle(x, y, w, h, 0x1a1a2e, 0.9)
+      .setStrokeStyle(1, callback ? 0x334155 : 0x222233);
+    if (callback) {
+      bg.setInteractive({ useHandCursor: true });
+      bg.on("pointerover", () => bg.setFillStyle(0x2a2a4e, 1));
+      bg.on("pointerout", () => bg.setFillStyle(0x1a1a2e, 0.9));
+      bg.on("pointerdown", callback);
+    }
 
-    this.add.text(x - width / 2 + 12, y - 12, `${icon} ${title}`, {
-      fontSize: "13px", color: "#e0e0e0", fontFamily: "monospace", fontStyle: "bold",
+    this.add.text(x - w / 2 + 12, y - 10, title, {
+      fontSize: "12px", color, fontFamily: "monospace", fontStyle: "bold",
     });
-
-    this.add.text(x - width / 2 + 12, y + 6, desc, {
+    this.add.text(x - w / 2 + 12, y + 5, desc, {
       fontSize: "9px", color: "#666680", fontFamily: "monospace",
     });
-
-    bg.on("pointerover", () => bg.setFillStyle(0x2a2a4e, 1));
-    bg.on("pointerout", () => bg.setFillStyle(0x1a1a2e, 0.9));
-    bg.on("pointerdown", callback);
   }
 
-  private enterDungeon() {
-    // Start a new dungeon run
+  private enterDungeon(dungeonId: string) {
     clearDungeonSave();
     this.meta.totalRuns++;
     saveMeta(this.meta);
 
     this.cameras.main.fadeOut(400, 0, 0, 0);
     this.time.delayedCall(450, () => {
-      this.scene.start("DungeonScene", { floor: 1, fromHub: true });
+      this.scene.start("DungeonScene", { floor: 1, fromHub: true, dungeonId });
     });
   }
 
   private continueSave() {
     const save = loadDungeon();
     if (!save) {
-      // Save corrupted — start fresh
       clearDungeonSave();
-      this.enterDungeon();
       return;
     }
 
@@ -216,26 +193,9 @@ export class HubScene extends Phaser.Scene {
         skills: deserializeSkills(save.skills),
         inventory: deserializeInventory(save.inventory),
         fromHub: true,
+        dungeonId: save.dungeonId,
       });
     });
-  }
-
-  private openUpgradeShop() {
-    this.scene.start("UpgradeScene");
-  }
-
-  private openStorage() {
-    // TODO: Phase 3-3
-    this.showNotice("Storage coming soon!");
-  }
-
-  private showRecords() {
-    this.showNotice(
-      `Total Runs: ${this.meta.totalRuns}\n` +
-      `Clears: ${this.meta.totalClears}\n` +
-      `Best Floor: B${this.meta.bestFloor}F\n` +
-      `Total Gold: ${this.meta.totalGold}`
-    );
   }
 
   private showNotice(msg: string) {
@@ -251,11 +211,7 @@ export class HubScene extends Phaser.Scene {
       fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(201).setInteractive();
 
-    const cleanup = () => {
-      overlay.destroy();
-      text.destroy();
-      close.destroy();
-    };
+    const cleanup = () => { overlay.destroy(); text.destroy(); close.destroy(); };
     close.on("pointerdown", cleanup);
     overlay.on("pointerdown", cleanup);
   }

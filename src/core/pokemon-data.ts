@@ -3,7 +3,7 @@
  */
 
 import { PokemonType } from "./type-chart";
-import { SKILL_DB, createSkill, Skill, SkillRange } from "./skill";
+import { SKILL_DB, createSkill, Skill } from "./skill";
 
 export interface PokemonSpecies {
   id: string;
@@ -89,26 +89,77 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     walkFrameWidth: 32, walkFrameHeight: 32,
     idleFrameWidth: 32, idleFrameHeight: 24,
     walkFrames: 4, idleFrames: 4,
-    skillIds: ["tackle"],
+    skillIds: ["tackle", "rockThrow"],
     floors: [4, 5],
   },
+  // ── Thunderwave Cave ──
+  pikachu: {
+    id: "pikachu",
+    name: "Pikachu",
+    spriteKey: "pikachu",
+    types: [PokemonType.Electric],
+    attackType: PokemonType.Electric,
+    baseStats: { hp: 28, atk: 12, def: 5 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 40, idleFrameHeight: 56,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["spark", "thunderShock", "quickAttack"],
+    floors: [],
+  },
+  voltorb: {
+    id: "voltorb",
+    name: "Voltorb",
+    spriteKey: "voltorb",
+    types: [PokemonType.Electric],
+    attackType: PokemonType.Electric,
+    baseStats: { hp: 22, atk: 8, def: 4 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 8, idleFrames: 5,
+    skillIds: ["tackle", "sonicBoom", "selfDestruct"],
+    floors: [],
+  },
+  magnemite: {
+    id: "magnemite",
+    name: "Magnemite",
+    spriteKey: "magnemite",
+    types: [PokemonType.Electric],
+    attackType: PokemonType.Electric,
+    baseStats: { hp: 22, atk: 10, def: 7 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 6, idleFrames: 4,
+    skillIds: ["thunderShock", "thunderWave", "tackle"],
+    floors: [],
+  },
+  // ── Tiny Woods ──
+  caterpie: {
+    id: "caterpie",
+    name: "Caterpie",
+    spriteKey: "caterpie",
+    types: [PokemonType.Bug],
+    attackType: PokemonType.Bug,
+    baseStats: { hp: 18, atk: 6, def: 3 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 3, idleFrames: 10,
+    skillIds: ["tackle", "stringShot", "bugBite"],
+    floors: [],
+  },
+  pidgey: {
+    id: "pidgey",
+    name: "Pidgey",
+    spriteKey: "pidgey",
+    types: [PokemonType.Normal, PokemonType.Flying],
+    attackType: PokemonType.Flying,
+    baseStats: { hp: 20, atk: 8, def: 4 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 5, idleFrames: 5,
+    skillIds: ["gust", "quickAttack", "tackle"],
+    floors: [],
+  },
 };
-
-/** Add Rock Throw to skill DB for Geodude */
-if (!SKILL_DB.rockThrow) {
-  SKILL_DB.rockThrow = {
-    id: "rockThrow",
-    name: "Rock Throw",
-    type: PokemonType.Rock,
-    power: 12,
-    pp: 15,
-    range: SkillRange.Front2,
-    accuracy: 85,
-    description: "Hurls a rock at the target.",
-  };
-  // Update geodude skills
-  SPECIES.geodude.skillIds = ["tackle", "rockThrow"];
-}
 
 /** Get enemy species that appear on a given floor */
 export function getFloorEnemies(floor: number): PokemonSpecies[] {

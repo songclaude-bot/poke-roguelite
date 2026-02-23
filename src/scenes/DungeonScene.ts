@@ -19,7 +19,8 @@ import { PokemonType, getEffectiveness, effectivenessText } from "../core/type-c
 import { Skill, SkillRange, SkillEffect } from "../core/skill";
 import { getSkillTargetTiles } from "../core/skill-targeting";
 import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY, ITEM_DB } from "../core/item";
-import { SPECIES, PokemonSpecies, getFloorEnemies, createSpeciesSkills } from "../core/pokemon-data";
+import { SPECIES, PokemonSpecies, createSpeciesSkills } from "../core/pokemon-data";
+import { DungeonDef, getDungeon, getDungeonFloorEnemies } from "../core/dungeon-data";
 import { expFromEnemy, processLevelUp } from "../core/leveling";
 import {
   saveDungeon, clearDungeonSave, serializeSkills, serializeInventory,
@@ -29,12 +30,10 @@ import { getUpgradeBonus } from "../scenes/UpgradeScene";
 
 const MOVE_DURATION = 150; // ms per tile movement
 const ENEMIES_PER_ROOM = 1; // base enemies per room (except player's room)
-const MAX_FLOOR = 5; // B5F is the last floor
-const ITEMS_PER_FLOOR = 3; // items spawned per floor
 
-// Per-floor enemy scaling (uses species base stats)
-function getEnemyStats(floor: number, species?: PokemonSpecies) {
-  const scale = 1 + (floor - 1) * 0.25;
+// Per-floor enemy scaling (uses species base stats + dungeon difficulty)
+function getEnemyStats(floor: number, difficulty: number, species?: PokemonSpecies) {
+  const scale = (1 + (floor - 1) * 0.25) * difficulty;
   const base = species?.baseStats ?? { hp: 20, atk: 8, def: 3 };
   return {
     hp: Math.floor(base.hp * scale),
@@ -47,6 +46,7 @@ function getEnemyStats(floor: number, species?: PokemonSpecies) {
 
 export class DungeonScene extends Phaser.Scene {
   private dungeon!: DungeonData;
+  private dungeonDef!: DungeonDef;
   private turnManager = new TurnManager();
   private currentFloor = 1;
 
@@ -88,13 +88,14 @@ export class DungeonScene extends Phaser.Scene {
     super({ key: "DungeonScene" });
   }
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string }) {
     // Apply upgrade bonuses on fresh run start (floor 1 from hub)
     const meta = loadMeta();
     const hpBonus = getUpgradeBonus(meta, "maxHp") * 5;
     const atkBonus = getUpgradeBonus(meta, "atk");
     const defBonus = getUpgradeBonus(meta, "def");
 
+    this.dungeonDef = getDungeon(data?.dungeonId ?? "beachCave");
     const isNewRun = (data?.floor ?? 1) === 1 && !data?.hp;
     this.currentFloor = data?.floor ?? 1;
     this.persistentHp = data?.hp ?? (50 + hpBonus);
@@ -126,15 +127,22 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image("beachcave-tiles", "tilesets/BeachCave/tileset_0.png");
+    // Load dungeon tileset
+    this.load.image(this.dungeonDef.tilesetKey, this.dungeonDef.tilesetPath);
 
-    // Load all pokemon sprites dynamically from SPECIES data
+    // Sprite dex map for all pokemon
     const spriteMap: Record<string, string> = {
       mudkip: "0258", zubat: "0041", shellos: "0422", corsola: "0222", geodude: "0074",
+      pikachu: "0025", voltorb: "0100", magnemite: "0081",
+      caterpie: "0010", pidgey: "0016",
     };
-    for (const [key, dexNum] of Object.entries(spriteMap)) {
+
+    // Load player + all enemy species for this dungeon
+    const neededKeys = new Set<string>(["mudkip", ...this.dungeonDef.enemySpeciesIds]);
+    for (const key of neededKeys) {
+      const dexNum = spriteMap[key];
       const sp = SPECIES[key];
-      if (!sp) continue;
+      if (!sp || !dexNum) continue;
       this.load.spritesheet(`${key}-walk`, `sprites/${dexNum}/Walk-Anim.png`, {
         frameWidth: sp.walkFrameWidth, frameHeight: sp.walkFrameHeight,
       });
@@ -159,7 +167,7 @@ export class DungeonScene extends Phaser.Scene {
     const map = this.make.tilemap({
       data: tileData, tileWidth: TILE_SIZE, tileHeight: TILE_SIZE,
     });
-    const tileset = map.addTilesetImage("beachcave-tiles")!;
+    const tileset = map.addTilesetImage(this.dungeonDef.tilesetKey)!;
     map.createLayer(0, tileset, 0, 0)!.setScale(TILE_SCALE);
 
     // Stairs marker
@@ -171,11 +179,12 @@ export class DungeonScene extends Phaser.Scene {
     stairsGfx.fillTriangle(sx, sy + 14, sx + 10, sy, sx - 10, sy);
     stairsGfx.setDepth(5);
 
-    // ── Create animations for all species ──
-    if (!this.anims.exists("mudkip-walk-0")) {
-      for (const sp of Object.values(SPECIES)) {
-        this.createAnimations(sp.spriteKey, sp.walkFrames, sp.idleFrames);
-      }
+    // ── Create animations for needed species ──
+    const neededKeys = new Set<string>(["mudkip", ...this.dungeonDef.enemySpeciesIds]);
+    for (const key of neededKeys) {
+      const sp = SPECIES[key];
+      if (!sp || this.anims.exists(`${key}-walk-0`)) continue;
+      this.createAnimations(sp.spriteKey, sp.walkFrames, sp.idleFrames);
     }
 
     // ── Player entity ──
@@ -207,10 +216,11 @@ export class DungeonScene extends Phaser.Scene {
     this.player.sprite.play(`mudkip-idle-${Direction.Down}`);
     this.allEntities.push(this.player);
 
-    // ── Spawn enemies (floor-specific species) ──
+    // ── Spawn enemies (dungeon + floor specific) ──
     const rooms = this.dungeon.rooms;
-    const floorSpecies = getFloorEnemies(this.currentFloor);
-    if (floorSpecies.length === 0) floorSpecies.push(SPECIES.zubat); // fallback
+    const floorSpeciesIds = getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
+    const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
+    if (floorSpecies.length === 0) floorSpecies.push(SPECIES.zubat);
 
     for (let i = 1; i < rooms.length; i++) {
       const room = rooms[i];
@@ -222,7 +232,7 @@ export class DungeonScene extends Phaser.Scene {
 
         // Pick random species from floor pool
         const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
-        const enemyStats = getEnemyStats(this.currentFloor, sp);
+        const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp);
 
         const enemy: Entity = {
           tileX: ex, tileY: ey,
@@ -248,7 +258,7 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Spawn floor items ──
     this.inventory = this.persistentInventory ?? [];
-    for (let i = 0; i < ITEMS_PER_FLOOR; i++) {
+    for (let i = 0; i < this.dungeonDef.itemsPerFloor; i++) {
       const room = rooms[Math.floor(Math.random() * rooms.length)];
       const ix = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
       const iy = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
@@ -348,7 +358,7 @@ export class DungeonScene extends Phaser.Scene {
     saveBtn.on("pointerdown", () => this.saveGame());
 
     this.updateHUD();
-    this.showLog(`Beach Cave B${this.currentFloor}F`);
+    this.showLog(`${this.dungeonDef.name} B${this.currentFloor}F`);
   }
 
   // ── Helpers ──
@@ -445,7 +455,7 @@ export class DungeonScene extends Phaser.Scene {
     const hpBar = "█".repeat(Math.ceil(hpRatio * 8));
     const hpEmpty = "░".repeat(8 - hpBar.length);
     const hpColor = hpRatio > 0.5 ? "#4ade80" : hpRatio > 0.25 ? "#fbbf24" : "#ef4444";
-    this.floorText.setText(`Beach Cave  B${this.currentFloor}F`);
+    this.floorText.setText(`${this.dungeonDef.name}  B${this.currentFloor}F`);
     this.hpText.setText(`HP ${hpBar}${hpEmpty} ${p.hp}/${p.maxHp}`);
     this.hpText.setColor(hpColor);
 
@@ -696,7 +706,7 @@ export class DungeonScene extends Phaser.Scene {
       version: 1,
       timestamp: Date.now(),
       floor: this.currentFloor,
-      dungeonId: "beach-cave",
+      dungeonId: this.dungeonDef.id,
       hp: this.player.stats.hp,
       maxHp: this.player.stats.maxHp,
       level: this.player.stats.level,
@@ -719,7 +729,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private advanceFloor() {
-    if (this.currentFloor >= MAX_FLOOR) {
+    if (this.currentFloor >= this.dungeonDef.floors) {
       this.showDungeonClear();
       return;
     }
@@ -739,6 +749,7 @@ export class DungeonScene extends Phaser.Scene {
         atk: this.player.stats.atk,
         def: this.player.stats.def,
         exp: this.totalExp,
+        dungeonId: this.dungeonDef.id,
       });
     });
   }
@@ -759,7 +770,7 @@ export class DungeonScene extends Phaser.Scene {
       fontSize: "20px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 15, `Beach Cave B${MAX_FLOOR}F cleared!`, {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 15, `${this.dungeonDef.name} B${this.dungeonDef.floors}F cleared!`, {
       fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
@@ -772,7 +783,7 @@ export class DungeonScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
     restartText.on("pointerdown", () => {
-      this.scene.start("HubScene", { gold, cleared: true, bestFloor: MAX_FLOOR });
+      this.scene.start("HubScene", { gold, cleared: true, bestFloor: this.dungeonDef.floors });
     });
 
     this.tweens.add({
