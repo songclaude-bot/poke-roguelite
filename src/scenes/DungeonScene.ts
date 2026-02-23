@@ -20,6 +20,7 @@ import { Skill, SkillRange, SkillEffect } from "../core/skill";
 import { getSkillTargetTiles } from "../core/skill-targeting";
 import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY } from "../core/item";
 import { SPECIES, PokemonSpecies, getFloorEnemies, createSpeciesSkills } from "../core/pokemon-data";
+import { expFromEnemy, processLevelUp } from "../core/leveling";
 
 const MOVE_DURATION = 150; // ms per tile movement
 const ENEMIES_PER_ROOM = 1; // base enemies per room (except player's room)
@@ -52,6 +53,10 @@ export class DungeonScene extends Phaser.Scene {
   private persistentHp = 50;
   private persistentMaxHp = 50;
   private persistentSkills: Skill[] | null = null;
+  private persistentLevel = 5;
+  private persistentAtk = 12;
+  private persistentDef = 6;
+  private totalExp = 0;
 
   // HUD references
   private hpText!: Phaser.GameObjects.Text;
@@ -77,12 +82,16 @@ export class DungeonScene extends Phaser.Scene {
     super({ key: "DungeonScene" });
   }
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[] }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number }) {
     this.currentFloor = data?.floor ?? 1;
     this.persistentHp = data?.hp ?? 50;
     this.persistentMaxHp = data?.maxHp ?? 50;
     this.persistentSkills = data?.skills ?? null;
     this.persistentInventory = data?.inventory ?? null;
+    this.persistentLevel = data?.level ?? 5;
+    this.persistentAtk = data?.atk ?? 12;
+    this.persistentDef = data?.def ?? 6;
+    this.totalExp = data?.exp ?? 0;
     this.enemies = [];
     this.allEntities = [];
     this.floorItems = [];
@@ -157,7 +166,7 @@ export class DungeonScene extends Phaser.Scene {
       stats: {
         hp: this.persistentHp,
         maxHp: this.persistentMaxHp,
-        atk: playerSp.baseStats.atk, def: playerSp.baseStats.def, level: 5,
+        atk: this.persistentAtk, def: this.persistentDef, level: this.persistentLevel,
       },
       alive: true,
       spriteKey: playerSp.spriteKey,
@@ -420,7 +429,7 @@ export class DungeonScene extends Phaser.Scene {
     // Show active buffs
     const buffs = this.player.statusEffects.map(s => `${s.type}(${s.turnsLeft})`).join(" ");
     const buffStr = buffs ? `  ${buffs}` : "";
-    this.turnText.setText(`Lv.${p.level}  Turn ${this.turnManager.turn}${buffStr}`);
+    this.turnText.setText(`Lv.${p.level}  EXP:${this.totalExp}  T${this.turnManager.turn}${buffStr}`);
 
     this.updateSkillButtons();
   }
@@ -680,6 +689,10 @@ export class DungeonScene extends Phaser.Scene {
         maxHp: this.player.stats.maxHp,
         skills: this.player.skills,
         inventory: this.inventory,
+        level: this.player.stats.level,
+        atk: this.player.stats.atk,
+        def: this.player.stats.def,
+        exp: this.totalExp,
       });
     });
   }
@@ -1031,8 +1044,31 @@ export class DungeonScene extends Phaser.Scene {
     if (entity === this.player) {
       this.showLog(`${this.player.name} fainted!`);
     } else {
-      const expGain = 10 + this.currentFloor * 5;
+      // Grant EXP
+      const expGain = expFromEnemy(entity.stats.level, this.currentFloor);
+      this.totalExp += expGain;
       this.showLog(`${entity.name} fainted! +${expGain} EXP`);
+
+      // Check level up
+      const { results } = processLevelUp(
+        this.player.stats, expGain, this.totalExp
+      );
+      this.totalExp = results.length > 0
+        ? this.totalExp // processLevelUp already updated totalExp internally
+        : this.totalExp;
+
+      for (const r of results) {
+        this.time.delayedCall(500, () => {
+          this.showLog(`Level up! Lv.${r.newLevel}! HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
+          if (this.player.sprite) {
+            this.player.sprite.setTint(0xffff44);
+            this.time.delayedCall(600, () => {
+              if (this.player.sprite) this.player.sprite.clearTint();
+            });
+          }
+          this.updateHUD();
+        });
+      }
     }
   }
 
