@@ -75,3 +75,11 @@
 - 날짜: 2026-02-23
 - [상세 기록](./12-multi-dungeon.md)
 - 핵심: Beach Cave/Thunderwave Cave/Tiny Woods, 던전별 타일셋, 10종 포켓몬
+
+## Phase 5: 폴리시 + 배포
+
+### 5-1~4. 미니맵 + 이펙트 + PWA + 배포
+- 날짜: 2026-02-23
+- [상세 기록](./13-polish-deploy.md)
+- 핵심: 미니맵, 그래픽 HP바, 데미지 팝업, PWA, GitHub Pages 배포
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
