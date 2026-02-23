@@ -1,6 +1,5 @@
 import Phaser from "phaser";
-import { DungeonScene } from "./DungeonScene";
-import { COLORS, GAME_WIDTH, GAME_HEIGHT } from "../config";
+import { GAME_WIDTH, GAME_HEIGHT } from "../config";
 
 export class BootScene extends Phaser.Scene {
   constructor() {
