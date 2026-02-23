@@ -70,6 +70,19 @@ export class DungeonScene extends Phaser.Scene {
   private logText!: Phaser.GameObjects.Text;
   private skillButtons: Phaser.GameObjects.Text[] = [];
 
+  // Minimap
+  private minimapGfx!: Phaser.GameObjects.Graphics;
+  private minimapBg!: Phaser.GameObjects.Graphics;
+  private minimapVisible = true;
+  private readonly MINIMAP_TILE = 3; // px per tile
+  private readonly MINIMAP_X = GAME_WIDTH - 80; // top-right
+  private readonly MINIMAP_Y = 4;
+
+  // HP Bar graphics
+  private hpBarBg!: Phaser.GameObjects.Graphics;
+  private hpBarFill!: Phaser.GameObjects.Graphics;
+  private portraitSprite!: Phaser.GameObjects.Sprite;
+
   // Skill state
   private activeSkillIndex = -1; // -1 = no skill selected
 
@@ -306,14 +319,29 @@ export class DungeonScene extends Phaser.Scene {
     });
 
     // ── HUD ──
+    // Portrait sprite (small idle frame)
+    this.portraitSprite = this.add.sprite(20, 20, "mudkip-idle")
+      .setScrollFactor(0).setDepth(101).setScale(1.2);
+    this.portraitSprite.play("mudkip-idle-0");
+
+    // HP Bar background
+    this.hpBarBg = this.add.graphics().setScrollFactor(0).setDepth(100);
+    this.hpBarBg.fillStyle(0x1a1a2e, 0.9);
+    this.hpBarBg.fillRoundedRect(38, 8, 100, 10, 3);
+    this.hpBarBg.lineStyle(1, 0x333355);
+    this.hpBarBg.strokeRoundedRect(38, 8, 100, 10, 3);
+
+    // HP Bar fill
+    this.hpBarFill = this.add.graphics().setScrollFactor(0).setDepth(101);
+
     this.floorText = this.add
       .text(8, 6, "", { fontSize: "11px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold" })
       .setScrollFactor(0).setDepth(100);
     this.hpText = this.add
-      .text(8, 22, "", { fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace" })
-      .setScrollFactor(0).setDepth(100);
+      .text(40, 9, "", { fontSize: "8px", color: "#ffffff", fontFamily: "monospace" })
+      .setScrollFactor(0).setDepth(102);
     this.turnText = this.add
-      .text(8, 38, "", { fontSize: "11px", color: "#60a5fa", fontFamily: "monospace" })
+      .text(8, 40, "", { fontSize: "10px", color: "#60a5fa", fontFamily: "monospace" })
       .setScrollFactor(0).setDepth(100);
     this.logText = this.add
       .text(8, GAME_HEIGHT - 130, "", {
@@ -321,6 +349,21 @@ export class DungeonScene extends Phaser.Scene {
         wordWrap: { width: 340 },
       })
       .setScrollFactor(0).setDepth(100);
+
+    // ── Minimap ──
+    this.minimapBg = this.add.graphics().setScrollFactor(0).setDepth(100);
+    this.minimapGfx = this.add.graphics().setScrollFactor(0).setDepth(101);
+    this.createMinimap();
+
+    // Minimap toggle
+    const mmToggle = this.add.text(this.MINIMAP_X - 2, this.MINIMAP_Y + height * this.MINIMAP_TILE + 4, "[Map]", {
+      fontSize: "8px", color: "#666680", fontFamily: "monospace",
+    }).setScrollFactor(0).setDepth(101).setInteractive();
+    mmToggle.on("pointerdown", () => {
+      this.minimapVisible = !this.minimapVisible;
+      this.minimapBg.setVisible(this.minimapVisible);
+      this.minimapGfx.setVisible(this.minimapVisible);
+    });
 
     // ── Skill Buttons ──
     this.createSkillButtons();
@@ -449,15 +492,95 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
+  private createMinimap() {
+    const { width, height, terrain } = this.dungeon;
+    const t = this.MINIMAP_TILE;
+    const mx = this.MINIMAP_X;
+    const my = this.MINIMAP_Y;
+
+    // Background
+    this.minimapBg.clear();
+    this.minimapBg.fillStyle(0x000000, 0.7);
+    this.minimapBg.fillRoundedRect(mx - 2, my - 2, width * t + 4, height * t + 4, 2);
+
+    // Terrain
+    this.minimapGfx.clear();
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (terrain[y][x] === TerrainType.GROUND) {
+          this.minimapGfx.fillStyle(0x334455, 1);
+          this.minimapGfx.fillRect(mx + x * t, my + y * t, t, t);
+        }
+      }
+    }
+
+    // Stairs
+    const { stairsPos } = this.dungeon;
+    this.minimapGfx.fillStyle(0xfbbf24, 1);
+    this.minimapGfx.fillRect(mx + stairsPos.x * t, my + stairsPos.y * t, t, t);
+  }
+
+  private updateMinimap() {
+    if (!this.minimapVisible) return;
+    const t = this.MINIMAP_TILE;
+    const mx = this.MINIMAP_X;
+    const my = this.MINIMAP_Y;
+    const { width, height, terrain } = this.dungeon;
+
+    this.minimapGfx.clear();
+
+    // Terrain
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (terrain[y][x] === TerrainType.GROUND) {
+          this.minimapGfx.fillStyle(0x334455, 1);
+          this.minimapGfx.fillRect(mx + x * t, my + y * t, t, t);
+        }
+      }
+    }
+
+    // Stairs
+    const { stairsPos } = this.dungeon;
+    this.minimapGfx.fillStyle(0xfbbf24, 1);
+    this.minimapGfx.fillRect(mx + stairsPos.x * t, my + stairsPos.y * t, t, t);
+
+    // Floor items (pink dots)
+    this.minimapGfx.fillStyle(0xff6b9d, 1);
+    for (const fi of this.floorItems) {
+      this.minimapGfx.fillRect(mx + fi.x * t, my + fi.y * t, t, t);
+    }
+
+    // Enemies (red dots)
+    this.minimapGfx.fillStyle(0xef4444, 1);
+    for (const e of this.enemies) {
+      if (e.alive) {
+        this.minimapGfx.fillRect(mx + e.tileX * t, my + e.tileY * t, t, t);
+      }
+    }
+
+    // Player (green dot, slightly larger)
+    this.minimapGfx.fillStyle(0x4ade80, 1);
+    this.minimapGfx.fillRect(
+      mx + this.player.tileX * t - 1,
+      my + this.player.tileY * t - 1,
+      t + 2, t + 2
+    );
+  }
+
   private updateHUD() {
     const p = this.player.stats;
     const hpRatio = p.hp / p.maxHp;
-    const hpBar = "█".repeat(Math.ceil(hpRatio * 8));
-    const hpEmpty = "░".repeat(8 - hpBar.length);
-    const hpColor = hpRatio > 0.5 ? "#4ade80" : hpRatio > 0.25 ? "#fbbf24" : "#ef4444";
+
+    // Update HP bar graphics
+    this.hpBarFill.clear();
+    const barColor = hpRatio > 0.5 ? 0x4ade80 : hpRatio > 0.25 ? 0xfbbf24 : 0xef4444;
+    const barWidth = Math.max(0, Math.floor(98 * hpRatio));
+    this.hpBarFill.fillStyle(barColor, 1);
+    this.hpBarFill.fillRoundedRect(39, 9, barWidth, 8, 2);
+
     this.floorText.setText(`${this.dungeonDef.name}  B${this.currentFloor}F`);
-    this.hpText.setText(`HP ${hpBar}${hpEmpty} ${p.hp}/${p.maxHp}`);
-    this.hpText.setColor(hpColor);
+    this.floorText.setPosition(40, 22);
+    this.hpText.setText(`${p.hp}/${p.maxHp}`);
 
     // Show active buffs
     const buffs = this.player.statusEffects.map(s => `${s.type}(${s.turnsLeft})`).join(" ");
@@ -465,6 +588,7 @@ export class DungeonScene extends Phaser.Scene {
     this.turnText.setText(`Lv.${p.level}  EXP:${this.totalExp}  T${this.turnManager.turn}${buffStr}`);
 
     this.updateSkillButtons();
+    this.updateMinimap();
   }
 
   private showLog(msg: string) {
@@ -592,6 +716,7 @@ export class DungeonScene extends Phaser.Scene {
         const heal = Math.min(30, this.player.stats.maxHp - this.player.stats.hp);
         this.player.stats.hp += heal;
         this.showLog(`Used Oran Berry! Restored ${heal} HP.`);
+        if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
         break;
       }
       case "sitrusBerry": {
@@ -599,6 +724,7 @@ export class DungeonScene extends Phaser.Scene {
         const actual = Math.min(heal, this.player.stats.maxHp - this.player.stats.hp);
         this.player.stats.hp += actual;
         this.showLog(`Used Sitrus Berry! Restored ${actual} HP.`);
+        if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, actual);
         break;
       }
       case "pechaberry": {
@@ -957,6 +1083,9 @@ export class DungeonScene extends Phaser.Scene {
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
       this.flashEntity(defender, effectiveness);
+      if (defender.sprite) {
+        this.showDamagePopup(defender.sprite.x, defender.sprite.y, dmg, effectiveness);
+      }
 
       let logMsg = `${attacker.name} attacks ${defender.name}! ${dmg} dmg!`;
       if (effText) logMsg += `\n${effText}`;
@@ -1018,6 +1147,9 @@ export class DungeonScene extends Phaser.Scene {
           target.stats.hp = Math.max(0, target.stats.hp - dmg);
 
           this.flashEntity(target, effectiveness);
+          if (target.sprite) {
+            this.showDamagePopup(target.sprite.x, target.sprite.y, dmg, effectiveness);
+          }
 
           let logMsg = `${user.name}'s ${skill.name} hit ${target.name}! ${dmg} dmg!`;
           if (effText) logMsg += ` ${effText}`;
@@ -1060,7 +1192,10 @@ export class DungeonScene extends Phaser.Scene {
         const healAmt = Math.floor(target.stats.maxHp * 0.3);
         target.stats.hp = Math.min(target.stats.maxHp, target.stats.hp + healAmt);
         this.showLog(`${target.name} recovered ${healAmt} HP!`);
-        if (target.sprite) target.sprite.setTint(0x44ff44);
+        if (target.sprite) {
+          target.sprite.setTint(0x44ff44);
+          this.showHealPopup(target.sprite.x, target.sprite.y, healAmt);
+        }
         this.time.delayedCall(300, () => { if (target.sprite) target.sprite.clearTint(); });
         break;
       }
@@ -1089,6 +1224,47 @@ export class DungeonScene extends Phaser.Scene {
     entity.sprite.setTint(tintColor);
     this.time.delayedCall(200, () => {
       if (entity.sprite) entity.sprite.clearTint();
+    });
+
+    // Screen shake for super effective
+    if (effectiveness >= 2.0) {
+      this.cameras.main.shake(200, 0.008);
+    }
+  }
+
+  /** Floating damage number popup */
+  private showDamagePopup(x: number, y: number, dmg: number, effectiveness: number) {
+    const color = effectiveness >= 2.0 ? "#ff4444" : effectiveness < 1.0 ? "#8888ff" : "#ffffff";
+    const size = effectiveness >= 2.0 ? "14px" : "11px";
+    const popup = this.add.text(x, y - 10, `${dmg}`, {
+      fontSize: size, color, fontFamily: "monospace", fontStyle: "bold",
+      stroke: "#000000", strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(50);
+
+    this.tweens.add({
+      targets: popup,
+      y: y - 40,
+      alpha: { from: 1, to: 0 },
+      duration: 800,
+      ease: "Quad.easeOut",
+      onComplete: () => popup.destroy(),
+    });
+  }
+
+  /** Heal number popup (green) */
+  private showHealPopup(x: number, y: number, amount: number) {
+    const popup = this.add.text(x, y - 10, `+${amount}`, {
+      fontSize: "11px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+      stroke: "#000000", strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(50);
+
+    this.tweens.add({
+      targets: popup,
+      y: y - 40,
+      alpha: { from: 1, to: 0 },
+      duration: 800,
+      ease: "Quad.easeOut",
+      onComplete: () => popup.destroy(),
     });
   }
 

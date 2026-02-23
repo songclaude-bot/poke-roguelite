@@ -31,7 +31,7 @@ export class BootScene extends Phaser.Scene {
       fontSize: "14px", color: hasSave ? "#4ade80" : "#667eea", fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    this.add.text(cx, cy + 60, "v0.3.0 — Phase 3: Meta Progression", {
+    this.add.text(cx, cy + 60, "v0.5.0 — Phase 5: Polish", {
       fontSize: "9px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 
