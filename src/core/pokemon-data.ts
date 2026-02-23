@@ -266,6 +266,46 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["tackle", "bite", "swift", "quickAttack"],
     floors: [],
   },
+  // ── Magma Cavern ──
+  numel: {
+    id: "numel",
+    name: "Numel",
+    spriteKey: "numel",
+    types: [PokemonType.Fire, PokemonType.Ground],
+    attackType: PokemonType.Fire,
+    baseStats: { hp: 32, atk: 10, def: 6 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 40, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["ember", "mudShot", "bodySlam"],
+    floors: [],
+  },
+  slugma: {
+    id: "slugma",
+    name: "Slugma",
+    spriteKey: "slugma",
+    types: [PokemonType.Fire],
+    attackType: PokemonType.Fire,
+    baseStats: { hp: 25, atk: 12, def: 4 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["ember", "rockThrow", "bodySlam"],
+    floors: [],
+  },
+  torkoal: {
+    id: "torkoal",
+    name: "Torkoal",
+    spriteKey: "torkoal",
+    types: [PokemonType.Fire],
+    attackType: PokemonType.Fire,
+    baseStats: { hp: 40, atk: 11, def: 10 },
+    walkFrameWidth: 40, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["flamethrower", "bodySlam", "ironDefense"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -300,6 +340,9 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   snorunt: { 7: "iceBeam", 10: "iceShard" },
   charmander: { 7: "ember", 10: "flamethrower" },
   eevee: { 7: "bite", 10: "swift" },
+  numel: { 7: "mudShot", 10: "earthPower" },
+  slugma: { 7: "ember", 10: "flamethrower" },
+  torkoal: { 8: "fireBlast", 12: "lavaSurf" },
 };
 
 /** Check if a species learns a new skill at this level */

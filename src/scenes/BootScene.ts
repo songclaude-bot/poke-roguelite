@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { GAME_WIDTH, GAME_HEIGHT } from "../config";
 import { hasDungeonSave } from "../core/save-system";
+import { initAudio } from "../core/sound-manager";
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -31,11 +32,12 @@ export class BootScene extends Phaser.Scene {
       fontSize: "14px", color: hasSave ? "#4ade80" : "#667eea", fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    this.add.text(cx, cy + 60, "v0.12.0 — Phase 12: Evolution + Monster House", {
+    this.add.text(cx, cy + 60, "v0.14.0 — Sound + Magma Cavern", {
       fontSize: "9px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 
     this.input.once("pointerdown", () => {
+      initAudio();
       this.cameras.main.fadeOut(300, 0, 0, 0);
       this.time.delayedCall(350, () => {
         this.scene.start("HubScene");

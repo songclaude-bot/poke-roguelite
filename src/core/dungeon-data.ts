@@ -161,6 +161,33 @@ export const DUNGEONS: Record<string, DungeonDef> = {
     description: "B1F~B10F. Ice and Psychic. The ultimate challenge!",
     boss: { speciesId: "snorunt", name: "Frost King Snorunt", statMultiplier: 4.5 },
   },
+  magmaCavern: {
+    id: "magmaCavern",
+    name: "Magma Cavern",
+    tilesetPath: "tilesets/ThunderwaveCave/tileset_0.png",
+    tilesetKey: "thunderwave-tiles",
+    floors: 12,
+    enemySpeciesIds: ["numel", "slugma", "torkoal", "geodude", "aron"],
+    floorEnemies: {
+      1: ["numel"],
+      2: ["numel", "slugma"],
+      3: ["slugma", "numel"],
+      4: ["slugma", "geodude"],
+      5: ["numel", "geodude", "slugma"],
+      6: ["geodude", "torkoal"],
+      7: ["torkoal", "slugma"],
+      8: ["torkoal", "aron", "numel"],
+      9: ["aron", "torkoal"],
+      10: ["torkoal", "aron", "slugma"],
+      11: ["torkoal", "numel"],
+      12: ["torkoal"],
+    },
+    difficulty: 2.2,
+    itemsPerFloor: 3,
+    unlockClears: 7,
+    description: "B1F~B12F. Fire and Ground. Volcanic inferno!",
+    boss: { speciesId: "torkoal", name: "Volcanic Torkoal", statMultiplier: 5.0 },
+  },
 };
 
 /** Get dungeon by ID */

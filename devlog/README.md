@@ -125,3 +125,10 @@
 - 날짜: 2026-02-23
 - [상세 기록](./19-evolution-newpokemon-frostyforest.md)
 - 핵심: 11종 진화 경로, Charmander/Eevee 스타터, Frosty Forest 10층 던전, Fire 스킬 5종
+
+## Phase 14: 사운드 + Magma Cavern
+
+### 14-1~2. 사운드 시스템 + 7번째 던전
+- 날짜: 2026-02-23
+- [상세 기록](./20-sound-magmacavern.md)
+- 핵심: 던전별 BGM, 20종 SFX 통합, Magma Cavern 12층, Numel/Slugma/Torkoal, Flame Body 능력

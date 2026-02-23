@@ -34,7 +34,13 @@ import { AbilityId, SPECIES_ABILITIES, ABILITIES } from "../core/ability";
 import { WeatherType, WEATHERS, weatherDamageMultiplier, isWeatherImmune, rollFloorWeather } from "../core/weather";
 import { ShopItem, generateShopItems, shouldSpawnShop } from "../core/shop";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
-// Sound system removed — will use PokeAutoChess resources later
+import {
+  initAudio, startBgm, stopBgm,
+  sfxHit, sfxSuperEffective, sfxNotEffective, sfxMove, sfxPickup,
+  sfxLevelUp, sfxRecruit, sfxStairs, sfxDeath, sfxBossDefeat,
+  sfxHeal, sfxSkill, sfxMenuOpen, sfxMenuClose,
+  sfxEvolution, sfxTrap, sfxVictory, sfxGameOver, sfxShop,
+} from "../core/sound-manager";
 
 interface AllyData {
   speciesId: string;
@@ -231,6 +237,7 @@ export class DungeonScene extends Phaser.Scene {
       aron: "0304", meditite: "0307", machop: "0066",
       gastly: "0092", drowzee: "0096", snorunt: "0361",
       charmander: "0004", eevee: "0133",
+      numel: "0322", slugma: "0218", torkoal: "0324",
     };
 
     // Load player + all enemy species + ally species for this dungeon
@@ -250,6 +257,9 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   create() {
+    initAudio();
+    startBgm(this.dungeonDef.id);
+
     this.dungeon = generateDungeon();
     const { width, height, terrain, playerStart, stairsPos } = this.dungeon;
 
@@ -309,10 +319,10 @@ export class DungeonScene extends Phaser.Scene {
     this.player.sprite = this.add.sprite(
       this.tileToPixelX(this.player.tileX),
       this.tileToPixelY(this.player.tileY),
-      "mudkip-idle"
+      `${playerSp.spriteKey}-idle`
     );
     this.player.sprite.setScale(TILE_SCALE).setDepth(10);
-    this.player.sprite.play(`mudkip-idle-${Direction.Down}`);
+    this.player.sprite.play(`${playerSp.spriteKey}-idle-${Direction.Down}`);
     this.allEntities.push(this.player);
 
     // ── Spawn persistent allies ──
@@ -1057,6 +1067,7 @@ export class DungeonScene extends Phaser.Scene {
       this.inventory.push({ item: fi.item, count: 1 });
     }
 
+    sfxPickup();
     fi.sprite.destroy();
     this.floorItems.splice(idx, 1);
     this.showLog(`Picked up ${fi.item.name}!`);
@@ -1072,6 +1083,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private openBag() {
     if (this.turnManager.isBusy || this.gameOver) return;
+    sfxMenuOpen();
     this.bagOpen = true;
 
     // Dark overlay
@@ -1132,6 +1144,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private closeBag() {
+    sfxMenuClose();
     this.bagOpen = false;
     this.bagUI.forEach(obj => obj.destroy());
     this.bagUI = [];
@@ -1142,6 +1155,7 @@ export class DungeonScene extends Phaser.Scene {
     if (!stack) return;
 
     const item = stack.item;
+    sfxHeal();
 
     switch (item.id) {
       case "oranBerry": {
@@ -1300,6 +1314,7 @@ export class DungeonScene extends Phaser.Scene {
     if (idx === -1) return;
 
     const ft = this.floorTraps[idx];
+    sfxTrap();
     // Reveal the trap
     if (!ft.revealed) {
       ft.revealed = true;
@@ -1543,6 +1558,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private openShopUI() {
     if (this.shopOpen || this.shopItems.length === 0) return;
+    sfxShop();
     this.shopOpen = true;
 
     // Dim overlay
@@ -1641,6 +1657,7 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     this.gameOver = true;
+    sfxStairs();
     this.showLog(`Went to B${this.currentFloor + 1}F!`);
 
     this.cameras.main.fadeOut(500, 0, 0, 0);
@@ -1665,6 +1682,8 @@ export class DungeonScene extends Phaser.Scene {
 
   private showDungeonClear() {
     this.gameOver = true;
+    stopBgm();
+    sfxVictory();
     clearDungeonSave();
 
     // Boss bonus: +50% gold if dungeon has a boss
@@ -1707,6 +1726,8 @@ export class DungeonScene extends Phaser.Scene {
 
   private showGameOver() {
     this.gameOver = true;
+    stopBgm();
+    sfxGameOver();
     clearDungeonSave();
 
     const gold = goldFromRun(this.currentFloor, this.enemiesDefeated, false);
@@ -1885,6 +1906,11 @@ export class DungeonScene extends Phaser.Scene {
       const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * wMult));
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
+      // Sound effects based on effectiveness
+      if (effectiveness >= 2) sfxSuperEffective();
+      else if (effectiveness <= 0.5 && effectiveness > 0) sfxNotEffective();
+      else sfxHit();
+
       this.flashEntity(defender, effectiveness);
       if (defender.sprite) {
         this.showDamagePopup(defender.sprite.x, defender.sprite.y, dmg, effectiveness);
@@ -1904,6 +1930,14 @@ export class DungeonScene extends Phaser.Scene {
         }
       }
 
+      // Ability: Flame Body — 30% chance to burn attacker on contact
+      if (defender.ability === AbilityId.FlameBody && Math.random() < 0.3) {
+        if (!attacker.statusEffects.some(s => s.type === SkillEffect.Burn)) {
+          attacker.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 3 });
+          this.showLog(`${defender.name}'s Flame Body burned ${attacker.name}!`);
+        }
+      }
+
       this.checkDeath(defender);
       this.time.delayedCall(250, resolve);
     });
@@ -1914,6 +1948,8 @@ export class DungeonScene extends Phaser.Scene {
     return new Promise((resolve) => {
       user.facing = dir;
       user.sprite!.play(`${user.spriteKey}-idle-${dir}`);
+
+      sfxSkill();
 
       // Self-targeting (buff/heal)
       if (skill.range === SkillRange.Self) {
@@ -2178,6 +2214,7 @@ export class DungeonScene extends Phaser.Scene {
       });
     }
     if (entity === this.player) {
+      sfxDeath();
       this.showLog(`${this.player.name} fainted!`);
     } else if (entity.isAlly) {
       // Ally fainted
@@ -2194,6 +2231,7 @@ export class DungeonScene extends Phaser.Scene {
 
       if (isBossKill) {
         // Boss defeat: big screen shake + special message
+        sfxBossDefeat();
         this.cameras.main.shake(500, 0.015);
         this.showLog(`★ BOSS DEFEATED! ${entity.name} fell! +${expGain} EXP ★`);
         this.bossEntity = null;
@@ -2212,6 +2250,7 @@ export class DungeonScene extends Phaser.Scene {
 
       for (const r of results) {
         this.time.delayedCall(500, () => {
+          sfxLevelUp();
           this.showLog(`Level up! Lv.${r.newLevel}! HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
           if (this.player.sprite) {
             this.player.sprite.setTint(0xffff44);
@@ -2252,6 +2291,7 @@ export class DungeonScene extends Phaser.Scene {
               if (evo.newSkillId && SKILL_DB[evo.newSkillId] && this.player.skills.length < 4) {
                 this.player.skills.push(createSkill(SKILL_DB[evo.newSkillId]));
               }
+              sfxEvolution();
               this.cameras.main.flash(500, 255, 255, 255);
               this.showLog(`Congratulations! ${evo.from} evolved into ${evo.newName}!`);
               this.updateHUD();
@@ -2323,6 +2363,7 @@ export class DungeonScene extends Phaser.Scene {
       onComplete: () => heart.destroy(),
     });
 
+    sfxRecruit();
     this.allies.push(ally);
     this.allEntities.push(ally);
     this.showLog(`${sp.name} joined your team!`);

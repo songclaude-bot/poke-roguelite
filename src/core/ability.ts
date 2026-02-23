@@ -16,6 +16,7 @@ export enum AbilityId {
   Pickup = "pickup",         // 10% chance to find items after defeating enemy
   SwiftSwim = "swiftSwim",   // Double speed in rain (extra action)
   Levitate = "levitate",     // Immune to ground traps
+  FlameBody = "flameBody",   // 30% chance to burn attackers
 }
 
 export interface AbilityDef {
@@ -85,6 +86,11 @@ export const ABILITIES: Record<AbilityId, AbilityDef> = {
     name: "Levitate",
     description: "Immune to Ground-type traps.",
   },
+  [AbilityId.FlameBody]: {
+    id: AbilityId.FlameBody,
+    name: "Flame Body",
+    description: "30% chance to burn an attacker on contact.",
+  },
 };
 
 /** Species → Ability mapping */
@@ -107,4 +113,7 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   snorunt: AbilityId.ShieldDust,
   charmander: AbilityId.Torrent, // Blaze doesn't exist, use Torrent as fire equiv
   eevee: AbilityId.RunAway,
+  numel: AbilityId.RockHead,
+  slugma: AbilityId.FlameBody,
+  torkoal: AbilityId.Sturdy,
 };

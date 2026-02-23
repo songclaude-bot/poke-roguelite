@@ -6,6 +6,7 @@ import {
   MetaSaveData,
 } from "../core/save-system";
 import { DUNGEONS, DungeonDef, getUnlockedDungeons } from "../core/dungeon-data";
+import { initAudio, startBgm, stopBgm } from "../core/sound-manager";
 
 /**
  * HubScene — the town between dungeon runs.
@@ -34,6 +35,9 @@ export class HubScene extends Phaser.Scene {
   }
 
   create() {
+    initAudio();
+    startBgm("hub");
+
     // Background
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x1a2744);
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 100, GAME_WIDTH, 200, 0x2d5a27);
@@ -135,7 +139,7 @@ export class HubScene extends Phaser.Scene {
     );
 
     // Version
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 15, "v0.12.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 15, "v0.14.0", {
       fontSize: "9px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 
@@ -176,6 +180,7 @@ export class HubScene extends Phaser.Scene {
   }
 
   private enterDungeon(dungeonId: string) {
+    stopBgm();
     clearDungeonSave();
     this.meta.totalRuns++;
     saveMeta(this.meta);
