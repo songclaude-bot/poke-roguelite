@@ -30,6 +30,8 @@ import {
 } from "../core/save-system";
 import { TrapDef, TrapType, rollTrap, trapsPerFloor } from "../core/trap";
 import { AbilityId, SPECIES_ABILITIES, ABILITIES } from "../core/ability";
+import { WeatherType, WEATHERS, weatherDamageMultiplier, isWeatherImmune, rollFloorWeather } from "../core/weather";
+import { ShopItem, generateShopItems, shouldSpawnShop } from "../core/shop";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
 // Sound system removed — will use PokeAutoChess resources later
 
@@ -119,6 +121,13 @@ export class DungeonScene extends Phaser.Scene {
   private belly = 100;
   private maxBelly = 100;
   private persistentBelly: number | null = null;
+
+  // Shop state
+  private shopItems: ShopItem[] = [];
+  private shopRoom: { x: number; y: number; w: number; h: number } | null = null;
+  private shopUI: Phaser.GameObjects.GameObject[] = [];
+  private shopOpen = false;
+  private gold = 0;
 
   // Starter species
   private starterId = "mudkip";
@@ -1132,6 +1141,15 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
 
+    // Ability: Levitate — immune to ground-based traps (Spike, Warp, Hunger)
+    if (this.player.ability === AbilityId.Levitate &&
+        (ft.trap.type === TrapType.Spike || ft.trap.type === TrapType.Warp || ft.trap.type === TrapType.Hunger)) {
+      this.showLog(`Stepped on a ${ft.trap.name}! Levitate avoided it!`);
+      ft.sprite.destroy();
+      this.floorTraps.splice(idx, 1);
+      return;
+    }
+
     this.showLog(`Stepped on a ${ft.trap.name}! ${ft.trap.description}`);
 
     switch (ft.trap.type) {
@@ -1158,20 +1176,40 @@ export class DungeonScene extends Phaser.Scene {
         this.time.delayedCall(300, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
         break;
       case TrapType.Warp: {
-        // Teleport to random ground tile
-        const { terrain, width, height } = this.dungeon;
+        const { terrain, width, height, stairsPos } = this.dungeon;
         let wx: number, wy: number;
         let tries = 0;
-        do {
-          wx = Math.floor(Math.random() * width);
-          wy = Math.floor(Math.random() * height);
-          tries++;
-        } while (tries < 200 && (terrain[wy][wx] !== TerrainType.GROUND ||
-          this.allEntities.some(e => e !== this.player && e.alive && e.tileX === wx && e.tileY === wy)));
-        this.player.tileX = wx;
-        this.player.tileY = wy;
+
+        // Ability: RunAway — warp near stairs instead of random
+        if (this.player.ability === AbilityId.RunAway) {
+          // Find open tile near stairs
+          const offsets = [{x:0,y:-1},{x:1,y:0},{x:0,y:1},{x:-1,y:0},{x:1,y:-1},{x:1,y:1},{x:-1,y:1},{x:-1,y:-1}];
+          let found = false;
+          for (const off of offsets) {
+            const tx = stairsPos.x + off.x;
+            const ty = stairsPos.y + off.y;
+            if (tx >= 0 && tx < width && ty >= 0 && ty < height &&
+                terrain[ty][tx] === TerrainType.GROUND &&
+                !this.allEntities.some(e => e !== this.player && e.alive && e.tileX === tx && e.tileY === ty)) {
+              wx = tx; wy = ty; found = true; break;
+            }
+          }
+          if (!found) { wx = stairsPos.x; wy = stairsPos.y; }
+          this.showLog("Run Away warped you near the stairs!");
+        } else {
+          // Normal: teleport to random ground tile
+          do {
+            wx = Math.floor(Math.random() * width);
+            wy = Math.floor(Math.random() * height);
+            tries++;
+          } while (tries < 200 && (terrain[wy][wx] !== TerrainType.GROUND ||
+            this.allEntities.some(e => e !== this.player && e.alive && e.tileX === wx && e.tileY === wy)));
+        }
+
+        this.player.tileX = wx!;
+        this.player.tileY = wy!;
         if (this.player.sprite) {
-          this.player.sprite.setPosition(this.tileToPixelX(wx), this.tileToPixelY(wy));
+          this.player.sprite.setPosition(this.tileToPixelX(wx!), this.tileToPixelY(wy!));
         }
         this.cameras.main.flash(200, 100, 100, 255);
         break;
@@ -1553,8 +1591,9 @@ export class DungeonScene extends Phaser.Scene {
       // Apply damage to each target
       let totalHits = 0;
       for (const target of targets) {
-        // Accuracy check
-        if (Math.random() * 100 > skill.accuracy) {
+        // Accuracy check (NoGuard: always hit)
+        const noGuard = user.ability === AbilityId.NoGuard || target.ability === AbilityId.NoGuard;
+        if (!noGuard && Math.random() * 100 > skill.accuracy) {
           this.showLog(`${user.name}'s ${skill.name} missed ${target.name}!`);
           continue;
         }
@@ -1596,6 +1635,13 @@ export class DungeonScene extends Phaser.Scene {
     if (!skill.effect || skill.effect === SkillEffect.None) return;
     const chance = skill.effectChance ?? 100;
     if (Math.random() * 100 > chance) return;
+
+    // ShieldDust: immune to harmful secondary effects from enemy skills
+    if (target.ability === AbilityId.ShieldDust && user !== target &&
+        (skill.effect === SkillEffect.Paralyze || skill.effect === SkillEffect.Burn)) {
+      this.showLog(`${target.name}'s Shield Dust blocked the effect!`);
+      return;
+    }
 
     switch (skill.effect) {
       case SkillEffect.AtkUp:
