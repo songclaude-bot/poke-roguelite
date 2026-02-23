@@ -83,3 +83,10 @@
 - [상세 기록](./13-polish-deploy.md)
 - 핵심: 미니맵, 그래픽 HP바, 데미지 팝업, PWA, GitHub Pages 배포
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+## Phase 6: 동료 시스템
+
+### 6-1~4. 리크루트 + 동료 AI + 파티 전투
+- 날짜: 2026-02-23
+- [상세 기록](./14-recruitment.md)
+- 핵심: 적 리크루트, 동료 AI, 최대 2명 파티, 프렌들리파이어 방지

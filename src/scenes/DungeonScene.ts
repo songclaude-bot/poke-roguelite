@@ -11,10 +11,11 @@ import { getTileIndex } from "../core/autotiler";
 import { Direction, DIR_DX, DIR_DY, angleToDirection } from "../core/direction";
 import { TurnManager } from "../core/turn-manager";
 import {
-  Entity, canMoveTo, canMoveDiagonal,
+  Entity, canMoveTo, canMoveDiagonal, chebyshevDist,
   getEffectiveAtk, getEffectiveDef, tickStatusEffects, isParalyzed, StatusEffect,
 } from "../core/entity";
 import { getEnemyMoveDirection, isAdjacentToPlayer, directionToPlayer } from "../core/enemy-ai";
+import { getAllyMoveDirection, tryRecruit, directionTo } from "../core/ally-ai";
 import { PokemonType, getEffectiveness, effectivenessText } from "../core/type-chart";
 import { Skill, SkillRange, SkillEffect } from "../core/skill";
 import { getSkillTargetTiles } from "../core/skill-targeting";
@@ -24,12 +25,22 @@ import { DungeonDef, getDungeon, getDungeonFloorEnemies } from "../core/dungeon-
 import { expFromEnemy, processLevelUp } from "../core/leveling";
 import {
   saveDungeon, clearDungeonSave, serializeSkills, serializeInventory,
+  deserializeSkills as deserializeSkillsFn,
   goldFromRun, loadMeta, saveMeta,
 } from "../core/save-system";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
 
+interface AllyData {
+  speciesId: string;
+  hp: number; maxHp: number;
+  atk: number; def: number;
+  level: number;
+  skills: { id: string; currentPp: number }[];
+}
+
 const MOVE_DURATION = 150; // ms per tile movement
 const ENEMIES_PER_ROOM = 1; // base enemies per room (except player's room)
+const MAX_ALLIES = 2; // max party members (excluding player)
 
 // Per-floor enemy scaling (uses species base stats + dungeon difficulty)
 function getEnemyStats(floor: number, difficulty: number, species?: PokemonSpecies) {
@@ -52,6 +63,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private player!: Entity;
   private enemies: Entity[] = [];
+  private allies: Entity[] = [];
   private allEntities: Entity[] = [];
 
   // Persistent player state across floors
@@ -101,7 +113,9 @@ export class DungeonScene extends Phaser.Scene {
     super({ key: "DungeonScene" });
   }
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string }) {
+  private persistentAllies: AllyData[] | null = null;
+
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null }) {
     // Apply upgrade bonuses on fresh run start (floor 1 from hub)
     const meta = loadMeta();
     const hpBonus = getUpgradeBonus(meta, "maxHp") * 5;
@@ -120,6 +134,7 @@ export class DungeonScene extends Phaser.Scene {
     this.persistentDef = data?.def ?? (6 + defBonus);
     this.totalExp = data?.exp ?? 0;
     this.enemies = [];
+    this.allies = [];
     this.allEntities = [];
     this.floorItems = [];
     this.gameOver = false;
@@ -129,6 +144,7 @@ export class DungeonScene extends Phaser.Scene {
     this.bagUI = [];
     this.enemiesDefeated = 0;
     this.turnManager = new TurnManager();
+    this.persistentAllies = data?.allies ?? null;
 
     // Give starter items on new run
     if (isNewRun) {
@@ -150,8 +166,9 @@ export class DungeonScene extends Phaser.Scene {
       caterpie: "0010", pidgey: "0016",
     };
 
-    // Load player + all enemy species for this dungeon
-    const neededKeys = new Set<string>(["mudkip", ...this.dungeonDef.enemySpeciesIds]);
+    // Load player + all enemy species + ally species for this dungeon
+    const allySpeciesIds = (this.persistentAllies ?? []).map(a => a.speciesId);
+    const neededKeys = new Set<string>(["mudkip", ...this.dungeonDef.enemySpeciesIds, ...allySpeciesIds]);
     for (const key of neededKeys) {
       const dexNum = spriteMap[key];
       const sp = SPECIES[key];
@@ -229,6 +246,35 @@ export class DungeonScene extends Phaser.Scene {
     this.player.sprite.play(`mudkip-idle-${Direction.Down}`);
     this.allEntities.push(this.player);
 
+    // ── Spawn persistent allies ──
+    if (this.persistentAllies) {
+      for (let ai = 0; ai < this.persistentAllies.length; ai++) {
+        const allyData = this.persistentAllies[ai];
+        const sp = SPECIES[allyData.speciesId];
+        if (!sp) continue;
+        const ax = playerStart.x + (ai === 0 ? 1 : -1);
+        const ay = playerStart.y;
+        const validX = (ax >= 0 && ax < width && terrain[ay]?.[ax] === TerrainType.GROUND) ? ax : playerStart.x;
+        const validY = (validX === playerStart.x && ay + 1 < height && terrain[ay + 1]?.[validX] === TerrainType.GROUND) ? ay + 1 : ay;
+
+        const ally: Entity = {
+          tileX: validX, tileY: validY === ay && validX === playerStart.x ? ay : validY,
+          facing: Direction.Down,
+          stats: { hp: allyData.hp, maxHp: allyData.maxHp, atk: allyData.atk, def: allyData.def, level: allyData.level },
+          alive: true, spriteKey: sp.spriteKey, name: sp.name,
+          types: sp.types, attackType: sp.attackType,
+          skills: deserializeSkillsFn(allyData.skills),
+          statusEffects: [], isAlly: true, speciesId: allyData.speciesId,
+        };
+        ally.sprite = this.add.sprite(
+          this.tileToPixelX(ally.tileX), this.tileToPixelY(ally.tileY), `${sp.spriteKey}-idle`
+        ).setScale(TILE_SCALE).setDepth(10);
+        ally.sprite.play(`${sp.spriteKey}-idle-${Direction.Down}`);
+        this.allies.push(ally);
+        this.allEntities.push(ally);
+      }
+    }
+
     // ── Spawn enemies (dungeon + floor specific) ──
     const rooms = this.dungeon.rooms;
     const floorSpeciesIds = getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
@@ -258,6 +304,7 @@ export class DungeonScene extends Phaser.Scene {
           attackType: sp.attackType,
           skills: createSpeciesSkills(sp),
           statusEffects: [],
+          speciesId: sp.spriteKey, // for recruitment
         };
         enemy.sprite = this.add.sprite(
           this.tileToPixelX(ex), this.tileToPixelY(ey), `${sp.spriteKey}-idle`
@@ -382,7 +429,7 @@ export class DungeonScene extends Phaser.Scene {
       if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
       this.turnManager.executeTurn(
         () => Promise.resolve(),
-        this.getEnemyActions()
+        [...this.getAllyActions(), ...this.getEnemyActions()]
       ).then(() => {
         this.recoverPP(this.player);
         tickStatusEffects(this.player);
@@ -555,6 +602,14 @@ export class DungeonScene extends Phaser.Scene {
     for (const e of this.enemies) {
       if (e.alive) {
         this.minimapGfx.fillRect(mx + e.tileX * t, my + e.tileY * t, t, t);
+      }
+    }
+
+    // Allies (blue dots)
+    this.minimapGfx.fillStyle(0x60a5fa, 1);
+    for (const a of this.allies) {
+      if (a.alive) {
+        this.minimapGfx.fillRect(mx + a.tileX * t, my + a.tileY * t, t, t);
       }
     }
 
@@ -876,6 +931,7 @@ export class DungeonScene extends Phaser.Scene {
         def: this.player.stats.def,
         exp: this.totalExp,
         dungeonId: this.dungeonDef.id,
+        allies: this.serializeAllies(),
       });
     });
   }
@@ -967,7 +1023,7 @@ export class DungeonScene extends Phaser.Scene {
     if (targetEnemy) {
       await this.turnManager.executeTurn(
         () => this.performBasicAttack(this.player, targetEnemy),
-        this.getEnemyActions()
+        [...this.getAllyActions(), ...this.getEnemyActions()]
       );
     } else {
       const canMove = this.canEntityMove(this.player, dir);
@@ -977,7 +1033,7 @@ export class DungeonScene extends Phaser.Scene {
       }
       await this.turnManager.executeTurn(
         () => this.moveEntity(this.player, dir),
-        this.getEnemyActions()
+        [...this.getAllyActions(), ...this.getEnemyActions()]
       );
 
       // PP recovery: 1 PP for a random depleted skill on movement
@@ -1116,11 +1172,15 @@ export class DungeonScene extends Phaser.Scene {
         this.dungeon.terrain, this.dungeon.width, this.dungeon.height
       );
 
-      // Find entities on those tiles
-      const targets = this.allEntities.filter(e =>
-        e.alive && e !== user &&
-        tiles.some(t => t.x === e.tileX && t.y === e.tileY)
-      );
+      // Find entities on those tiles (friendly fire prevention)
+      const isUserFriendly = user === this.player || user.isAlly;
+      const targets = this.allEntities.filter(e => {
+        if (!e.alive || e === user) return false;
+        if (!tiles.some(t => t.x === e.tileX && t.y === e.tileY)) return false;
+        // Friendly = player or ally; don't hit same team
+        const isTargetFriendly = e === this.player || e.isAlly;
+        return isUserFriendly !== isTargetFriendly;
+      });
 
       if (targets.length === 0) {
         this.showLog(`${user.name} used ${skill.name}! But it missed!`);
@@ -1290,8 +1350,12 @@ export class DungeonScene extends Phaser.Scene {
     }
     if (entity === this.player) {
       this.showLog(`${this.player.name} fainted!`);
+    } else if (entity.isAlly) {
+      // Ally fainted
+      this.showLog(`${entity.name} fainted!`);
+      this.allies = this.allies.filter(a => a !== entity);
     } else {
-      // Track defeated enemies for gold calculation
+      // Enemy defeated — track for gold
       this.enemiesDefeated++;
       // Grant EXP
       const expGain = expFromEnemy(entity.stats.level, this.currentFloor);
@@ -1303,7 +1367,7 @@ export class DungeonScene extends Phaser.Scene {
         this.player.stats, expGain, this.totalExp
       );
       this.totalExp = results.length > 0
-        ? this.totalExp // processLevelUp already updated totalExp internally
+        ? this.totalExp
         : this.totalExp;
 
       for (const r of results) {
@@ -1318,7 +1382,61 @@ export class DungeonScene extends Phaser.Scene {
           this.updateHUD();
         });
       }
+
+      // ── Recruitment check ──
+      if (entity.speciesId && this.allies.length < MAX_ALLIES && tryRecruit(this.player.stats.level, entity.stats.level)) {
+        this.time.delayedCall(800, () => {
+          this.recruitEnemy(entity);
+        });
+      }
     }
+  }
+
+  /** Recruit a defeated enemy as ally */
+  private recruitEnemy(entity: Entity) {
+    const sp = entity.speciesId ? SPECIES[entity.speciesId] : null;
+    if (!sp) return;
+
+    // Create ally at the entity's last position
+    const ally: Entity = {
+      tileX: entity.tileX, tileY: entity.tileY,
+      facing: Direction.Down,
+      stats: {
+        hp: Math.floor(entity.stats.maxHp * 0.5),
+        maxHp: entity.stats.maxHp,
+        atk: entity.stats.atk, def: entity.stats.def,
+        level: entity.stats.level,
+      },
+      alive: true, spriteKey: sp.spriteKey, name: sp.name,
+      types: sp.types, attackType: sp.attackType,
+      skills: createSpeciesSkills(sp),
+      statusEffects: [], isAlly: true, speciesId: entity.speciesId,
+    };
+
+    ally.sprite = this.add.sprite(
+      this.tileToPixelX(ally.tileX), this.tileToPixelY(ally.tileY),
+      `${sp.spriteKey}-idle`
+    ).setScale(TILE_SCALE).setDepth(10);
+    ally.sprite.play(`${sp.spriteKey}-idle-${Direction.Down}`);
+
+    // Recruitment animation — pink heart + flash
+    ally.sprite.setTint(0xff88cc);
+    this.time.delayedCall(400, () => { if (ally.sprite) ally.sprite.clearTint(); });
+
+    const heart = this.add.text(
+      this.tileToPixelX(ally.tileX), this.tileToPixelY(ally.tileY) - 20,
+      "♥", { fontSize: "18px", color: "#ff6b9d", fontFamily: "monospace" }
+    ).setOrigin(0.5).setDepth(50);
+    this.tweens.add({
+      targets: heart, y: heart.y - 30, alpha: { from: 1, to: 0 },
+      duration: 1000, ease: "Quad.easeOut",
+      onComplete: () => heart.destroy(),
+    });
+
+    this.allies.push(ally);
+    this.allEntities.push(ally);
+    this.showLog(`${sp.name} joined your team!`);
+    this.updateHUD();
   }
 
   // ── Enemy AI ──
@@ -1339,17 +1457,22 @@ export class DungeonScene extends Phaser.Scene {
           // Tick enemy status effects
           tickStatusEffects(enemy);
 
-          if (isAdjacentToPlayer(enemy, this.player)) {
-            const dir = directionToPlayer(enemy, this.player);
+          // Find closest adjacent target (player or ally)
+          const adjacentTargets = [this.player, ...this.allies].filter(
+            t => t.alive && chebyshevDist(enemy.tileX, enemy.tileY, t.tileX, t.tileY) === 1
+          );
+          if (adjacentTargets.length > 0) {
+            // Prefer attacking player, otherwise random
+            const target = adjacentTargets.find(t => t === this.player) ?? adjacentTargets[0];
+            const dir = directionToPlayer(enemy, target);
             enemy.facing = dir;
-            // Pick a random usable skill or basic attack
             const usableSkills = enemy.skills.filter(s => s.currentPp > 0 && s.power > 0);
             if (usableSkills.length > 0 && Math.random() < 0.4) {
               const skill = usableSkills[Math.floor(Math.random() * usableSkills.length)];
               skill.currentPp--;
               await this.performSkill(enemy, skill, dir);
             } else {
-              await this.performBasicAttack(enemy, this.player);
+              await this.performBasicAttack(enemy, target);
             }
             this.updateHUD();
             return;
@@ -1366,5 +1489,56 @@ export class DungeonScene extends Phaser.Scene {
           }
         };
       });
+  }
+
+  // ── Ally AI ──
+
+  private getAllyActions(): (() => Promise<void>)[] {
+    return this.allies
+      .filter((a) => a.alive)
+      .map((ally) => {
+        return async () => {
+          if (!ally.alive || !this.player.alive) return;
+          if (isParalyzed(ally)) return;
+          tickStatusEffects(ally);
+
+          const { moveDir, attackTarget } = getAllyMoveDirection(
+            ally, this.player, this.enemies,
+            this.dungeon.terrain, this.dungeon.width, this.dungeon.height,
+            this.allEntities
+          );
+
+          if (attackTarget) {
+            const dir = directionTo(ally, attackTarget);
+            ally.facing = dir;
+            // Use skill sometimes
+            const usableSkills = ally.skills.filter(s => s.currentPp > 0 && s.power > 0);
+            if (usableSkills.length > 0 && Math.random() < 0.35) {
+              const skill = usableSkills[Math.floor(Math.random() * usableSkills.length)];
+              skill.currentPp--;
+              await this.performSkill(ally, skill, dir);
+            } else {
+              await this.performBasicAttack(ally, attackTarget);
+            }
+            this.updateHUD();
+          } else if (moveDir !== null && this.canEntityMove(ally, moveDir)) {
+            await this.moveEntity(ally, moveDir);
+            this.recoverPP(ally);
+          }
+        };
+      });
+  }
+
+  /** Serialize allies for floor transition / save */
+  private serializeAllies(): AllyData[] {
+    return this.allies.filter(a => a.alive).map(a => ({
+      speciesId: a.speciesId!,
+      hp: a.stats.hp,
+      maxHp: a.stats.maxHp,
+      atk: a.stats.atk,
+      def: a.stats.def,
+      level: a.stats.level,
+      skills: serializeSkills(a.skills),
+    }));
   }
 }

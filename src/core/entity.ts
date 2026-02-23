@@ -30,6 +30,8 @@ export interface Entity {
   attackType: PokemonType; // type of basic attack (STAB type)
   skills: Skill[];
   statusEffects: StatusEffect[];
+  isAlly?: boolean; // true if recruited ally
+  speciesId?: string; // species key for serialization
 }
 
 /** Get effective ATK (with buffs) */
