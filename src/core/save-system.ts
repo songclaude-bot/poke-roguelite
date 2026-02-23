@@ -43,6 +43,8 @@ export interface MetaSaveData {
   storage: { itemId: string; count: number }[];
   // Upgrades purchased
   upgrades: Record<string, number>; // upgradeId → level
+  // Starter pokemon (unlocked by clears)
+  starter?: string; // speciesId (default: "mudkip")
 }
 
 const SAVE_VERSION = 1;

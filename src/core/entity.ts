@@ -3,6 +3,7 @@ import { TerrainType } from "./dungeon-generator";
 import { PokemonType } from "./type-chart";
 import { Skill } from "./skill";
 import { SkillEffect } from "./skill";
+import { AbilityId } from "./ability";
 
 export interface EntityStats {
   hp: number;
@@ -33,12 +34,21 @@ export interface Entity {
   isAlly?: boolean; // true if recruited ally
   isBoss?: boolean; // true if floor boss
   speciesId?: string; // species key for serialization
+  ability?: AbilityId; // passive ability
+  sturdyUsed?: boolean; // track if Sturdy was consumed this floor
 }
 
-/** Get effective ATK (with buffs) */
+/** Get effective ATK (with buffs + abilities) */
 export function getEffectiveAtk(entity: Entity): number {
+  let atk = entity.stats.atk;
+  // Ability: Pure Power (+30% always)
+  if (entity.ability === AbilityId.PurePower) atk = Math.floor(atk * 1.3);
+  // Ability: Guts (+50% when has status effect)
+  if (entity.ability === AbilityId.Guts && entity.statusEffects.length > 0) atk = Math.floor(atk * 1.5);
+  // Buff: AtkUp (+50%)
   const hasAtkUp = entity.statusEffects.some(s => s.type === SkillEffect.AtkUp);
-  return hasAtkUp ? Math.floor(entity.stats.atk * 1.5) : entity.stats.atk;
+  if (hasAtkUp) atk = Math.floor(atk * 1.5);
+  return atk;
 }
 
 /** Get effective DEF (with buffs) */

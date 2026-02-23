@@ -29,6 +29,7 @@ import {
   goldFromRun, loadMeta, saveMeta,
 } from "../core/save-system";
 import { TrapDef, TrapType, rollTrap, trapsPerFloor } from "../core/trap";
+import { AbilityId, SPECIES_ABILITIES, ABILITIES } from "../core/ability";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
 // Sound system removed — will use PokeAutoChess resources later
 
@@ -260,6 +261,8 @@ export class DungeonScene extends Phaser.Scene {
       attackType: playerSp.attackType,
       skills: playerSkills,
       statusEffects: [],
+      ability: SPECIES_ABILITIES["mudkip"],
+      speciesId: "mudkip",
     };
     this.player.sprite = this.add.sprite(
       this.tileToPixelX(this.player.tileX),
@@ -289,6 +292,7 @@ export class DungeonScene extends Phaser.Scene {
           types: sp.types, attackType: sp.attackType,
           skills: deserializeSkillsFn(allyData.skills),
           statusEffects: [], isAlly: true, speciesId: allyData.speciesId,
+          ability: SPECIES_ABILITIES[allyData.speciesId],
         };
         ally.sprite = this.add.sprite(
           this.tileToPixelX(ally.tileX), this.tileToPixelY(ally.tileY), `${sp.spriteKey}-idle`
@@ -329,6 +333,7 @@ export class DungeonScene extends Phaser.Scene {
           skills: createSpeciesSkills(sp),
           statusEffects: [],
           speciesId: sp.spriteKey, // for recruitment
+          ability: SPECIES_ABILITIES[sp.spriteKey],
         };
         enemy.sprite = this.add.sprite(
           this.tileToPixelX(ex), this.tileToPixelY(ey), `${sp.spriteKey}-idle`
@@ -373,6 +378,7 @@ export class DungeonScene extends Phaser.Scene {
           statusEffects: [],
           speciesId: sp.spriteKey,
           isBoss: true,
+          ability: SPECIES_ABILITIES[sp.spriteKey],
         };
         boss.sprite = this.add.sprite(
           this.tileToPixelX(bx), this.tileToPixelY(by), `${sp.spriteKey}-idle`
@@ -439,26 +445,7 @@ export class DungeonScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, mapPixelW, mapPixelH);
     this.cameras.main.startFollow(this.player.sprite!, true, 0.15, 0.15);
 
-    // ── Input ──
-    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen) return;
-
-      const dx = pointer.worldX - this.player.sprite!.x;
-      const dy = pointer.worldY - this.player.sprite!.y;
-      if (Math.abs(dx) < 16 && Math.abs(dy) < 16) return;
-
-      const angle = Math.atan2(dy, dx);
-      const dir = angleToDirection(angle);
-
-      if (this.activeSkillIndex >= 0) {
-        // Use selected skill in the tapped direction
-        this.handleSkillUse(this.activeSkillIndex, dir);
-        this.activeSkillIndex = -1;
-        this.updateSkillButtons();
-      } else {
-        this.handlePlayerAction(dir);
-      }
-    });
+    // Input is handled by D-Pad and skill buttons below
 
     // ── HUD ──
     // Portrait sprite (small idle frame)
@@ -486,9 +473,11 @@ export class DungeonScene extends Phaser.Scene {
       .text(8, 40, "", { fontSize: "10px", color: "#60a5fa", fontFamily: "monospace" })
       .setScrollFactor(0).setDepth(100);
     this.logText = this.add
-      .text(8, GAME_HEIGHT - 130, "", {
+      .text(8, GAME_HEIGHT - 200, "", {
         fontSize: "10px", color: "#fbbf24", fontFamily: "monospace",
         wordWrap: { width: 340 },
+        backgroundColor: "#000000cc",
+        padding: { x: 6, y: 4 },
       })
       .setScrollFactor(0).setDepth(100);
 
@@ -508,39 +497,43 @@ export class DungeonScene extends Phaser.Scene {
     });
 
     // ── Skill Buttons ──
+    // ── Virtual D-Pad (bottom-left) ──
+    this.createDPad();
+
+    // ── Skill Buttons (bottom-right, 2x2 grid) ──
     this.createSkillButtons();
 
-    // Menu buttons
-    const menuY = GAME_HEIGHT - 40;
-    const bagBtn = this.add.text(15, menuY, "[가방]", {
-      fontSize: "11px", color: "#666680", fontFamily: "monospace",
-    }).setScrollFactor(0).setDepth(100).setInteractive();
-    bagBtn.on("pointerdown", () => this.toggleBag());
+    // ── Menu icon buttons (center-bottom) ──
+    const menuCX = GAME_WIDTH / 2;
+    const menuCY = GAME_HEIGHT - 55;
+    const iconStyle = { fontSize: "18px", color: "#aab0c8", fontFamily: "monospace", backgroundColor: "#1a1a2ecc", padding: { x: 6, y: 4 } };
 
-    const waitBtn = this.add.text(105, menuY, "[대기]", {
-      fontSize: "11px", color: "#666680", fontFamily: "monospace",
-    }).setScrollFactor(0).setDepth(100).setInteractive();
-    waitBtn.on("pointerdown", () => {
-      if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
-      this.turnManager.executeTurn(
-        () => Promise.resolve(),
-        [...this.getAllyActions(), ...this.getEnemyActions()]
-      ).then(() => {
-        this.recoverPP(this.player);
-        tickStatusEffects(this.player);
-        this.updateHUD();
-      });
-    });
+    this.add.text(menuCX - 22, menuCY - 25, "🎒", iconStyle)
+      .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
+      .on("pointerdown", () => this.toggleBag());
 
-    this.add.text(195, menuY, "[줍기]", {
-      fontSize: "11px", color: "#666680", fontFamily: "monospace",
-    }).setScrollFactor(0).setDepth(100).setInteractive()
+    this.add.text(menuCX + 22, menuCY - 25, "⬇", iconStyle)
+      .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
       .on("pointerdown", () => this.pickupItem());
 
-    const saveBtn = this.add.text(275, menuY, "[저장]", {
-      fontSize: "11px", color: "#666680", fontFamily: "monospace",
-    }).setScrollFactor(0).setDepth(100).setInteractive();
-    saveBtn.on("pointerdown", () => this.saveGame());
+    this.add.text(menuCX - 22, menuCY + 15, "⏳", iconStyle)
+      .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
+      .on("pointerdown", () => {
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
+        this.turnManager.executeTurn(
+          () => Promise.resolve(),
+          [...this.getAllyActions(), ...this.getEnemyActions()]
+        ).then(() => {
+          this.recoverPP(this.player);
+          this.tickBelly();
+          tickStatusEffects(this.player);
+          this.updateHUD();
+        });
+      });
+
+    this.add.text(menuCX + 22, menuCY + 15, "💾", iconStyle)
+      .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
+      .on("pointerdown", () => this.saveGame());
 
     // ── Boss HP Bar (fixed UI, hidden until boss floor) ──
     if (this.bossEntity) {
@@ -600,23 +593,76 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
-  // ── Skill Buttons ──
+  // ── Virtual D-Pad (bottom-left) ──
+
+  private createDPad() {
+    const cx = 70;
+    const cy = GAME_HEIGHT - 70;
+    const r = 50;
+    const btnR = 18;
+
+    const bg = this.add.graphics().setScrollFactor(0).setDepth(108);
+    bg.fillStyle(0x000000, 0.4);
+    bg.fillCircle(cx, cy, r + 5);
+    bg.lineStyle(2, 0x334155, 0.6);
+    bg.strokeCircle(cx, cy, r + 5);
+
+    const dirs: { dir: Direction; label: string; dx: number; dy: number }[] = [
+      { dir: Direction.Up, label: "▲", dx: 0, dy: -1 },
+      { dir: Direction.UpRight, label: "◣", dx: 0.7, dy: -0.7 },
+      { dir: Direction.Right, label: "▶", dx: 1, dy: 0 },
+      { dir: Direction.DownRight, label: "◤", dx: 0.7, dy: 0.7 },
+      { dir: Direction.Down, label: "▼", dx: 0, dy: 1 },
+      { dir: Direction.DownLeft, label: "◥", dx: -0.7, dy: 0.7 },
+      { dir: Direction.Left, label: "◀", dx: -1, dy: 0 },
+      { dir: Direction.UpLeft, label: "◢", dx: -0.7, dy: -0.7 },
+    ];
+
+    for (const d of dirs) {
+      const bx = cx + d.dx * (r - 5);
+      const by = cy + d.dy * (r - 5);
+      const btn = this.add.circle(bx, by, btnR, 0x1a1a2e, 0.7)
+        .setScrollFactor(0).setDepth(109).setInteractive();
+      const txt = this.add.text(bx, by, d.label, {
+        fontSize: "12px", color: "#8899bb", fontFamily: "monospace",
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(110);
+
+      btn.on("pointerdown", () => {
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen) return;
+        txt.setColor("#fbbf24");
+        this.time.delayedCall(150, () => txt.setColor("#8899bb"));
+        this.handlePlayerAction(d.dir);
+      });
+    }
+  }
+
+  // ── Skill Buttons (bottom-right, 2x2 grid) ──
 
   private createSkillButtons() {
-    const btnY = GAME_HEIGHT - 80;
+    const baseX = GAME_WIDTH - 120;
+    const baseY = GAME_HEIGHT - 95;
+    const cellW = 58;
+    const cellH = 38;
     const skills = this.player.skills;
+    const positions = [
+      { col: 0, row: 0 }, { col: 1, row: 0 },
+      { col: 0, row: 1 }, { col: 1, row: 1 },
+    ];
 
     for (let i = 0; i < 4; i++) {
       const skill = skills[i];
+      const pos = positions[i];
+      const px = baseX + pos.col * cellW;
+      const py = baseY + pos.row * cellH;
       const label = skill ? `${skill.name}\n${skill.currentPp}/${skill.pp}` : "---";
       const color = skill && skill.currentPp > 0 ? "#667eea" : "#444460";
 
-      const btn = this.add.text(5 + i * 89, btnY, label, {
-        fontSize: "10px", color, fontFamily: "monospace",
-        fixedWidth: 85, align: "center",
+      const btn = this.add.text(px, py, label, {
+        fontSize: "9px", color, fontFamily: "monospace",
+        fixedWidth: cellW - 4, align: "center",
         backgroundColor: "#1a1a2e",
-        padding: { x: 2, y: 4 },
-      }).setScrollFactor(0).setDepth(100).setInteractive();
+        padding: { x: 2, y: 3 },
+      }).setScrollFactor(0).setDepth(110).setInteractive();
 
       btn.on("pointerdown", () => {
         if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
@@ -624,20 +670,7 @@ export class DungeonScene extends Phaser.Scene {
           this.showLog("No PP left!");
           return;
         }
-
-        if (skill.range === SkillRange.Self) {
-          // Self-targeting skills activate immediately
-          this.handleSkillUse(i, this.player.facing);
-        } else {
-          // Select skill, wait for direction tap
-          if (this.activeSkillIndex === i) {
-            this.activeSkillIndex = -1; // deselect
-          } else {
-            this.activeSkillIndex = i;
-            this.showLog(`${skill.name} selected! Tap a direction.`);
-          }
-          this.updateSkillButtons();
-        }
+        this.handleSkillUse(i, this.player.facing);
       });
 
       this.skillButtons.push(btn);
@@ -649,16 +682,13 @@ export class DungeonScene extends Phaser.Scene {
     for (let i = 0; i < this.skillButtons.length; i++) {
       const skill = skills[i];
       if (!skill) continue;
-      const isSelected = this.activeSkillIndex === i;
       const haspp = skill.currentPp > 0;
-      const color = isSelected ? "#fbbf24" : haspp ? "#667eea" : "#444460";
-      const bg = isSelected ? "#2a2a4e" : "#1a1a2e";
+      const color = haspp ? "#667eea" : "#444460";
       this.skillButtons[i].setText(`${skill.name}\n${skill.currentPp}/${skill.pp}`);
       this.skillButtons[i].setColor(color);
-      this.skillButtons[i].setBackgroundColor(bg);
+      this.skillButtons[i].setBackgroundColor("#1a1a2e");
     }
   }
-
   private createMinimap() {
     const { width, height, terrain } = this.dungeon;
     const t = this.MINIMAP_TILE;
@@ -774,7 +804,9 @@ export class DungeonScene extends Phaser.Scene {
     const buffs = this.player.statusEffects.map(s => `${s.type}(${s.turnsLeft})`).join(" ");
     const buffStr = buffs ? `  ${buffs}` : "";
     const bellyColor = this.belly > 30 ? "" : this.belly > 0 ? " ⚠" : " ☠";
-    this.turnText.setText(`Lv.${p.level} EXP:${this.totalExp} Belly:${this.belly}${bellyColor} T${this.turnManager.turn}${buffStr}`);
+    const abilityName = this.player.ability ? ABILITIES[this.player.ability]?.name ?? "" : "";
+    const abilityStr = abilityName ? ` [${abilityName}]` : "";
+    this.turnText.setText(`Lv.${p.level} Belly:${this.belly}${bellyColor} T${this.turnManager.turn}${abilityStr}${buffStr}`);
 
     // Boss HP bar update
     if (this.bossEntity && this.bossHpBar) {
@@ -1085,6 +1117,14 @@ export class DungeonScene extends Phaser.Scene {
     if (!ft.revealed) {
       ft.revealed = true;
       ft.sprite.setAlpha(1);
+    }
+
+    // Ability: Rock Head — immune to trap damage
+    if (this.player.ability === AbilityId.RockHead) {
+      this.showLog(`Stepped on a ${ft.trap.name}! Rock Head negated it!`);
+      ft.sprite.destroy();
+      this.floorTraps.splice(idx, 1);
+      return;
     }
 
     this.showLog(`Stepped on a ${ft.trap.name}! ${ft.trap.description}`);
@@ -1432,7 +1472,14 @@ export class DungeonScene extends Phaser.Scene {
       const atk = getEffectiveAtk(attacker);
       const def = getEffectiveDef(defender);
       const baseDmg = Math.max(1, atk - Math.floor(def / 2));
-      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness));
+      // Ability: Torrent — +50% Water damage when HP < 33%
+      let abilityMult = 1.0;
+      if (attacker.ability === AbilityId.Torrent &&
+          attacker.attackType === PokemonType.Water &&
+          attacker.stats.hp < attacker.stats.maxHp / 3) {
+        abilityMult = 1.5;
+      }
+      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult));
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
       this.flashEntity(defender, effectiveness);
@@ -1442,7 +1489,16 @@ export class DungeonScene extends Phaser.Scene {
 
       let logMsg = `${attacker.name} attacks ${defender.name}! ${dmg} dmg!`;
       if (effText) logMsg += `\n${effText}`;
+      if (abilityMult > 1) logMsg += " (Torrent!)";
       this.showLog(logMsg);
+
+      // Ability: Static — 30% chance to paralyze attacker on contact
+      if (defender.ability === AbilityId.Static && Math.random() < 0.3) {
+        if (!attacker.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
+          attacker.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 2 });
+          this.showLog(`${defender.name}'s Static paralyzed ${attacker.name}!`);
+        }
+      }
 
       this.checkDeath(defender);
       this.time.delayedCall(250, resolve);
@@ -1675,6 +1731,18 @@ export class DungeonScene extends Phaser.Scene {
   private checkDeath(entity: Entity) {
     if (entity.stats.hp > 0 || !entity.alive) return;
 
+    // Ability: Sturdy — survive one lethal hit per floor
+    if (entity.ability === AbilityId.Sturdy && !entity.sturdyUsed) {
+      entity.stats.hp = 1;
+      entity.sturdyUsed = true;
+      this.showLog(`${entity.name}'s Sturdy held on!`);
+      if (entity.sprite) {
+        entity.sprite.setTint(0xffff44);
+        this.time.delayedCall(400, () => { if (entity.sprite) entity.sprite.clearTint(); });
+      }
+      return;
+    }
+
     // Player: check revive seed
     if (entity === this.player) {
       if (this.tryRevive()) return;
@@ -1738,6 +1806,17 @@ export class DungeonScene extends Phaser.Scene {
         });
       }
 
+      // ── Ability: Pickup — 10% chance to find item ──
+      if (this.player.ability === AbilityId.Pickup && Math.random() < 0.1) {
+        if (this.inventory.length < MAX_INVENTORY) {
+          const found = rollFloorItem();
+          const existing = this.inventory.find(s => s.item.id === found.id && found.stackable);
+          if (existing) existing.count++;
+          else this.inventory.push({ item: found, count: 1 });
+          this.showLog(`Pickup found a ${found.name}!`);
+        }
+      }
+
       // ── Recruitment check (bosses can't be recruited) ──
       if (!isBossKill && entity.speciesId && this.allies.length < MAX_ALLIES && tryRecruit(this.player.stats.level, entity.stats.level)) {
         this.time.delayedCall(800, () => {
@@ -1766,6 +1845,7 @@ export class DungeonScene extends Phaser.Scene {
       types: sp.types, attackType: sp.attackType,
       skills: createSpeciesSkills(sp),
       statusEffects: [], isAlly: true, speciesId: entity.speciesId,
+      ability: entity.ability,
     };
 
     ally.sprite = this.add.sprite(

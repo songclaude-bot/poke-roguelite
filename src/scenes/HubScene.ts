@@ -106,6 +106,17 @@ export class HubScene extends Phaser.Scene {
     // ── Bottom Buttons ──
     y += 5;
 
+    // Starter selection
+    const currentStarter = this.meta.starter ?? "mudkip";
+    const starterName = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
+    this.createButton(GAME_WIDTH / 2, y, btnW, 38,
+      `Starter: ${starterName}`,
+      "Tap to change your starting Pokemon",
+      "#f472b6",
+      () => this.showStarterSelect()
+    );
+    y += 48;
+
     this.createButton(GAME_WIDTH / 2, y, btnW, 38,
       "Upgrade Shop",
       `Gold: ${this.meta.gold}`,
@@ -124,15 +135,17 @@ export class HubScene extends Phaser.Scene {
     );
 
     // Version
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 15, "v0.4.0 — Phase 4", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 15, "v0.8.0", {
       fontSize: "9px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    // Mudkip sprite
-    if (this.textures.exists("mudkip-idle")) {
-      const sprite = this.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT - 140, "mudkip-idle");
+    // Starter sprite (show current)
+    const starterSpriteKey = `${currentStarter}-idle`;
+    if (this.textures.exists(starterSpriteKey)) {
+      const sprite = this.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT - 110, starterSpriteKey);
       sprite.setScale(2.5);
-      if (this.anims.exists("mudkip-idle-0")) sprite.play("mudkip-idle-0");
+      const animKey = `${currentStarter}-idle-0`;
+      if (this.anims.exists(animKey)) sprite.play(animKey);
       this.tweens.add({
         targets: sprite, y: sprite.y - 3,
         duration: 1200, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
@@ -169,7 +182,10 @@ export class HubScene extends Phaser.Scene {
 
     this.cameras.main.fadeOut(400, 0, 0, 0);
     this.time.delayedCall(450, () => {
-      this.scene.start("DungeonScene", { floor: 1, fromHub: true, dungeonId });
+      this.scene.start("DungeonScene", {
+        floor: 1, fromHub: true, dungeonId,
+        starter: this.meta.starter ?? "mudkip",
+      });
     });
   }
 
@@ -214,5 +230,79 @@ export class HubScene extends Phaser.Scene {
     const cleanup = () => { overlay.destroy(); text.destroy(); close.destroy(); };
     close.on("pointerdown", cleanup);
     overlay.on("pointerdown", cleanup);
+  }
+
+  private showStarterSelect() {
+    const uiItems: Phaser.GameObjects.GameObject[] = [];
+
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.85
+    ).setDepth(200).setInteractive();
+    uiItems.push(overlay);
+
+    const title = this.add.text(GAME_WIDTH / 2, 30, "── Choose Starter ──", {
+      fontSize: "14px", color: "#f472b6", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(201);
+    uiItems.push(title);
+
+    // Starter options: id, name, unlock condition (clears needed)
+    const starters: { id: string; name: string; unlock: number }[] = [
+      { id: "mudkip", name: "Mudkip", unlock: 0 },
+      { id: "pikachu", name: "Pikachu", unlock: 1 },
+      { id: "machop", name: "Machop", unlock: 3 },
+      { id: "caterpie", name: "Caterpie", unlock: 0 },
+      { id: "geodude", name: "Geodude", unlock: 2 },
+      { id: "magnemite", name: "Magnemite", unlock: 4 },
+    ];
+
+    const current = this.meta.starter ?? "mudkip";
+    let sy = 65;
+
+    for (const s of starters) {
+      const isUnlocked = this.meta.totalClears >= s.unlock;
+      const isCurrent = s.id === current;
+      const color = isCurrent ? "#fbbf24" : isUnlocked ? "#e0e0e0" : "#444460";
+      const label = isCurrent ? `★ ${s.name}` : s.name;
+      const desc = isUnlocked
+        ? (isCurrent ? "Currently selected" : "Tap to select")
+        : `Need ${s.unlock} clears (have ${this.meta.totalClears})`;
+
+      const bg = this.add.rectangle(GAME_WIDTH / 2, sy, 300, 36, 0x1a1a2e, 0.9)
+        .setStrokeStyle(1, isCurrent ? 0xfbbf24 : isUnlocked ? 0x334155 : 0x222233)
+        .setDepth(201);
+      uiItems.push(bg);
+
+      const nameText = this.add.text(GAME_WIDTH / 2 - 130, sy - 8, label, {
+        fontSize: "12px", color, fontFamily: "monospace", fontStyle: "bold",
+      }).setDepth(202);
+      uiItems.push(nameText);
+
+      const descText = this.add.text(GAME_WIDTH / 2 - 130, sy + 6, desc, {
+        fontSize: "8px", color: "#666680", fontFamily: "monospace",
+      }).setDepth(202);
+      uiItems.push(descText);
+
+      if (isUnlocked && !isCurrent) {
+        bg.setInteractive({ useHandCursor: true });
+        bg.on("pointerover", () => bg.setFillStyle(0x2a2a4e, 1));
+        bg.on("pointerout", () => bg.setFillStyle(0x1a1a2e, 0.9));
+        bg.on("pointerdown", () => {
+          this.meta.starter = s.id;
+          saveMeta(this.meta);
+          uiItems.forEach(o => o.destroy());
+          this.scene.restart(); // Rebuild hub with new starter
+        });
+      }
+
+      sy += 46;
+    }
+
+    const closeBtn = this.add.text(GAME_WIDTH / 2, sy + 10, "[Close]", {
+      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
+    }).setOrigin(0.5).setDepth(201).setInteractive();
+    uiItems.push(closeBtn);
+
+    closeBtn.on("pointerdown", () => uiItems.forEach(o => o.destroy()));
+    overlay.on("pointerdown", () => uiItems.forEach(o => o.destroy()));
   }
 }
