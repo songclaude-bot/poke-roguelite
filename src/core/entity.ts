@@ -1,6 +1,8 @@
 import { Direction, DIR_DX, DIR_DY } from "./direction";
 import { TerrainType } from "./dungeon-generator";
 import { PokemonType } from "./type-chart";
+import { Skill } from "./skill";
+import { SkillEffect } from "./skill";
 
 export interface EntityStats {
   hp: number;
@@ -8,6 +10,11 @@ export interface EntityStats {
   atk: number;
   def: number;
   level: number;
+}
+
+export interface StatusEffect {
+  type: SkillEffect;
+  turnsLeft: number;
 }
 
 export interface Entity {
@@ -21,6 +28,39 @@ export interface Entity {
   name: string; // display name e.g. "Mudkip"
   types: PokemonType[]; // pokemon types for effectiveness calc
   attackType: PokemonType; // type of basic attack (STAB type)
+  skills: Skill[];
+  statusEffects: StatusEffect[];
+}
+
+/** Get effective ATK (with buffs) */
+export function getEffectiveAtk(entity: Entity): number {
+  const hasAtkUp = entity.statusEffects.some(s => s.type === SkillEffect.AtkUp);
+  return hasAtkUp ? Math.floor(entity.stats.atk * 1.5) : entity.stats.atk;
+}
+
+/** Get effective DEF (with buffs) */
+export function getEffectiveDef(entity: Entity): number {
+  const hasDefUp = entity.statusEffects.some(s => s.type === SkillEffect.DefUp);
+  return hasDefUp ? Math.floor(entity.stats.def * 1.5) : entity.stats.def;
+}
+
+/** Tick status effects at end of turn, remove expired ones */
+export function tickStatusEffects(entity: Entity): string[] {
+  const messages: string[] = [];
+  entity.statusEffects = entity.statusEffects.filter(s => {
+    s.turnsLeft--;
+    if (s.turnsLeft <= 0) {
+      messages.push(`${entity.name}'s ${s.type} wore off.`);
+      return false;
+    }
+    return true;
+  });
+  return messages;
+}
+
+/** Check if entity is paralyzed (50% skip) */
+export function isParalyzed(entity: Entity): boolean {
+  return entity.statusEffects.some(s => s.type === SkillEffect.Paralyze) && Math.random() < 0.5;
 }
 
 /**

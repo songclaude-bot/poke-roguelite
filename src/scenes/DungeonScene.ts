@@ -10,9 +10,14 @@ import { generateDungeon, DungeonData, TerrainType } from "../core/dungeon-gener
 import { getTileIndex } from "../core/autotiler";
 import { Direction, DIR_DX, DIR_DY, angleToDirection } from "../core/direction";
 import { TurnManager } from "../core/turn-manager";
-import { Entity, canMoveTo, canMoveDiagonal, chebyshevDist } from "../core/entity";
+import {
+  Entity, canMoveTo, canMoveDiagonal,
+  getEffectiveAtk, getEffectiveDef, tickStatusEffects, isParalyzed, StatusEffect,
+} from "../core/entity";
 import { getEnemyMoveDirection, isAdjacentToPlayer, directionToPlayer } from "../core/enemy-ai";
 import { PokemonType, getEffectiveness, effectivenessText } from "../core/type-chart";
+import { Skill, SkillRange, SkillEffect, getDefaultSkills } from "../core/skill";
+import { getSkillTargetTiles } from "../core/skill-targeting";
 
 const MOVE_DURATION = 150; // ms per tile movement
 const ENEMIES_PER_ROOM = 1; // base enemies per room (except player's room)
@@ -26,7 +31,7 @@ const ZUBAT_IDLE_FRAMES = 8;
 
 // Per-floor enemy scaling
 function getEnemyStats(floor: number) {
-  const scale = 1 + (floor - 1) * 0.25; // 1.0, 1.25, 1.5, 1.75, 2.0
+  const scale = 1 + (floor - 1) * 0.25;
   return {
     hp: Math.floor(20 * scale),
     maxHp: Math.floor(20 * scale),
@@ -45,15 +50,20 @@ export class DungeonScene extends Phaser.Scene {
   private enemies: Entity[] = [];
   private allEntities: Entity[] = [];
 
-  // Persistent player HP across floors
+  // Persistent player state across floors
   private persistentHp = 50;
   private persistentMaxHp = 50;
+  private persistentSkills: Skill[] | null = null;
 
   // HUD references
   private hpText!: Phaser.GameObjects.Text;
   private turnText!: Phaser.GameObjects.Text;
   private floorText!: Phaser.GameObjects.Text;
   private logText!: Phaser.GameObjects.Text;
+  private skillButtons: Phaser.GameObjects.Text[] = [];
+
+  // Skill state
+  private activeSkillIndex = -1; // -1 = no skill selected
 
   // Game state
   private gameOver = false;
@@ -62,26 +72,27 @@ export class DungeonScene extends Phaser.Scene {
     super({ key: "DungeonScene" });
   }
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[] }) {
     this.currentFloor = data?.floor ?? 1;
     this.persistentHp = data?.hp ?? 50;
     this.persistentMaxHp = data?.maxHp ?? 50;
+    this.persistentSkills = data?.skills ?? null;
     this.enemies = [];
     this.allEntities = [];
     this.gameOver = false;
+    this.activeSkillIndex = -1;
+    this.skillButtons = [];
     this.turnManager = new TurnManager();
   }
 
   preload() {
     this.load.image("beachcave-tiles", "tilesets/BeachCave/tileset_0.png");
-    // Mudkip sprites
     this.load.spritesheet("mudkip-walk", "sprites/0258/Walk-Anim.png", {
       frameWidth: 32, frameHeight: 40,
     });
     this.load.spritesheet("mudkip-idle", "sprites/0258/Idle-Anim.png", {
       frameWidth: 24, frameHeight: 40,
     });
-    // Zubat sprites
     this.load.spritesheet("zubat-walk", "sprites/0041/Walk-Anim.png", {
       frameWidth: 32, frameHeight: 56,
     });
@@ -117,13 +128,14 @@ export class DungeonScene extends Phaser.Scene {
     stairsGfx.fillTriangle(sx, sy + 14, sx + 10, sy, sx - 10, sy);
     stairsGfx.setDepth(5);
 
-    // ── Create animations (only on first floor — they persist in cache) ──
+    // ── Create animations ──
     if (!this.anims.exists("mudkip-walk-0")) {
       this.createAnimations("mudkip", MUDKIP_WALK_FRAMES, MUDKIP_IDLE_FRAMES);
       this.createAnimations("zubat", ZUBAT_WALK_FRAMES, ZUBAT_IDLE_FRAMES);
     }
 
     // ── Player entity ──
+    const playerSkills = this.persistentSkills ?? getDefaultSkills("mudkip");
     this.player = {
       tileX: playerStart.x,
       tileY: playerStart.y,
@@ -138,6 +150,8 @@ export class DungeonScene extends Phaser.Scene {
       name: "Mudkip",
       types: [PokemonType.Water],
       attackType: PokemonType.Water,
+      skills: playerSkills,
+      statusEffects: [],
     };
     this.player.sprite = this.add.sprite(
       this.tileToPixelX(this.player.tileX),
@@ -148,7 +162,7 @@ export class DungeonScene extends Phaser.Scene {
     this.player.sprite.play(`mudkip-idle-${Direction.Down}`);
     this.allEntities.push(this.player);
 
-    // ── Spawn enemies in rooms (skip first room = player's room) ──
+    // ── Spawn enemies ──
     const rooms = this.dungeon.rooms;
     const enemyStats = getEnemyStats(this.currentFloor);
     for (let i = 1; i < rooms.length; i++) {
@@ -160,8 +174,7 @@ export class DungeonScene extends Phaser.Scene {
         if (ex === stairsPos.x && ey === stairsPos.y) continue;
 
         const enemy: Entity = {
-          tileX: ex,
-          tileY: ey,
+          tileX: ex, tileY: ey,
           facing: Direction.Down,
           stats: { ...enemyStats },
           alive: true,
@@ -169,15 +182,14 @@ export class DungeonScene extends Phaser.Scene {
           name: "Zubat",
           types: [PokemonType.Poison, PokemonType.Flying],
           attackType: PokemonType.Flying,
+          skills: getDefaultSkills("zubat"),
+          statusEffects: [],
         };
         enemy.sprite = this.add.sprite(
-          this.tileToPixelX(ex),
-          this.tileToPixelY(ey),
-          "zubat-idle"
+          this.tileToPixelX(ex), this.tileToPixelY(ey), "zubat-idle"
         );
         enemy.sprite.setScale(TILE_SCALE).setDepth(9);
         enemy.sprite.play(`zubat-idle-${Direction.Down}`);
-
         this.enemies.push(enemy);
         this.allEntities.push(enemy);
       }
@@ -199,7 +211,15 @@ export class DungeonScene extends Phaser.Scene {
 
       const angle = Math.atan2(dy, dx);
       const dir = angleToDirection(angle);
-      this.handlePlayerAction(dir);
+
+      if (this.activeSkillIndex >= 0) {
+        // Use selected skill in the tapped direction
+        this.handleSkillUse(this.activeSkillIndex, dir);
+        this.activeSkillIndex = -1;
+        this.updateSkillButtons();
+      } else {
+        this.handlePlayerAction(dir);
+      }
     });
 
     // ── HUD ──
@@ -213,21 +233,17 @@ export class DungeonScene extends Phaser.Scene {
       .text(8, 38, "", { fontSize: "11px", color: "#60a5fa", fontFamily: "monospace" })
       .setScrollFactor(0).setDepth(100);
     this.logText = this.add
-      .text(8, GAME_HEIGHT - 120, "", {
+      .text(8, GAME_HEIGHT - 130, "", {
         fontSize: "10px", color: "#fbbf24", fontFamily: "monospace",
         wordWrap: { width: 340 },
       })
       .setScrollFactor(0).setDepth(100);
 
-    // Bottom buttons
-    const btnY = GAME_HEIGHT - 80;
-    ["기술1", "기술2", "기술3", "기술4"].forEach((label, i) => {
-      this.add.text(20 + i * 85, btnY, `[${label}]`, {
-        fontSize: "12px", color: "#667eea", fontFamily: "monospace",
-      }).setScrollFactor(0).setDepth(100).setInteractive();
-    });
+    // ── Skill Buttons ──
+    this.createSkillButtons();
 
-    const menuY = GAME_HEIGHT - 50;
+    // Menu buttons
+    const menuY = GAME_HEIGHT - 40;
     ["가방", "팀", "대기", "💾저장"].forEach((label, i) => {
       this.add.text(15 + i * 88, menuY, `[${label}]`, {
         fontSize: "11px", color: "#666680", fontFamily: "monospace",
@@ -235,8 +251,6 @@ export class DungeonScene extends Phaser.Scene {
     });
 
     this.updateHUD();
-
-    // Floor entrance message
     this.showLog(`Beach Cave B${this.currentFloor}F`);
   }
 
@@ -269,6 +283,65 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
+  // ── Skill Buttons ──
+
+  private createSkillButtons() {
+    const btnY = GAME_HEIGHT - 80;
+    const skills = this.player.skills;
+
+    for (let i = 0; i < 4; i++) {
+      const skill = skills[i];
+      const label = skill ? `${skill.name}\n${skill.currentPp}/${skill.pp}` : "---";
+      const color = skill && skill.currentPp > 0 ? "#667eea" : "#444460";
+
+      const btn = this.add.text(5 + i * 89, btnY, label, {
+        fontSize: "10px", color, fontFamily: "monospace",
+        fixedWidth: 85, align: "center",
+        backgroundColor: "#1a1a2e",
+        padding: { x: 2, y: 4 },
+      }).setScrollFactor(0).setDepth(100).setInteractive();
+
+      btn.on("pointerdown", () => {
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
+        if (!skill || skill.currentPp <= 0) {
+          this.showLog("No PP left!");
+          return;
+        }
+
+        if (skill.range === SkillRange.Self) {
+          // Self-targeting skills activate immediately
+          this.handleSkillUse(i, this.player.facing);
+        } else {
+          // Select skill, wait for direction tap
+          if (this.activeSkillIndex === i) {
+            this.activeSkillIndex = -1; // deselect
+          } else {
+            this.activeSkillIndex = i;
+            this.showLog(`${skill.name} selected! Tap a direction.`);
+          }
+          this.updateSkillButtons();
+        }
+      });
+
+      this.skillButtons.push(btn);
+    }
+  }
+
+  private updateSkillButtons() {
+    const skills = this.player.skills;
+    for (let i = 0; i < this.skillButtons.length; i++) {
+      const skill = skills[i];
+      if (!skill) continue;
+      const isSelected = this.activeSkillIndex === i;
+      const haspp = skill.currentPp > 0;
+      const color = isSelected ? "#fbbf24" : haspp ? "#667eea" : "#444460";
+      const bg = isSelected ? "#2a2a4e" : "#1a1a2e";
+      this.skillButtons[i].setText(`${skill.name}\n${skill.currentPp}/${skill.pp}`);
+      this.skillButtons[i].setColor(color);
+      this.skillButtons[i].setBackgroundColor(bg);
+    }
+  }
+
   private updateHUD() {
     const p = this.player.stats;
     const hpRatio = p.hp / p.maxHp;
@@ -278,7 +351,13 @@ export class DungeonScene extends Phaser.Scene {
     this.floorText.setText(`Beach Cave  B${this.currentFloor}F`);
     this.hpText.setText(`HP ${hpBar}${hpEmpty} ${p.hp}/${p.maxHp}`);
     this.hpText.setColor(hpColor);
-    this.turnText.setText(`Lv.${p.level}  Turn ${this.turnManager.turn}`);
+
+    // Show active buffs
+    const buffs = this.player.statusEffects.map(s => `${s.type}(${s.turnsLeft})`).join(" ");
+    const buffStr = buffs ? `  ${buffs}` : "";
+    this.turnText.setText(`Lv.${p.level}  Turn ${this.turnManager.turn}${buffStr}`);
+
+    this.updateSkillButtons();
   }
 
   private showLog(msg: string) {
@@ -299,12 +378,11 @@ export class DungeonScene extends Phaser.Scene {
 
   private advanceFloor() {
     if (this.currentFloor >= MAX_FLOOR) {
-      // Dungeon clear!
       this.showDungeonClear();
       return;
     }
 
-    this.gameOver = true; // prevent input during transition
+    this.gameOver = true;
     this.showLog(`Went to B${this.currentFloor + 1}F!`);
 
     this.cameras.main.fadeOut(500, 0, 0, 0);
@@ -313,6 +391,7 @@ export class DungeonScene extends Phaser.Scene {
         floor: this.currentFloor + 1,
         hp: this.player.stats.hp,
         maxHp: this.player.stats.maxHp,
+        skills: this.player.skills,
       });
     });
   }
@@ -320,8 +399,7 @@ export class DungeonScene extends Phaser.Scene {
   private showDungeonClear() {
     this.gameOver = true;
 
-    // Dark overlay
-    const overlay = this.add.rectangle(
+    this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
       GAME_WIDTH, GAME_HEIGHT,
       0x000000, 0.7
@@ -331,7 +409,7 @@ export class DungeonScene extends Phaser.Scene {
       fontSize: "20px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const detailText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `Beach Cave B${MAX_FLOOR}F cleared!`, {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `Beach Cave B${MAX_FLOOR}F cleared!`, {
       fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
@@ -343,20 +421,17 @@ export class DungeonScene extends Phaser.Scene {
       this.scene.start("DungeonScene", { floor: 1 });
     });
 
-    // Pulsing animation on title
     this.tweens.add({
       targets: titleText,
       alpha: { from: 1, to: 0.6 },
-      duration: 800,
-      yoyo: true,
-      repeat: -1,
+      duration: 800, yoyo: true, repeat: -1,
     });
   }
 
   private showGameOver() {
     this.gameOver = true;
 
-    const overlay = this.add.rectangle(
+    this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
       GAME_WIDTH, GAME_HEIGHT,
       0x000000, 0.7
@@ -384,7 +459,7 @@ export class DungeonScene extends Phaser.Scene {
   private async handlePlayerAction(dir: Direction) {
     this.player.facing = dir;
 
-    // Check if there's an enemy in the target direction → attack
+    // Check if there's an enemy in the target direction → basic attack
     const targetX = this.player.tileX + DIR_DX[dir];
     const targetY = this.player.tileY + DIR_DY[dir];
     const targetEnemy = this.enemies.find(
@@ -392,16 +467,13 @@ export class DungeonScene extends Phaser.Scene {
     );
 
     if (targetEnemy) {
-      // Attack turn
       await this.turnManager.executeTurn(
-        () => this.performAttack(this.player, targetEnemy),
+        () => this.performBasicAttack(this.player, targetEnemy),
         this.getEnemyActions()
       );
     } else {
-      // Move turn
       const canMove = this.canEntityMove(this.player, dir);
       if (!canMove) {
-        // Face direction but don't use a turn
         this.player.sprite!.play(`${this.player.spriteKey}-idle-${dir}`);
         return;
       }
@@ -410,13 +482,35 @@ export class DungeonScene extends Phaser.Scene {
         this.getEnemyActions()
       );
 
-      // After moving, check if player stepped on stairs
+      // PP recovery: 1 PP for a random depleted skill on movement
+      this.recoverPP(this.player);
       this.checkStairs();
     }
 
+    // Tick status effects
+    tickStatusEffects(this.player);
     this.updateHUD();
 
-    // Check game over (player died from enemy attack)
+    if (!this.player.alive && !this.gameOver) {
+      this.showGameOver();
+    }
+  }
+
+  private async handleSkillUse(skillIndex: number, dir: Direction) {
+    const skill = this.player.skills[skillIndex];
+    if (!skill || skill.currentPp <= 0) return;
+
+    this.player.facing = dir;
+    skill.currentPp--;
+
+    await this.turnManager.executeTurn(
+      () => this.performSkill(this.player, skill, dir),
+      this.getEnemyActions()
+    );
+
+    tickStatusEffects(this.player);
+    this.updateHUD();
+
     if (!this.player.alive && !this.gameOver) {
       this.showGameOver();
     }
@@ -452,7 +546,19 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
-  private performAttack(attacker: Entity, defender: Entity): Promise<void> {
+  /** PP recovery: on move, recover 1 PP on a random depleted skill */
+  private recoverPP(entity: Entity) {
+    const depleted = entity.skills.filter(s => s.currentPp < s.pp);
+    if (depleted.length > 0) {
+      const pick = depleted[Math.floor(Math.random() * depleted.length)];
+      pick.currentPp = Math.min(pick.pp, pick.currentPp + 1);
+    }
+  }
+
+  // ── Combat ──
+
+  /** Basic (non-skill) attack — front 1 tile, uses entity's attackType */
+  private performBasicAttack(attacker: Entity, defender: Entity): Promise<void> {
     return new Promise((resolve) => {
       const dir = attacker === this.player
         ? attacker.facing
@@ -460,53 +566,171 @@ export class DungeonScene extends Phaser.Scene {
       attacker.facing = dir;
       attacker.sprite!.play(`${attacker.spriteKey}-idle-${dir}`);
 
-      // Type effectiveness
       const effectiveness = getEffectiveness(attacker.attackType, defender.types);
       const effText = effectivenessText(effectiveness);
 
-      // Damage calculation: (atk - def/2) * type_effectiveness, minimum 1
-      const baseDmg = Math.max(1, attacker.stats.atk - Math.floor(defender.stats.def / 2));
+      const atk = getEffectiveAtk(attacker);
+      const def = getEffectiveDef(defender);
+      const baseDmg = Math.max(1, atk - Math.floor(def / 2));
       const dmg = Math.max(1, Math.floor(baseDmg * effectiveness));
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
-      // Flash the defender — color based on effectiveness
-      if (defender.sprite) {
-        const tintColor = effectiveness >= 2.0 ? 0xff2222 : effectiveness < 1.0 ? 0x8888ff : 0xff4444;
-        defender.sprite.setTint(tintColor);
-        this.time.delayedCall(200, () => {
-          if (defender.sprite) defender.sprite.clearTint();
-        });
-      }
+      this.flashEntity(defender, effectiveness);
 
-      // Build log message
-      let logMsg = `${attacker.name} attacks ${defender.name}! ${dmg} damage!`;
+      let logMsg = `${attacker.name} attacks ${defender.name}! ${dmg} dmg!`;
       if (effText) logMsg += `\n${effText}`;
       this.showLog(logMsg);
 
-      // Check death
-      if (defender.stats.hp <= 0) {
-        defender.alive = false;
-        if (defender.sprite) {
-          this.tweens.add({
-            targets: defender.sprite,
-            alpha: 0,
-            duration: 300,
-            onComplete: () => {
-              defender.sprite?.destroy();
-              defender.sprite = undefined;
-            },
-          });
-        }
-        if (defender === this.player) {
-          this.showLog(`${this.player.name} fainted!`);
-        } else {
-          const expGain = 10 + this.currentFloor * 5;
-          this.showLog(`${defender.name} fainted! +${expGain} EXP`);
-        }
-      }
-
+      this.checkDeath(defender);
       this.time.delayedCall(250, resolve);
     });
+  }
+
+  /** Skill-based attack — variable range, typed damage, effects */
+  private performSkill(user: Entity, skill: Skill, dir: Direction): Promise<void> {
+    return new Promise((resolve) => {
+      user.facing = dir;
+      user.sprite!.play(`${user.spriteKey}-idle-${dir}`);
+
+      // Self-targeting (buff/heal)
+      if (skill.range === SkillRange.Self) {
+        this.applySkillEffect(user, user, skill);
+        this.showLog(`${user.name} used ${skill.name}!`);
+        this.time.delayedCall(250, resolve);
+        return;
+      }
+
+      // Get target tiles
+      const tiles = getSkillTargetTiles(
+        skill.range, user.tileX, user.tileY, dir,
+        this.dungeon.terrain, this.dungeon.width, this.dungeon.height
+      );
+
+      // Find entities on those tiles
+      const targets = this.allEntities.filter(e =>
+        e.alive && e !== user &&
+        tiles.some(t => t.x === e.tileX && t.y === e.tileY)
+      );
+
+      if (targets.length === 0) {
+        this.showLog(`${user.name} used ${skill.name}! But it missed!`);
+        this.time.delayedCall(200, resolve);
+        return;
+      }
+
+      // Apply damage to each target
+      let totalHits = 0;
+      for (const target of targets) {
+        // Accuracy check
+        if (Math.random() * 100 > skill.accuracy) {
+          this.showLog(`${user.name}'s ${skill.name} missed ${target.name}!`);
+          continue;
+        }
+
+        if (skill.power > 0) {
+          const effectiveness = getEffectiveness(skill.type, target.types);
+          const effText = effectivenessText(effectiveness);
+          const atk = getEffectiveAtk(user);
+          const def = getEffectiveDef(target);
+          const baseDmg = Math.max(1, Math.floor(skill.power * atk / 10) - Math.floor(def / 2));
+          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness));
+          target.stats.hp = Math.max(0, target.stats.hp - dmg);
+
+          this.flashEntity(target, effectiveness);
+
+          let logMsg = `${user.name}'s ${skill.name} hit ${target.name}! ${dmg} dmg!`;
+          if (effText) logMsg += ` ${effText}`;
+          this.showLog(logMsg);
+          totalHits++;
+        }
+
+        // Apply effect
+        this.applySkillEffect(user, target, skill);
+        this.checkDeath(target);
+      }
+
+      if (totalHits === 0 && skill.power > 0) {
+        this.showLog(`${user.name} used ${skill.name}!`);
+      }
+
+      this.time.delayedCall(300, resolve);
+    });
+  }
+
+  private applySkillEffect(user: Entity, target: Entity, skill: Skill) {
+    if (!skill.effect || skill.effect === SkillEffect.None) return;
+    const chance = skill.effectChance ?? 100;
+    if (Math.random() * 100 > chance) return;
+
+    switch (skill.effect) {
+      case SkillEffect.AtkUp:
+        target.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 5 });
+        this.showLog(`${target.name}'s ATK rose!`);
+        if (target.sprite) target.sprite.setTint(0xff8844);
+        this.time.delayedCall(300, () => { if (target.sprite) target.sprite.clearTint(); });
+        break;
+
+      case SkillEffect.DefUp:
+        target.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 5 });
+        this.showLog(`${target.name}'s DEF rose!`);
+        break;
+
+      case SkillEffect.Heal: {
+        const healAmt = Math.floor(target.stats.maxHp * 0.3);
+        target.stats.hp = Math.min(target.stats.maxHp, target.stats.hp + healAmt);
+        this.showLog(`${target.name} recovered ${healAmt} HP!`);
+        if (target.sprite) target.sprite.setTint(0x44ff44);
+        this.time.delayedCall(300, () => { if (target.sprite) target.sprite.clearTint(); });
+        break;
+      }
+
+      case SkillEffect.Paralyze:
+        if (!target.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
+          target.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 3 });
+          this.showLog(`${target.name} was paralyzed!`);
+          if (target.sprite) target.sprite.setTint(0xffff00);
+          this.time.delayedCall(300, () => { if (target.sprite) target.sprite.clearTint(); });
+        }
+        break;
+
+      case SkillEffect.Burn:
+        if (!target.statusEffects.some(s => s.type === SkillEffect.Burn)) {
+          target.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 3 });
+          this.showLog(`${target.name} was burned!`);
+        }
+        break;
+    }
+  }
+
+  private flashEntity(entity: Entity, effectiveness: number) {
+    if (!entity.sprite) return;
+    const tintColor = effectiveness >= 2.0 ? 0xff2222 : effectiveness < 1.0 ? 0x8888ff : 0xff4444;
+    entity.sprite.setTint(tintColor);
+    this.time.delayedCall(200, () => {
+      if (entity.sprite) entity.sprite.clearTint();
+    });
+  }
+
+  private checkDeath(entity: Entity) {
+    if (entity.stats.hp > 0 || !entity.alive) return;
+    entity.alive = false;
+    if (entity.sprite) {
+      this.tweens.add({
+        targets: entity.sprite,
+        alpha: 0,
+        duration: 300,
+        onComplete: () => {
+          entity.sprite?.destroy();
+          entity.sprite = undefined;
+        },
+      });
+    }
+    if (entity === this.player) {
+      this.showLog(`${this.player.name} fainted!`);
+    } else {
+      const expGain = 10 + this.currentFloor * 5;
+      this.showLog(`${entity.name} fainted! +${expGain} EXP`);
+    }
   }
 
   // ── Enemy AI ──
@@ -518,16 +742,31 @@ export class DungeonScene extends Phaser.Scene {
         return async () => {
           if (!enemy.alive || !this.player.alive) return;
 
-          // If adjacent to player, attack
+          // Check paralysis
+          if (isParalyzed(enemy)) {
+            this.showLog(`${enemy.name} is paralyzed and can't move!`);
+            return;
+          }
+
+          // Tick enemy status effects
+          tickStatusEffects(enemy);
+
           if (isAdjacentToPlayer(enemy, this.player)) {
             const dir = directionToPlayer(enemy, this.player);
             enemy.facing = dir;
-            await this.performAttack(enemy, this.player);
+            // Pick a random usable skill or basic attack
+            const usableSkills = enemy.skills.filter(s => s.currentPp > 0 && s.power > 0);
+            if (usableSkills.length > 0 && Math.random() < 0.4) {
+              const skill = usableSkills[Math.floor(Math.random() * usableSkills.length)];
+              skill.currentPp--;
+              await this.performSkill(enemy, skill, dir);
+            } else {
+              await this.performBasicAttack(enemy, this.player);
+            }
             this.updateHUD();
             return;
           }
 
-          // Try to move toward player
           const moveDir = getEnemyMoveDirection(
             enemy, this.player,
             this.dungeon.terrain, this.dungeon.width, this.dungeon.height,
