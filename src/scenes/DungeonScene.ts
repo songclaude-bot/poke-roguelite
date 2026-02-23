@@ -17,8 +17,9 @@ import {
 import { getEnemyMoveDirection, isAdjacentToPlayer, directionToPlayer } from "../core/enemy-ai";
 import { getAllyMoveDirection, tryRecruit, directionTo } from "../core/ally-ai";
 import { PokemonType, getEffectiveness, effectivenessText } from "../core/type-chart";
-import { Skill, SkillRange, SkillEffect } from "../core/skill";
+import { Skill, SkillRange, SkillEffect, SKILL_DB, createSkill } from "../core/skill";
 import { getSkillTargetTiles } from "../core/skill-targeting";
+import { getEvolution } from "../core/evolution";
 import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY, ITEM_DB } from "../core/item";
 import { SPECIES, PokemonSpecies, createSpeciesSkills } from "../core/pokemon-data";
 import { DungeonDef, BossDef, getDungeon, getDungeonFloorEnemies } from "../core/dungeon-data";
@@ -137,6 +138,10 @@ export class DungeonScene extends Phaser.Scene {
   // Starter species
   private starterId = "mudkip";
 
+  // Monster House
+  private monsterHouseRoom: { x: number; y: number; w: number; h: number } | null = null;
+  private monsterHouseTriggered = false;
+
   // Weather
   private currentWeather = WeatherType.None;
   private weatherText!: Phaser.GameObjects.Text;
@@ -197,6 +202,8 @@ export class DungeonScene extends Phaser.Scene {
     this.shopUI = [];
     this.shopOpen = false;
     this.shopTiles = [];
+    this.monsterHouseRoom = null;
+    this.monsterHouseTriggered = false;
     this.gold = meta.gold;
 
     // Give starter items on new run
@@ -375,6 +382,20 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Monster House (15% chance, not on floor 1 or boss floors) ──
+    const isLastFloor = this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors;
+    if (!isLastFloor && this.currentFloor > 1 && Math.random() < 0.15 && rooms.length > 2) {
+      const mhCandidates = rooms.filter((r, idx) =>
+        idx > 0 && // Not player's room
+        !(stairsPos.x >= r.x && stairsPos.x < r.x + r.w &&
+          stairsPos.y >= r.y && stairsPos.y < r.y + r.h) &&
+        (!this.shopRoom || !(r.x === this.shopRoom.x && r.y === this.shopRoom.y))
+      );
+      if (mhCandidates.length > 0) {
+        this.monsterHouseRoom = mhCandidates[Math.floor(Math.random() * mhCandidates.length)];
+      }
+    }
+
     // ── Spawn boss on final floor ──
     if (this.currentFloor === this.dungeonDef.floors && this.dungeonDef.boss) {
       const bossDef = this.dungeonDef.boss;
@@ -518,6 +539,19 @@ export class DungeonScene extends Phaser.Scene {
         }).setOrigin(0.5).setDepth(8);
 
         this.showLog("There's a Kecleon Shop on this floor!");
+      }
+    }
+
+    // ── Monster House (15% chance on floor 3+, not boss/floor 1) ──
+    if (this.currentFloor >= 3 && !isBossFloor && Math.random() < 0.15 && rooms.length > 2) {
+      const mhCandidates = rooms.filter(r =>
+        !(playerStart.x >= r.x && playerStart.x < r.x + r.w &&
+          playerStart.y >= r.y && playerStart.y < r.y + r.h) &&
+        r !== this.shopRoom &&
+        r.w * r.h >= 16
+      );
+      if (mhCandidates.length > 0) {
+        this.monsterHouseRoom = mhCandidates[Math.floor(Math.random() * mhCandidates.length)];
       }
     }
 
@@ -1450,6 +1484,57 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
+  private checkMonsterHouse() {
+    if (!this.monsterHouseRoom || this.monsterHouseTriggered) return;
+    const r = this.monsterHouseRoom;
+    const px = this.player.tileX;
+    const py = this.player.tileY;
+    if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h) {
+      this.monsterHouseTriggered = true;
+      this.cameras.main.shake(300, 0.01);
+      this.cameras.main.flash(200, 255, 0, 0);
+      this.showLog("It's a Monster House!");
+
+      // Spawn 4-6 extra enemies in this room
+      const count = 4 + Math.floor(Math.random() * 3);
+      const floorSpeciesIds = getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
+      const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
+      if (floorSpecies.length === 0) return;
+
+      for (let i = 0; i < count; i++) {
+        const ex = r.x + 1 + Math.floor(Math.random() * Math.max(1, r.w - 2));
+        const ey = r.y + 1 + Math.floor(Math.random() * Math.max(1, r.h - 2));
+        if (this.dungeon.terrain[ey]?.[ex] !== TerrainType.GROUND) continue;
+        if (this.allEntities.some(e => e.alive && e.tileX === ex && e.tileY === ey)) continue;
+
+        const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
+        const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty * 1.2, sp);
+
+        const enemy: Entity = {
+          tileX: ex, tileY: ey,
+          facing: Direction.Down,
+          stats: { ...enemyStats },
+          alive: true,
+          spriteKey: sp.spriteKey,
+          name: sp.name,
+          types: sp.types,
+          attackType: sp.attackType,
+          skills: createSpeciesSkills(sp),
+          statusEffects: [],
+          speciesId: sp.spriteKey,
+          ability: SPECIES_ABILITIES[sp.spriteKey],
+        };
+        enemy.sprite = this.add.sprite(
+          this.tileToPixelX(ex), this.tileToPixelY(ey), `${sp.spriteKey}-idle`
+        );
+        enemy.sprite.setScale(TILE_SCALE).setDepth(9);
+        enemy.sprite.play(`${sp.spriteKey}-idle-${Direction.Down}`);
+        this.enemies.push(enemy);
+        this.allEntities.push(enemy);
+      }
+    }
+  }
+
   private openShopUI() {
     if (this.shopOpen || this.shopItems.length === 0) return;
     this.shopOpen = true;
@@ -1688,6 +1773,7 @@ export class DungeonScene extends Phaser.Scene {
       this.checkTraps();
       this.checkStairs();
       this.checkShop();
+      this.checkMonsterHouse();
     }
 
     // Belly drain per turn (movement or attack)
@@ -2127,6 +2213,25 @@ export class DungeonScene extends Phaser.Scene {
             });
           }
           this.updateHUD();
+
+          // ── Evolution check ──
+          const evo = getEvolution(this.player.speciesId ?? this.starterId, r.newLevel);
+          if (evo) {
+            this.time.delayedCall(800, () => {
+              this.player.name = evo.newName;
+              this.player.stats.maxHp += evo.hpBonus;
+              this.player.stats.hp += evo.hpBonus;
+              this.player.stats.atk += evo.atkBonus;
+              this.player.stats.def += evo.defBonus;
+              this.player.speciesId = evo.to;
+              if (evo.newSkillId && SKILL_DB[evo.newSkillId] && this.player.skills.length < 4) {
+                this.player.skills.push(createSkill(SKILL_DB[evo.newSkillId]));
+              }
+              this.cameras.main.flash(500, 255, 255, 255);
+              this.showLog(`Congratulations! ${evo.from} evolved into ${evo.newName}!`);
+              this.updateHUD();
+            });
+          }
         });
       }
 
