@@ -19,3 +19,8 @@
 - 날짜: 2026-02-23
 - [상세 기록](./02-dungeon-generation.md)
 - 핵심: DTEF MaskCoordinate 룩업 테이블로 47-state 오토타일링 구현
+
+### 1-3. 포켓몬 스프라이트 + 8방향 이동 + 카메라
+- 날짜: 2026-02-23
+- [상세 기록](./03-sprite-movement.md)
+- 핵심: Mudkip PMD 스프라이트, 탭 기반 8방향 타일 이동, 부드러운 카메라 추적
