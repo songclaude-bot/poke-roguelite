@@ -18,10 +18,12 @@ import { getEnemyMoveDirection, isAdjacentToPlayer, directionToPlayer } from "..
 import { PokemonType, getEffectiveness, effectivenessText } from "../core/type-chart";
 import { Skill, SkillRange, SkillEffect, getDefaultSkills } from "../core/skill";
 import { getSkillTargetTiles } from "../core/skill-targeting";
+import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY } from "../core/item";
 
 const MOVE_DURATION = 150; // ms per tile movement
 const ENEMIES_PER_ROOM = 1; // base enemies per room (except player's room)
 const MAX_FLOOR = 5; // B5F is the last floor
+const ITEMS_PER_FLOOR = 3; // items spawned per floor
 
 // Sprite frame counts (from AnimData.xml)
 const MUDKIP_WALK_FRAMES = 6;
@@ -65,6 +67,13 @@ export class DungeonScene extends Phaser.Scene {
   // Skill state
   private activeSkillIndex = -1; // -1 = no skill selected
 
+  // Item state
+  private inventory: ItemStack[] = [];
+  private floorItems: { x: number; y: number; item: ItemDef; sprite: Phaser.GameObjects.Text }[] = [];
+  private persistentInventory: ItemStack[] | null = null;
+  private bagOpen = false;
+  private bagUI: Phaser.GameObjects.GameObject[] = [];
+
   // Game state
   private gameOver = false;
 
@@ -72,16 +81,20 @@ export class DungeonScene extends Phaser.Scene {
     super({ key: "DungeonScene" });
   }
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[] }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[] }) {
     this.currentFloor = data?.floor ?? 1;
     this.persistentHp = data?.hp ?? 50;
     this.persistentMaxHp = data?.maxHp ?? 50;
     this.persistentSkills = data?.skills ?? null;
+    this.persistentInventory = data?.inventory ?? null;
     this.enemies = [];
     this.allEntities = [];
+    this.floorItems = [];
     this.gameOver = false;
     this.activeSkillIndex = -1;
     this.skillButtons = [];
+    this.bagOpen = false;
+    this.bagUI = [];
     this.turnManager = new TurnManager();
   }
 
@@ -195,6 +208,28 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Spawn floor items ──
+    this.inventory = this.persistentInventory ?? [];
+    for (let i = 0; i < ITEMS_PER_FLOOR; i++) {
+      const room = rooms[Math.floor(Math.random() * rooms.length)];
+      const ix = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
+      const iy = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
+      if (terrain[iy][ix] !== TerrainType.GROUND) continue;
+      if (ix === stairsPos.x && iy === stairsPos.y) continue;
+      if (ix === playerStart.x && iy === playerStart.y) continue;
+
+      const item = rollFloorItem();
+      const icon = item.category === "berry" ? "●" : item.category === "seed" ? "◆" : "★";
+      const color = item.category === "berry" ? "#ff6b9d" : item.category === "seed" ? "#4ade80" : "#60a5fa";
+      const sprite = this.add.text(
+        ix * TILE_DISPLAY + TILE_DISPLAY / 2,
+        iy * TILE_DISPLAY + TILE_DISPLAY / 2,
+        icon, { fontSize: "16px", color, fontFamily: "monospace" }
+      ).setOrigin(0.5).setDepth(6);
+
+      this.floorItems.push({ x: ix, y: iy, item, sprite });
+    }
+
     // ── Camera ──
     const mapPixelW = width * TILE_DISPLAY;
     const mapPixelH = height * TILE_DISPLAY;
@@ -244,11 +279,34 @@ export class DungeonScene extends Phaser.Scene {
 
     // Menu buttons
     const menuY = GAME_HEIGHT - 40;
-    ["가방", "팀", "대기", "💾저장"].forEach((label, i) => {
-      this.add.text(15 + i * 88, menuY, `[${label}]`, {
-        fontSize: "11px", color: "#666680", fontFamily: "monospace",
-      }).setScrollFactor(0).setDepth(100).setInteractive();
+    const bagBtn = this.add.text(15, menuY, "[가방]", {
+      fontSize: "11px", color: "#666680", fontFamily: "monospace",
+    }).setScrollFactor(0).setDepth(100).setInteractive();
+    bagBtn.on("pointerdown", () => this.toggleBag());
+
+    const waitBtn = this.add.text(105, menuY, "[대기]", {
+      fontSize: "11px", color: "#666680", fontFamily: "monospace",
+    }).setScrollFactor(0).setDepth(100).setInteractive();
+    waitBtn.on("pointerdown", () => {
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
+      this.turnManager.executeTurn(
+        () => Promise.resolve(),
+        this.getEnemyActions()
+      ).then(() => {
+        this.recoverPP(this.player);
+        tickStatusEffects(this.player);
+        this.updateHUD();
+      });
     });
+
+    this.add.text(195, menuY, "[줍기]", {
+      fontSize: "11px", color: "#666680", fontFamily: "monospace",
+    }).setScrollFactor(0).setDepth(100).setInteractive()
+      .on("pointerdown", () => this.pickupItem());
+
+    this.add.text(285, menuY, "[💾저장]", {
+      fontSize: "11px", color: "#666680", fontFamily: "monospace",
+    }).setScrollFactor(0).setDepth(100).setInteractive();
 
     this.updateHUD();
     this.showLog(`Beach Cave B${this.currentFloor}F`);
@@ -367,6 +425,228 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
+  // ── Items ──
+
+  private pickupItem() {
+    if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
+
+    const idx = this.floorItems.findIndex(
+      fi => fi.x === this.player.tileX && fi.y === this.player.tileY
+    );
+    if (idx === -1) {
+      this.showLog("Nothing here to pick up.");
+      return;
+    }
+
+    if (this.inventory.length >= MAX_INVENTORY) {
+      this.showLog("Inventory is full!");
+      return;
+    }
+
+    const fi = this.floorItems[idx];
+    // Add to inventory (stack if possible)
+    const existing = this.inventory.find(s => s.item.id === fi.item.id && fi.item.stackable);
+    if (existing) {
+      existing.count++;
+    } else {
+      this.inventory.push({ item: fi.item, count: 1 });
+    }
+
+    fi.sprite.destroy();
+    this.floorItems.splice(idx, 1);
+    this.showLog(`Picked up ${fi.item.name}!`);
+  }
+
+  private toggleBag() {
+    if (this.bagOpen) {
+      this.closeBag();
+    } else {
+      this.openBag();
+    }
+  }
+
+  private openBag() {
+    if (this.turnManager.isBusy || this.gameOver) return;
+    this.bagOpen = true;
+
+    // Dark overlay
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2,
+      GAME_WIDTH, GAME_HEIGHT,
+      0x000000, 0.8
+    ).setScrollFactor(0).setDepth(150).setInteractive();
+    this.bagUI.push(overlay);
+
+    const title = this.add.text(GAME_WIDTH / 2, 30, "── Bag ──", {
+      fontSize: "14px", color: "#fbbf24", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(151);
+    this.bagUI.push(title);
+
+    if (this.inventory.length === 0) {
+      const empty = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, "Empty", {
+        fontSize: "12px", color: "#666680", fontFamily: "monospace",
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(151);
+      this.bagUI.push(empty);
+    } else {
+      this.inventory.forEach((stack, i) => {
+        const y = 60 + i * 32;
+        const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : "★";
+        const countStr = stack.count > 1 ? ` ×${stack.count}` : "";
+        const btn = this.add.text(20, y, `${icon} ${stack.item.name}${countStr}`, {
+          fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace",
+          backgroundColor: "#1a1a3e", padding: { x: 4, y: 4 },
+          fixedWidth: 200,
+        }).setScrollFactor(0).setDepth(151).setInteractive();
+
+        const useBtn = this.add.text(230, y, "[Use]", {
+          fontSize: "11px", color: "#4ade80", fontFamily: "monospace",
+          padding: { x: 4, y: 4 },
+        }).setScrollFactor(0).setDepth(151).setInteractive();
+
+        const desc = this.add.text(20, y + 16, stack.item.description, {
+          fontSize: "9px", color: "#666680", fontFamily: "monospace",
+        }).setScrollFactor(0).setDepth(151);
+
+        useBtn.on("pointerdown", () => {
+          this.useItem(i);
+          this.closeBag();
+        });
+
+        this.bagUI.push(btn, useBtn, desc);
+      });
+    }
+
+    // Close button
+    const closeBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 50, "[Close]", {
+      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(151).setInteractive();
+    closeBtn.on("pointerdown", () => this.closeBag());
+    this.bagUI.push(closeBtn);
+
+    overlay.on("pointerdown", () => this.closeBag());
+  }
+
+  private closeBag() {
+    this.bagOpen = false;
+    this.bagUI.forEach(obj => obj.destroy());
+    this.bagUI = [];
+  }
+
+  private useItem(index: number) {
+    const stack = this.inventory[index];
+    if (!stack) return;
+
+    const item = stack.item;
+
+    switch (item.id) {
+      case "oranBerry": {
+        const heal = Math.min(30, this.player.stats.maxHp - this.player.stats.hp);
+        this.player.stats.hp += heal;
+        this.showLog(`Used Oran Berry! Restored ${heal} HP.`);
+        break;
+      }
+      case "sitrusBerry": {
+        const heal = Math.floor(this.player.stats.maxHp * 0.5);
+        const actual = Math.min(heal, this.player.stats.maxHp - this.player.stats.hp);
+        this.player.stats.hp += actual;
+        this.showLog(`Used Sitrus Berry! Restored ${actual} HP.`);
+        break;
+      }
+      case "pechaberry": {
+        this.player.statusEffects = [];
+        this.showLog("Used Pecha Berry! Status cleared.");
+        break;
+      }
+      case "reviveSeed": {
+        // Auto-use on death — just show message for now
+        this.showLog("Revive Seed will activate if you faint.");
+        // Don't consume here, consumed on death
+        return; // Don't consume
+      }
+      case "blastSeed": {
+        // Damage first enemy in facing direction
+        const dx = DIR_DX[this.player.facing];
+        const dy = DIR_DY[this.player.facing];
+        const tx = this.player.tileX + dx;
+        const ty = this.player.tileY + dy;
+        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
+        if (target) {
+          target.stats.hp = Math.max(0, target.stats.hp - 40);
+          this.flashEntity(target, 2.0);
+          this.showLog(`Blast Seed hit ${target.name}! 40 dmg!`);
+          this.checkDeath(target);
+        } else {
+          this.showLog("Blast Seed missed! No enemy in front.");
+        }
+        break;
+      }
+      case "sleepSeed": {
+        const dx = DIR_DX[this.player.facing];
+        const dy = DIR_DY[this.player.facing];
+        const tx = this.player.tileX + dx;
+        const ty = this.player.tileY + dy;
+        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
+        if (target) {
+          target.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 5 });
+          this.showLog(`Sleep Seed hit ${target.name}! Paralyzed!`);
+        } else {
+          this.showLog("Sleep Seed missed! No enemy in front.");
+        }
+        break;
+      }
+      case "escapeOrb": {
+        this.showLog("Used Escape Orb! Escaped the dungeon!");
+        this.gameOver = true;
+        this.cameras.main.fadeOut(500);
+        this.time.delayedCall(600, () => {
+          this.scene.start("DungeonScene", { floor: 1 });
+        });
+        break;
+      }
+      case "luminousOrb": {
+        // Just show a message — real map reveal would need fog of war
+        this.showLog("Used Luminous Orb! Floor layout revealed!");
+        break;
+      }
+      case "allPowerOrb": {
+        this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 10 });
+        this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
+        this.showLog("Used All-Power Orb! ATK & DEF boosted!");
+        break;
+      }
+    }
+
+    // Consume item
+    stack.count--;
+    if (stack.count <= 0) {
+      this.inventory.splice(index, 1);
+    }
+
+    this.updateHUD();
+  }
+
+  /** Check for revive seed on death */
+  private tryRevive(): boolean {
+    const idx = this.inventory.findIndex(s => s.item.id === "reviveSeed");
+    if (idx === -1) return false;
+
+    const stack = this.inventory[idx];
+    stack.count--;
+    if (stack.count <= 0) this.inventory.splice(idx, 1);
+
+    this.player.stats.hp = Math.floor(this.player.stats.maxHp * 0.5);
+    this.player.alive = true;
+    if (this.player.sprite) {
+      this.player.sprite.setAlpha(1);
+      this.player.sprite.setTint(0x44ff44);
+      this.time.delayedCall(500, () => {
+        if (this.player.sprite) this.player.sprite.clearTint();
+      });
+    }
+    this.showLog("Revive Seed activated! Restored to 50% HP!");
+    return true;
+  }
+
   // ── Stairs ──
 
   private checkStairs() {
@@ -392,6 +672,7 @@ export class DungeonScene extends Phaser.Scene {
         hp: this.player.stats.hp,
         maxHp: this.player.stats.maxHp,
         skills: this.player.skills,
+        inventory: this.inventory,
       });
     });
   }
@@ -484,6 +765,15 @@ export class DungeonScene extends Phaser.Scene {
 
       // PP recovery: 1 PP for a random depleted skill on movement
       this.recoverPP(this.player);
+
+      // Check for items on ground
+      const itemHere = this.floorItems.find(
+        fi => fi.x === this.player.tileX && fi.y === this.player.tileY
+      );
+      if (itemHere) {
+        this.showLog(`There's a ${itemHere.item.name} here. [줍기] to pick up.`);
+      }
+
       this.checkStairs();
     }
 
@@ -713,6 +1003,12 @@ export class DungeonScene extends Phaser.Scene {
 
   private checkDeath(entity: Entity) {
     if (entity.stats.hp > 0 || !entity.alive) return;
+
+    // Player: check revive seed
+    if (entity === this.player) {
+      if (this.tryRevive()) return;
+    }
+
     entity.alive = false;
     if (entity.sprite) {
       this.tweens.add({
