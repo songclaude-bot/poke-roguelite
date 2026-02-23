@@ -118,3 +118,10 @@
 - 날짜: 2026-02-23
 - [상세 기록](./18-weather-shop-skytower.md)
 - 핵심: Rain/Sandstorm/Hail 날씨, 켈레온 상점, Sky Tower 던전, Ghost/Psychic/Ice 타입, Gastly/Drowzee/Snorunt
+
+## Phase 12-13: 진화 + 새 포켓몬 + Frosty Forest
+
+### 12-13. 진화 시스템 + Charmander/Eevee + 6번째 던전
+- 날짜: 2026-02-23
+- [상세 기록](./19-evolution-newpokemon-frostyforest.md)
+- 핵심: 11종 진화 경로, Charmander/Eevee 스타터, Frosty Forest 10층 던전, Fire 스킬 5종

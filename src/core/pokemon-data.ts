@@ -239,6 +239,33 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["iceShard", "iceBeam", "headbutt"],
     floors: [],
   },
+  // ── Starters ──
+  charmander: {
+    id: "charmander",
+    name: "Charmander",
+    spriteKey: "charmander",
+    types: [PokemonType.Fire],
+    attackType: PokemonType.Fire,
+    baseStats: { hp: 45, atk: 13, def: 5 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["scratch", "ember", "flamethrower", "swordsDance"],
+    floors: [],
+  },
+  eevee: {
+    id: "eevee",
+    name: "Eevee",
+    spriteKey: "eevee",
+    types: [PokemonType.Normal],
+    attackType: PokemonType.Normal,
+    baseStats: { hp: 48, atk: 11, def: 7 },
+    walkFrameWidth: 56, walkFrameHeight: 48,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 5, idleFrames: 2,
+    skillIds: ["tackle", "bite", "swift", "quickAttack"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -271,6 +298,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   gastly: { 7: "nightShade", 10: "hypnosis" },
   drowzee: { 7: "confusion", 10: "hypnosis" },
   snorunt: { 7: "iceBeam", 10: "iceShard" },
+  charmander: { 7: "ember", 10: "flamethrower" },
+  eevee: { 7: "bite", 10: "swift" },
 };
 
 /** Check if a species learns a new skill at this level */

@@ -105,4 +105,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   gastly: AbilityId.Levitate,
   drowzee: AbilityId.NoGuard,
   snorunt: AbilityId.ShieldDust,
+  charmander: AbilityId.Torrent, // Blaze doesn't exist, use Torrent as fire equiv
+  eevee: AbilityId.RunAway,
 };

@@ -51,9 +51,9 @@ function enemiesPerRoom(floor: number): number {
 }
 const MAX_ALLIES = 2; // max party members (excluding player)
 
-// Per-floor enemy scaling (uses species base stats + dungeon difficulty)
-function getEnemyStats(floor: number, difficulty: number, species?: PokemonSpecies) {
-  const scale = (1 + (floor - 1) * 0.25) * difficulty;
+// Per-floor enemy scaling (uses species base stats + dungeon difficulty + NG+ bonus)
+function getEnemyStats(floor: number, difficulty: number, species?: PokemonSpecies, ngPlusBonus = 0) {
+  const scale = (1 + (floor - 1) * 0.25) * difficulty * (1 + ngPlusBonus * 0.1);
   const base = species?.baseStats ?? { hp: 20, atk: 8, def: 3 };
   return {
     hp: Math.floor(base.hp * scale),
@@ -142,6 +142,9 @@ export class DungeonScene extends Phaser.Scene {
   private monsterHouseRoom: { x: number; y: number; w: number; h: number } | null = null;
   private monsterHouseTriggered = false;
 
+  // NG+ difficulty scaling
+  private ngPlusLevel = 0;
+
   // Weather
   private currentWeather = WeatherType.None;
   private weatherText!: Phaser.GameObjects.Text;
@@ -204,6 +207,7 @@ export class DungeonScene extends Phaser.Scene {
     this.shopTiles = [];
     this.monsterHouseRoom = null;
     this.monsterHouseTriggered = false;
+    this.ngPlusLevel = Math.min(10, meta.totalClears); // Cap at NG+10
     this.gold = meta.gold;
 
     // Give starter items on new run
@@ -226,6 +230,7 @@ export class DungeonScene extends Phaser.Scene {
       caterpie: "0010", pidgey: "0016",
       aron: "0304", meditite: "0307", machop: "0066",
       gastly: "0092", drowzee: "0096", snorunt: "0361",
+      charmander: "0004", eevee: "0133",
     };
 
     // Load player + all enemy species + ally species for this dungeon
@@ -356,7 +361,7 @@ export class DungeonScene extends Phaser.Scene {
 
         // Pick random species from floor pool
         const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
-        const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp);
+        const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
 
         const enemy: Entity = {
           tileX: ex, tileY: ey,
@@ -407,7 +412,7 @@ export class DungeonScene extends Phaser.Scene {
         const bx = bossRoom.x + Math.floor(bossRoom.w / 2);
         const by = bossRoom.y + Math.floor(bossRoom.h / 2);
 
-        const baseStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp);
+        const baseStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
         const bossStats = {
           hp: Math.floor(baseStats.hp * bossDef.statMultiplier),
           maxHp: Math.floor(baseStats.hp * bossDef.statMultiplier),
@@ -975,7 +980,8 @@ export class DungeonScene extends Phaser.Scene {
     this.hpBarFill.fillStyle(barColor, 1);
     this.hpBarFill.fillRoundedRect(39, 9, barWidth, 8, 2);
 
-    this.floorText.setText(`${this.dungeonDef.name}  B${this.currentFloor}F`);
+    const ngStr = this.ngPlusLevel > 0 ? ` NG+${this.ngPlusLevel}` : "";
+    this.floorText.setText(`${this.dungeonDef.name}  B${this.currentFloor}F${ngStr}`);
     this.floorText.setPosition(40, 22);
     this.hpText.setText(`${p.hp}/${p.maxHp}`);
 
@@ -1508,7 +1514,7 @@ export class DungeonScene extends Phaser.Scene {
         if (this.allEntities.some(e => e.alive && e.tileX === ex && e.tileY === ey)) continue;
 
         const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
-        const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty * 1.2, sp);
+        const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty * 1.2, sp, this.ngPlusLevel);
 
         const enemy: Entity = {
           tileX: ex, tileY: ey,
@@ -1663,7 +1669,8 @@ export class DungeonScene extends Phaser.Scene {
 
     // Boss bonus: +50% gold if dungeon has a boss
     const baseGold = goldFromRun(this.currentFloor, this.enemiesDefeated, true);
-    const gold = this.dungeonDef.boss ? Math.floor(baseGold * 1.5) : baseGold;
+    const ngGoldBonus = 1 + this.ngPlusLevel * 0.15; // +15% gold per NG+ level
+    const gold = Math.floor((this.dungeonDef.boss ? baseGold * 1.5 : baseGold) * ngGoldBonus);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,

@@ -136,6 +136,31 @@ export const DUNGEONS: Record<string, DungeonDef> = {
     description: "B1F~B8F. Ghost, Psychic, Ice. Dangerous!",
     boss: { speciesId: "gastly", name: "Phantom Gastly", statMultiplier: 4.0 },
   },
+  frostyForest: {
+    id: "frostyForest",
+    name: "Frosty Forest",
+    tilesetPath: "tilesets/TinyWoods/tileset_0.png",
+    tilesetKey: "tinywoods-tiles",
+    floors: 10,
+    enemySpeciesIds: ["snorunt", "shellos", "zubat", "drowzee"],
+    floorEnemies: {
+      1: ["snorunt"],
+      2: ["snorunt", "shellos"],
+      3: ["shellos", "zubat"],
+      4: ["zubat", "snorunt"],
+      5: ["snorunt", "drowzee"],
+      6: ["drowzee", "zubat"],
+      7: ["drowzee", "snorunt", "zubat"],
+      8: ["snorunt", "drowzee"],
+      9: ["drowzee", "snorunt"],
+      10: ["snorunt"],
+    },
+    difficulty: 2.0,
+    itemsPerFloor: 4,
+    unlockClears: 5,
+    description: "B1F~B10F. Ice and Psychic. The ultimate challenge!",
+    boss: { speciesId: "snorunt", name: "Frost King Snorunt", statMultiplier: 4.5 },
+  },
 };
 
 /** Get dungeon by ID */
