@@ -31,6 +31,7 @@ export interface Entity {
   skills: Skill[];
   statusEffects: StatusEffect[];
   isAlly?: boolean; // true if recruited ally
+  isBoss?: boolean; // true if floor boss
   speciesId?: string; // species key for serialization
 }
 

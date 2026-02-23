@@ -2,6 +2,13 @@
  * Dungeon definitions — each dungeon has its own tileset, enemy pool, and floor count.
  */
 
+export interface BossDef {
+  speciesId: string;
+  name: string;
+  statMultiplier: number; // e.g. 2.5 means 2.5x base stats
+  extraSkillIds?: string[];
+}
+
 export interface DungeonDef {
   id: string;
   name: string;
@@ -19,6 +26,8 @@ export interface DungeonDef {
   unlockClears: number;
   /** Description shown in hub */
   description: string;
+  /** Boss on final floor (optional) */
+  boss?: BossDef;
 }
 
 export const DUNGEONS: Record<string, DungeonDef> = {
@@ -40,6 +49,7 @@ export const DUNGEONS: Record<string, DungeonDef> = {
     itemsPerFloor: 3,
     unlockClears: 0,
     description: "B1F~B5F. Water and Rock types.",
+    boss: { speciesId: "corsola", name: "Giant Corsola", statMultiplier: 2.5 },
   },
   thunderwaveCave: {
     id: "thunderwaveCave",
@@ -60,6 +70,7 @@ export const DUNGEONS: Record<string, DungeonDef> = {
     itemsPerFloor: 3,
     unlockClears: 1,
     description: "B1F~B6F. Electric types. Harder!",
+    boss: { speciesId: "pikachu", name: "Alpha Pikachu", statMultiplier: 3.0 },
   },
   tinyWoods: {
     id: "tinyWoods",
@@ -78,6 +89,7 @@ export const DUNGEONS: Record<string, DungeonDef> = {
     itemsPerFloor: 4,
     unlockClears: 0,
     description: "B1F~B4F. Bug and Flying. Easy!",
+    boss: { speciesId: "pidgey", name: "Fierce Pidgey", statMultiplier: 2.0 },
   },
 };
 

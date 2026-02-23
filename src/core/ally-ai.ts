@@ -61,7 +61,14 @@ export function getAllyMoveDirection(
   height: number,
   allEntities: Entity[]
 ): { moveDir: Direction | null; attackTarget: Entity | null } {
-  // Check if adjacent to an enemy — attack instead of moving
+  const distToPlayer = chebyshevDist(ally.tileX, ally.tileY, player.tileX, player.tileY);
+
+  // Priority 1: If too far from player, always follow player (leash)
+  if (distToPlayer > ALLY_FOLLOW_DIST + 2) {
+    return { moveDir: findBestDir(ally, player, terrain, width, height, allEntities), attackTarget: null };
+  }
+
+  // Priority 2: If adjacent to an enemy, attack it
   for (const e of enemies) {
     if (!e.alive || e.isAlly) continue;
     if (chebyshevDist(ally.tileX, ally.tileY, e.tileX, e.tileY) === 1) {
@@ -69,33 +76,41 @@ export function getAllyMoveDirection(
     }
   }
 
-  // Check if there's a nearby enemy to chase
-  const nearestEnemy = findNearestEnemy(ally, enemies, 4);
-  const distToPlayer = chebyshevDist(ally.tileX, ally.tileY, player.tileX, player.tileY);
-
-  // Choose target: chase enemy if close, otherwise follow player
-  let target: Entity;
-  if (nearestEnemy && distToPlayer <= ALLY_FOLLOW_DIST + 2) {
-    target = nearestEnemy;
-  } else {
-    target = player;
+  // Priority 3: Chase nearby enemy if within range AND not too far from player
+  const nearestEnemy = findNearestEnemy(ally, enemies, 3);
+  if (nearestEnemy && distToPlayer <= ALLY_FOLLOW_DIST) {
+    return { moveDir: findBestDir(ally, nearestEnemy, terrain, width, height, allEntities), attackTarget: null };
   }
 
-  // Don't move if already adjacent to target
-  const distToTarget = chebyshevDist(ally.tileX, ally.tileY, target.tileX, target.tileY);
-  if (distToTarget <= 1) return { moveDir: null, attackTarget: null };
+  // Priority 4: Follow player if more than 2 tiles away
+  if (distToPlayer > 2) {
+    return { moveDir: findBestDir(ally, player, terrain, width, height, allEntities), attackTarget: null };
+  }
 
-  // Find best direction toward target
+  // Close enough to player, idle
+  return { moveDir: null, attackTarget: null };
+}
+
+/** Find best direction to move toward a target entity */
+function findBestDir(
+  from: Entity,
+  target: Entity,
+  terrain: TerrainType[][],
+  width: number,
+  height: number,
+  allEntities: Entity[]
+): Direction | null {
+  const currentDist = chebyshevDist(from.tileX, from.tileY, target.tileX, target.tileY);
   let bestDir: Direction | null = null;
-  let bestDist = distToTarget;
+  let bestDist = currentDist;
 
   for (let d = 0; d < 8; d++) {
     const dir = d as Direction;
-    const nx = ally.tileX + DIR_DX[dir];
-    const ny = ally.tileY + DIR_DY[dir];
+    const nx = from.tileX + DIR_DX[dir];
+    const ny = from.tileY + DIR_DY[dir];
 
-    if (!canMoveTo(nx, ny, terrain, width, height, allEntities, ally)) continue;
-    if (!canMoveDiagonal(ally.tileX, ally.tileY, dir, terrain, width, height)) continue;
+    if (!canMoveTo(nx, ny, terrain, width, height, allEntities, from)) continue;
+    if (!canMoveDiagonal(from.tileX, from.tileY, dir, terrain, width, height)) continue;
 
     const newDist = chebyshevDist(nx, ny, target.tileX, target.tileY);
     if (newDist < bestDist) {
@@ -104,5 +119,5 @@ export function getAllyMoveDirection(
     }
   }
 
-  return { moveDir: bestDir, attackTarget: null };
+  return bestDir;
 }

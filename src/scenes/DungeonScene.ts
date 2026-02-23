@@ -21,7 +21,7 @@ import { Skill, SkillRange, SkillEffect } from "../core/skill";
 import { getSkillTargetTiles } from "../core/skill-targeting";
 import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY, ITEM_DB } from "../core/item";
 import { SPECIES, PokemonSpecies, createSpeciesSkills } from "../core/pokemon-data";
-import { DungeonDef, getDungeon, getDungeonFloorEnemies } from "../core/dungeon-data";
+import { DungeonDef, BossDef, getDungeon, getDungeonFloorEnemies } from "../core/dungeon-data";
 import { expFromEnemy, processLevelUp } from "../core/leveling";
 import {
   saveDungeon, clearDungeonSave, serializeSkills, serializeInventory,
@@ -29,6 +29,12 @@ import {
   goldFromRun, loadMeta, saveMeta,
 } from "../core/save-system";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
+import {
+  initAudio, startBgm, stopBgm,
+  sfxHit, sfxSuperEffective, sfxNotEffective, sfxMove, sfxPickup,
+  sfxLevelUp, sfxRecruit, sfxStairs, sfxDeath, sfxBossDefeat,
+  sfxHeal, sfxSkill, sfxMenuOpen, sfxMenuClose,
+} from "../core/sound-manager";
 
 interface AllyData {
   speciesId: string;
@@ -109,6 +115,12 @@ export class DungeonScene extends Phaser.Scene {
   private gameOver = false;
   private enemiesDefeated = 0;
 
+  // Boss state
+  private bossEntity: Entity | null = null;
+  private bossHpBar: Phaser.GameObjects.Graphics | null = null;
+  private bossHpBg: Phaser.GameObjects.Graphics | null = null;
+  private bossNameText: Phaser.GameObjects.Text | null = null;
+
   constructor() {
     super({ key: "DungeonScene" });
   }
@@ -138,6 +150,10 @@ export class DungeonScene extends Phaser.Scene {
     this.allEntities = [];
     this.floorItems = [];
     this.gameOver = false;
+    this.bossEntity = null;
+    this.bossHpBar = null;
+    this.bossHpBg = null;
+    this.bossNameText = null;
     this.activeSkillIndex = -1;
     this.skillButtons = [];
     this.bagOpen = false;
@@ -316,6 +332,55 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Spawn boss on final floor ──
+    if (this.currentFloor === this.dungeonDef.floors && this.dungeonDef.boss) {
+      const bossDef = this.dungeonDef.boss;
+      const sp = SPECIES[bossDef.speciesId];
+      if (sp) {
+        // Place boss in the largest room (excluding player's room)
+        const bossRoom = rooms.slice(1).reduce((best, r) =>
+          (r.w * r.h > best.w * best.h) ? r : best, rooms[1]);
+        const bx = bossRoom.x + Math.floor(bossRoom.w / 2);
+        const by = bossRoom.y + Math.floor(bossRoom.h / 2);
+
+        const baseStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp);
+        const bossStats = {
+          hp: Math.floor(baseStats.hp * bossDef.statMultiplier),
+          maxHp: Math.floor(baseStats.hp * bossDef.statMultiplier),
+          atk: Math.floor(baseStats.atk * bossDef.statMultiplier),
+          def: Math.floor(baseStats.def * bossDef.statMultiplier),
+          level: baseStats.level + 3,
+        };
+
+        const boss: Entity = {
+          tileX: bx, tileY: by,
+          facing: Direction.Down,
+          stats: bossStats,
+          alive: true,
+          spriteKey: sp.spriteKey,
+          name: bossDef.name,
+          types: sp.types,
+          attackType: sp.attackType,
+          skills: createSpeciesSkills(sp),
+          statusEffects: [],
+          speciesId: sp.spriteKey,
+          isBoss: true,
+        };
+        boss.sprite = this.add.sprite(
+          this.tileToPixelX(bx), this.tileToPixelY(by), `${sp.spriteKey}-idle`
+        );
+        boss.sprite.setScale(TILE_SCALE * 1.5).setDepth(11);
+        boss.sprite.play(`${sp.spriteKey}-idle-${Direction.Down}`);
+        // Red tint aura for boss
+        boss.sprite.setTint(0xff6666);
+        this.time.delayedCall(800, () => { if (boss.sprite) boss.sprite.clearTint(); });
+
+        this.bossEntity = boss;
+        this.enemies.push(boss);
+        this.allEntities.push(boss);
+      }
+    }
+
     // ── Spawn floor items ──
     this.inventory = this.persistentInventory ?? [];
     for (let i = 0; i < this.dungeonDef.itemsPerFloor; i++) {
@@ -344,9 +409,15 @@ export class DungeonScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, mapPixelW, mapPixelH);
     this.cameras.main.startFollow(this.player.sprite!, true, 0.15, 0.15);
 
+    // ── Audio ──
+    this.input.once("pointerdown", () => {
+      initAudio();
+      startBgm();
+    });
+
     // ── Input ──
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-      if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen) return;
 
       const dx = pointer.worldX - this.player.sprite!.x;
       const dy = pointer.worldY - this.player.sprite!.y;
@@ -447,8 +518,33 @@ export class DungeonScene extends Phaser.Scene {
     }).setScrollFactor(0).setDepth(100).setInteractive();
     saveBtn.on("pointerdown", () => this.saveGame());
 
+    // ── Boss HP Bar (fixed UI, hidden until boss floor) ──
+    if (this.bossEntity) {
+      const barW = 200;
+      const barX = (GAME_WIDTH - barW) / 2;
+      const barY = 56;
+
+      this.bossHpBg = this.add.graphics().setScrollFactor(0).setDepth(100);
+      this.bossHpBg.fillStyle(0x1a1a2e, 0.95);
+      this.bossHpBg.fillRoundedRect(barX - 4, barY - 4, barW + 8, 24, 4);
+      this.bossHpBg.lineStyle(2, 0xff4444);
+      this.bossHpBg.strokeRoundedRect(barX - 4, barY - 4, barW + 8, 24, 4);
+
+      this.bossHpBar = this.add.graphics().setScrollFactor(0).setDepth(101);
+
+      this.bossNameText = this.add.text(GAME_WIDTH / 2, barY - 2, `★ ${this.bossEntity.name} ★`, {
+        fontSize: "10px", color: "#ff6666", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(102);
+    }
+
     this.updateHUD();
-    this.showLog(`${this.dungeonDef.name} B${this.currentFloor}F`);
+
+    // Boss floor entrance message
+    if (this.bossEntity) {
+      this.showLog(`⚠ BOSS FLOOR! ${this.bossEntity.name} awaits!`);
+    } else {
+      this.showLog(`${this.dungeonDef.name} B${this.currentFloor}F`);
+    }
   }
 
   // ── Helpers ──
@@ -597,11 +693,16 @@ export class DungeonScene extends Phaser.Scene {
       this.minimapGfx.fillRect(mx + fi.x * t, my + fi.y * t, t, t);
     }
 
-    // Enemies (red dots)
-    this.minimapGfx.fillStyle(0xef4444, 1);
+    // Enemies (red dots, boss = larger)
     for (const e of this.enemies) {
       if (e.alive) {
-        this.minimapGfx.fillRect(mx + e.tileX * t, my + e.tileY * t, t, t);
+        if (e.isBoss) {
+          this.minimapGfx.fillStyle(0xff2222, 1);
+          this.minimapGfx.fillRect(mx + e.tileX * t - 1, my + e.tileY * t - 1, t + 2, t + 2);
+        } else {
+          this.minimapGfx.fillStyle(0xef4444, 1);
+          this.minimapGfx.fillRect(mx + e.tileX * t, my + e.tileY * t, t, t);
+        }
       }
     }
 
@@ -641,6 +742,31 @@ export class DungeonScene extends Phaser.Scene {
     const buffs = this.player.statusEffects.map(s => `${s.type}(${s.turnsLeft})`).join(" ");
     const buffStr = buffs ? `  ${buffs}` : "";
     this.turnText.setText(`Lv.${p.level}  EXP:${this.totalExp}  T${this.turnManager.turn}${buffStr}`);
+
+    // Boss HP bar update
+    if (this.bossEntity && this.bossHpBar) {
+      this.bossHpBar.clear();
+      if (this.bossEntity.alive) {
+        const bossRatio = this.bossEntity.stats.hp / this.bossEntity.stats.maxHp;
+        const barW = 200;
+        const barX = (GAME_WIDTH - barW) / 2;
+        const barY = 56;
+        const bossBarColor = bossRatio > 0.5 ? 0xff4444 : bossRatio > 0.25 ? 0xff8844 : 0xffcc00;
+        const bossBarWidth = Math.max(0, Math.floor(barW * bossRatio));
+        this.bossHpBar.fillStyle(bossBarColor, 1);
+        this.bossHpBar.fillRoundedRect(barX, barY, bossBarWidth, 12, 3);
+
+        // HP text on bar
+        if (this.bossNameText) {
+          this.bossNameText.setText(`★ ${this.bossEntity.name} — ${this.bossEntity.stats.hp}/${this.bossEntity.stats.maxHp} ★`);
+        }
+      } else {
+        // Boss defeated — hide bar
+        if (this.bossHpBg) this.bossHpBg.setVisible(false);
+        this.bossHpBar.setVisible(false);
+        if (this.bossNameText) this.bossNameText.setVisible(false);
+      }
+    }
 
     this.updateSkillButtons();
     this.updateMinimap();
@@ -682,6 +808,7 @@ export class DungeonScene extends Phaser.Scene {
 
     fi.sprite.destroy();
     this.floorItems.splice(idx, 1);
+    sfxPickup();
     this.showLog(`Picked up ${fi.item.name}!`);
   }
 
@@ -696,6 +823,7 @@ export class DungeonScene extends Phaser.Scene {
   private openBag() {
     if (this.turnManager.isBusy || this.gameOver) return;
     this.bagOpen = true;
+    sfxMenuOpen();
 
     // Dark overlay
     const overlay = this.add.rectangle(
@@ -756,6 +884,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private closeBag() {
     this.bagOpen = false;
+    sfxMenuClose();
     this.bagUI.forEach(obj => obj.destroy());
     this.bagUI = [];
   }
@@ -905,6 +1034,11 @@ export class DungeonScene extends Phaser.Scene {
   private checkStairs() {
     const { stairsPos } = this.dungeon;
     if (this.player.tileX === stairsPos.x && this.player.tileY === stairsPos.y) {
+      // Block stairs if boss is alive
+      if (this.bossEntity && this.bossEntity.alive) {
+        this.showLog("The stairs are sealed! Defeat the boss first!");
+        return;
+      }
       this.advanceFloor();
     }
   }
@@ -916,6 +1050,7 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     this.gameOver = true;
+    sfxStairs();
     this.showLog(`Went to B${this.currentFloor + 1}F!`);
 
     this.cameras.main.fadeOut(500, 0, 0, 0);
@@ -938,9 +1073,12 @@ export class DungeonScene extends Phaser.Scene {
 
   private showDungeonClear() {
     this.gameOver = true;
+    stopBgm();
     clearDungeonSave();
 
-    const gold = goldFromRun(this.currentFloor, this.enemiesDefeated, true);
+    // Boss bonus: +50% gold if dungeon has a boss
+    const baseGold = goldFromRun(this.currentFloor, this.enemiesDefeated, true);
+    const gold = this.dungeonDef.boss ? Math.floor(baseGold * 1.5) : baseGold;
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -977,6 +1115,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private showGameOver() {
     this.gameOver = true;
+    stopBgm();
     clearDungeonSave();
 
     const gold = goldFromRun(this.currentFloor, this.enemiesDefeated, false);
@@ -1094,6 +1233,7 @@ export class DungeonScene extends Phaser.Scene {
       entity.tileX += DIR_DX[dir];
       entity.tileY += DIR_DY[dir];
       entity.sprite!.play(`${entity.spriteKey}-walk-${dir}`);
+      if (entity === this.player) sfxMove();
 
       this.tweens.add({
         targets: entity.sprite,
@@ -1157,6 +1297,7 @@ export class DungeonScene extends Phaser.Scene {
     return new Promise((resolve) => {
       user.facing = dir;
       user.sprite!.play(`${user.spriteKey}-idle-${dir}`);
+      sfxSkill();
 
       // Self-targeting (buff/heal)
       if (skill.range === SkillRange.Self) {
@@ -1171,6 +1312,9 @@ export class DungeonScene extends Phaser.Scene {
         skill.range, user.tileX, user.tileY, dir,
         this.dungeon.terrain, this.dungeon.width, this.dungeon.height
       );
+
+      // Show visual effect on target tiles
+      this.showSkillEffect(tiles, skill);
 
       // Find entities on those tiles (friendly fire prevention)
       const isUserFriendly = user === this.player || user.isAlly;
@@ -1286,9 +1430,56 @@ export class DungeonScene extends Phaser.Scene {
       if (entity.sprite) entity.sprite.clearTint();
     });
 
-    // Screen shake for super effective
+    // Sound effect based on effectiveness
     if (effectiveness >= 2.0) {
+      sfxSuperEffective();
       this.cameras.main.shake(200, 0.008);
+    } else if (effectiveness < 1.0) {
+      sfxNotEffective();
+    } else {
+      sfxHit();
+    }
+  }
+
+  /** Show visual effect on skill target tiles */
+  private showSkillEffect(tiles: { x: number; y: number }[], skill: Skill) {
+    const typeColors: Record<string, { color: number; symbol: string }> = {
+      Water: { color: 0x3b82f6, symbol: "~" },
+      Fire: { color: 0xef4444, symbol: "*" },
+      Electric: { color: 0xfbbf24, symbol: "⚡" },
+      Grass: { color: 0x22c55e, symbol: "♣" },
+      Flying: { color: 0xa78bfa, symbol: ">" },
+      Poison: { color: 0xa855f7, symbol: "☠" },
+      Rock: { color: 0x92400e, symbol: "◆" },
+      Ground: { color: 0xd97706, symbol: "▲" },
+      Bug: { color: 0x84cc16, symbol: "●" },
+      Normal: { color: 0xd1d5db, symbol: "✦" },
+    };
+    const tc = typeColors[skill.type] ?? typeColors.Normal;
+
+    for (const t of tiles) {
+      const px = t.x * TILE_DISPLAY + TILE_DISPLAY / 2;
+      const py = t.y * TILE_DISPLAY + TILE_DISPLAY / 2;
+
+      // Colored tile overlay
+      const gfx = this.add.graphics().setDepth(15);
+      gfx.fillStyle(tc.color, 0.4);
+      gfx.fillRect(t.x * TILE_DISPLAY, t.y * TILE_DISPLAY, TILE_DISPLAY, TILE_DISPLAY);
+
+      // Symbol
+      const sym = this.add.text(px, py, tc.symbol, {
+        fontSize: "16px", color: "#ffffff", fontFamily: "monospace",
+        stroke: "#000000", strokeThickness: 2,
+      }).setOrigin(0.5).setDepth(16);
+
+      // Fade out
+      this.tweens.add({
+        targets: [gfx, sym],
+        alpha: { from: 1, to: 0 },
+        duration: 400,
+        ease: "Quad.easeOut",
+        onComplete: () => { gfx.destroy(); sym.destroy(); },
+      });
     }
   }
 
@@ -1313,6 +1504,7 @@ export class DungeonScene extends Phaser.Scene {
 
   /** Heal number popup (green) */
   private showHealPopup(x: number, y: number, amount: number) {
+    sfxHeal();
     const popup = this.add.text(x, y - 10, `+${amount}`, {
       fontSize: "11px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
       stroke: "#000000", strokeThickness: 3,
@@ -1349,6 +1541,7 @@ export class DungeonScene extends Phaser.Scene {
       });
     }
     if (entity === this.player) {
+      sfxDeath();
       this.showLog(`${this.player.name} fainted!`);
     } else if (entity.isAlly) {
       // Ally fainted
@@ -1357,10 +1550,22 @@ export class DungeonScene extends Phaser.Scene {
     } else {
       // Enemy defeated — track for gold
       this.enemiesDefeated++;
-      // Grant EXP
-      const expGain = expFromEnemy(entity.stats.level, this.currentFloor);
+      const isBossKill = entity.isBoss;
+      // Grant EXP (boss gives 5x)
+      const baseExp = expFromEnemy(entity.stats.level, this.currentFloor);
+      const expGain = isBossKill ? baseExp * 5 : baseExp;
       this.totalExp += expGain;
-      this.showLog(`${entity.name} fainted! +${expGain} EXP`);
+
+      if (isBossKill) {
+        // Boss defeat: big screen shake + special message
+        sfxBossDefeat();
+        this.cameras.main.shake(500, 0.015);
+        this.showLog(`★ BOSS DEFEATED! ${entity.name} fell! +${expGain} EXP ★`);
+        this.bossEntity = null;
+        this.cameras.main.flash(300, 255, 255, 200);
+      } else {
+        this.showLog(`${entity.name} fainted! +${expGain} EXP`);
+      }
 
       // Check level up
       const { results } = processLevelUp(
@@ -1372,6 +1577,7 @@ export class DungeonScene extends Phaser.Scene {
 
       for (const r of results) {
         this.time.delayedCall(500, () => {
+          sfxLevelUp();
           this.showLog(`Level up! Lv.${r.newLevel}! HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
           if (this.player.sprite) {
             this.player.sprite.setTint(0xffff44);
@@ -1383,8 +1589,8 @@ export class DungeonScene extends Phaser.Scene {
         });
       }
 
-      // ── Recruitment check ──
-      if (entity.speciesId && this.allies.length < MAX_ALLIES && tryRecruit(this.player.stats.level, entity.stats.level)) {
+      // ── Recruitment check (bosses can't be recruited) ──
+      if (!isBossKill && entity.speciesId && this.allies.length < MAX_ALLIES && tryRecruit(this.player.stats.level, entity.stats.level)) {
         this.time.delayedCall(800, () => {
           this.recruitEnemy(entity);
         });
@@ -1435,6 +1641,7 @@ export class DungeonScene extends Phaser.Scene {
 
     this.allies.push(ally);
     this.allEntities.push(ally);
+    sfxRecruit();
     this.showLog(`${sp.name} joined your team!`);
     this.updateHUD();
   }
