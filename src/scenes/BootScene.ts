@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { GAME_WIDTH, GAME_HEIGHT } from "../config";
+import { hasDungeonSave } from "../core/save-system";
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -10,32 +11,35 @@ export class BootScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
 
-    this.add
-      .text(cx, cy - 40, "Poke Roguelite", {
-        fontSize: "24px",
-        color: "#e0e0e0",
-        fontFamily: "monospace",
-      })
-      .setOrigin(0.5);
+    // Background
+    this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x0a0a1a);
 
-    this.add
-      .text(cx, cy + 10, "Tap to Start", {
-        fontSize: "14px",
-        color: "#667eea",
-        fontFamily: "monospace",
-      })
-      .setOrigin(0.5);
+    // Title
+    this.add.text(cx, cy - 60, "Poke Roguelite", {
+      fontSize: "24px", color: "#e0e0e0", fontFamily: "monospace",
+    }).setOrigin(0.5);
 
-    this.add
-      .text(cx, cy + 50, "v0.1.0 — Phase 1 MVP", {
-        fontSize: "10px",
-        color: "#666680",
-        fontFamily: "monospace",
-      })
-      .setOrigin(0.5);
+    this.add.text(cx, cy - 30, "Mystery Dungeon", {
+      fontSize: "14px", color: "#667eea", fontFamily: "monospace",
+    }).setOrigin(0.5);
+
+    // Subtitle
+    const hasSave = hasDungeonSave();
+    const subtitle = hasSave ? "Saved run found!" : "Tap to Start";
+
+    this.add.text(cx, cy + 20, subtitle, {
+      fontSize: "14px", color: hasSave ? "#4ade80" : "#667eea", fontFamily: "monospace",
+    }).setOrigin(0.5);
+
+    this.add.text(cx, cy + 60, "v0.3.0 — Phase 3: Meta Progression", {
+      fontSize: "9px", color: "#444460", fontFamily: "monospace",
+    }).setOrigin(0.5);
 
     this.input.once("pointerdown", () => {
-      this.scene.start("DungeonScene");
+      this.cameras.main.fadeOut(300, 0, 0, 0);
+      this.time.delayedCall(350, () => {
+        this.scene.start("HubScene");
+      });
     });
   }
 }

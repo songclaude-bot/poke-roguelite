@@ -18,9 +18,14 @@ import { getEnemyMoveDirection, isAdjacentToPlayer, directionToPlayer } from "..
 import { PokemonType, getEffectiveness, effectivenessText } from "../core/type-chart";
 import { Skill, SkillRange, SkillEffect } from "../core/skill";
 import { getSkillTargetTiles } from "../core/skill-targeting";
-import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY } from "../core/item";
+import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY, ITEM_DB } from "../core/item";
 import { SPECIES, PokemonSpecies, getFloorEnemies, createSpeciesSkills } from "../core/pokemon-data";
 import { expFromEnemy, processLevelUp } from "../core/leveling";
+import {
+  saveDungeon, clearDungeonSave, serializeSkills, serializeInventory,
+  goldFromRun, loadMeta, saveMeta,
+} from "../core/save-system";
+import { getUpgradeBonus } from "../scenes/UpgradeScene";
 
 const MOVE_DURATION = 150; // ms per tile movement
 const ENEMIES_PER_ROOM = 1; // base enemies per room (except player's room)
@@ -77,20 +82,28 @@ export class DungeonScene extends Phaser.Scene {
 
   // Game state
   private gameOver = false;
+  private enemiesDefeated = 0;
 
   constructor() {
     super({ key: "DungeonScene" });
   }
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean }) {
+    // Apply upgrade bonuses on fresh run start (floor 1 from hub)
+    const meta = loadMeta();
+    const hpBonus = getUpgradeBonus(meta, "maxHp") * 5;
+    const atkBonus = getUpgradeBonus(meta, "atk");
+    const defBonus = getUpgradeBonus(meta, "def");
+
+    const isNewRun = (data?.floor ?? 1) === 1 && !data?.hp;
     this.currentFloor = data?.floor ?? 1;
-    this.persistentHp = data?.hp ?? 50;
-    this.persistentMaxHp = data?.maxHp ?? 50;
+    this.persistentHp = data?.hp ?? (50 + hpBonus);
+    this.persistentMaxHp = data?.maxHp ?? (50 + hpBonus);
     this.persistentSkills = data?.skills ?? null;
     this.persistentInventory = data?.inventory ?? null;
     this.persistentLevel = data?.level ?? 5;
-    this.persistentAtk = data?.atk ?? 12;
-    this.persistentDef = data?.def ?? 6;
+    this.persistentAtk = data?.atk ?? (12 + atkBonus);
+    this.persistentDef = data?.def ?? (6 + defBonus);
     this.totalExp = data?.exp ?? 0;
     this.enemies = [];
     this.allEntities = [];
@@ -100,7 +113,16 @@ export class DungeonScene extends Phaser.Scene {
     this.skillButtons = [];
     this.bagOpen = false;
     this.bagUI = [];
+    this.enemiesDefeated = 0;
     this.turnManager = new TurnManager();
+
+    // Give starter items on new run
+    if (isNewRun) {
+      const starterLevel = getUpgradeBonus(meta, "startItems");
+      if (starterLevel > 0 && !this.persistentInventory) {
+        this.persistentInventory = [{ item: ITEM_DB.oranBerry, count: starterLevel }];
+      }
+    }
   }
 
   preload() {
@@ -320,9 +342,10 @@ export class DungeonScene extends Phaser.Scene {
     }).setScrollFactor(0).setDepth(100).setInteractive()
       .on("pointerdown", () => this.pickupItem());
 
-    this.add.text(285, menuY, "[💾저장]", {
+    const saveBtn = this.add.text(275, menuY, "[저장]", {
       fontSize: "11px", color: "#666680", fontFamily: "monospace",
     }).setScrollFactor(0).setDepth(100).setInteractive();
+    saveBtn.on("pointerdown", () => this.saveGame());
 
     this.updateHUD();
     this.showLog(`Beach Cave B${this.currentFloor}F`);
@@ -613,9 +636,11 @@ export class DungeonScene extends Phaser.Scene {
       case "escapeOrb": {
         this.showLog("Used Escape Orb! Escaped the dungeon!");
         this.gameOver = true;
+        clearDungeonSave();
+        const escGold = goldFromRun(this.currentFloor, this.enemiesDefeated, false);
         this.cameras.main.fadeOut(500);
         this.time.delayedCall(600, () => {
-          this.scene.start("DungeonScene", { floor: 1 });
+          this.scene.start("HubScene", { gold: escGold, cleared: false, bestFloor: this.currentFloor });
         });
         break;
       }
@@ -663,6 +688,27 @@ export class DungeonScene extends Phaser.Scene {
     return true;
   }
 
+  // ── Save ──
+
+  private saveGame() {
+    if (this.gameOver) return;
+    saveDungeon({
+      version: 1,
+      timestamp: Date.now(),
+      floor: this.currentFloor,
+      dungeonId: "beach-cave",
+      hp: this.player.stats.hp,
+      maxHp: this.player.stats.maxHp,
+      level: this.player.stats.level,
+      atk: this.player.stats.atk,
+      def: this.player.stats.def,
+      totalExp: this.totalExp,
+      skills: serializeSkills(this.player.skills),
+      inventory: serializeInventory(this.inventory),
+    });
+    this.showLog("Game saved!");
+  }
+
   // ── Stairs ──
 
   private checkStairs() {
@@ -699,6 +745,9 @@ export class DungeonScene extends Phaser.Scene {
 
   private showDungeonClear() {
     this.gameOver = true;
+    clearDungeonSave();
+
+    const gold = goldFromRun(this.currentFloor, this.enemiesDefeated, true);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -706,20 +755,24 @@ export class DungeonScene extends Phaser.Scene {
       0x000000, 0.7
     ).setScrollFactor(0).setDepth(200);
 
-    const titleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "DUNGEON CLEAR!", {
+    const titleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, "DUNGEON CLEAR!", {
       fontSize: "20px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `Beach Cave B${MAX_FLOOR}F cleared!`, {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 15, `Beach Cave B${MAX_FLOOR}F cleared!`, {
       fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, "[Tap to restart]", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10, `Earned ${gold} Gold!`, {
+      fontSize: "13px", color: "#fde68a", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, "[Return to Town]", {
       fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
     restartText.on("pointerdown", () => {
-      this.scene.start("DungeonScene", { floor: 1 });
+      this.scene.start("HubScene", { gold, cleared: true, bestFloor: MAX_FLOOR });
     });
 
     this.tweens.add({
@@ -731,6 +784,9 @@ export class DungeonScene extends Phaser.Scene {
 
   private showGameOver() {
     this.gameOver = true;
+    clearDungeonSave();
+
+    const gold = goldFromRun(this.currentFloor, this.enemiesDefeated, false);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -738,20 +794,24 @@ export class DungeonScene extends Phaser.Scene {
       0x000000, 0.7
     ).setScrollFactor(0).setDepth(200);
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, "GAME OVER", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "GAME OVER", {
       fontSize: "22px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 5, `Fainted on B${this.currentFloor}F`, {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 5, `Fainted on B${this.currentFloor}F`, {
       fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 45, "[Tap to retry]", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 18, `Salvaged ${gold} Gold`, {
+      fontSize: "11px", color: "#fde68a", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 55, "[Return to Town]", {
       fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
     restartText.on("pointerdown", () => {
-      this.scene.start("DungeonScene", { floor: 1 });
+      this.scene.start("HubScene", { gold, cleared: false, bestFloor: this.currentFloor });
     });
   }
 
@@ -1044,6 +1104,8 @@ export class DungeonScene extends Phaser.Scene {
     if (entity === this.player) {
       this.showLog(`${this.player.name} fainted!`);
     } else {
+      // Track defeated enemies for gold calculation
+      this.enemiesDefeated++;
       // Grant EXP
       const expGain = expFromEnemy(entity.stats.level, this.currentFloor);
       this.totalExp += expGain;

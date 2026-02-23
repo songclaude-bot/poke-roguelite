@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import { BootScene } from "./scenes/BootScene";
+import { HubScene } from "./scenes/HubScene";
 import { DungeonScene } from "./scenes/DungeonScene";
+import { UpgradeScene } from "./scenes/UpgradeScene";
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from "./config";
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -17,7 +19,7 @@ const config: Phaser.Types.Core.GameConfig = {
   render: {
     preserveDrawingBuffer: true,
   },
-  scene: [BootScene, DungeonScene],
+  scene: [BootScene, HubScene, DungeonScene, UpgradeScene],
 };
 
 const game = new Phaser.Game(config);
