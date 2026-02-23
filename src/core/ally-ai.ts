@@ -18,13 +18,13 @@ export enum AllyState {
 
 // ── Recruitment ──
 
-export function recruitChance(playerLevel: number, enemyLevel: number): number {
+export function recruitChance(playerLevel: number, enemyLevel: number, bonus = 0): number {
   const levelBonus = Math.max(0, (playerLevel - enemyLevel) * 2);
-  return Math.min(40, 15 + levelBonus);
+  return Math.min(60, 15 + levelBonus + bonus);
 }
 
-export function tryRecruit(playerLevel: number, enemyLevel: number): boolean {
-  return Math.random() * 100 < recruitChance(playerLevel, enemyLevel);
+export function tryRecruit(playerLevel: number, enemyLevel: number, bonus = 0): boolean {
+  return Math.random() * 100 < recruitChance(playerLevel, enemyLevel, bonus);
 }
 
 // ── Direction helpers ──

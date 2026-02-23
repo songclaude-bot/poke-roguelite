@@ -52,6 +52,22 @@ const UPGRADES: UpgradeDef[] = [
     baseCost: 60,
     costScale: 40,
   },
+  {
+    id: "bellyMax",
+    name: "Iron Stomach",
+    description: "+20 max belly per level",
+    maxLevel: 5,
+    baseCost: 70,
+    costScale: 40,
+  },
+  {
+    id: "recruitRate",
+    name: "Charm Aura",
+    description: "+5% recruit chance per level",
+    maxLevel: 5,
+    baseCost: 90,
+    costScale: 60,
+  },
 ];
 
 export class UpgradeScene extends Phaser.Scene {
@@ -81,8 +97,8 @@ export class UpgradeScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Upgrades list
-    const startY = 100;
-    const gap = 80;
+    const startY = 90;
+    const gap = 62;
 
     UPGRADES.forEach((upg, i) => {
       const y = startY + i * gap;

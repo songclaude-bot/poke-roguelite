@@ -90,10 +90,11 @@ export class DungeonScene extends Phaser.Scene {
   private logText!: Phaser.GameObjects.Text;
   private skillButtons: Phaser.GameObjects.Text[] = [];
 
-  // Minimap
+  // Minimap + Fog of War
   private minimapGfx!: Phaser.GameObjects.Graphics;
   private minimapBg!: Phaser.GameObjects.Graphics;
   private minimapVisible = true;
+  private visited!: boolean[][];
   private readonly MINIMAP_TILE = 3; // px per tile
   private readonly MINIMAP_X = GAME_WIDTH - 80; // top-right
   private readonly MINIMAP_Y = 4;
@@ -187,8 +188,9 @@ export class DungeonScene extends Phaser.Scene {
     this.turnManager = new TurnManager();
     this.persistentAllies = data?.allies ?? null;
     this.floorTraps = [];
-    this.belly = data?.belly ?? 100;
-    this.maxBelly = 100;
+    const bellyBonus = getUpgradeBonus(meta, "bellyMax") * 20;
+    this.maxBelly = 100 + bellyBonus;
+    this.belly = data?.belly ?? this.maxBelly;
     this.starterId = data?.starter ?? "mudkip";
     this.shopItems = [];
     this.shopRoom = null;
@@ -519,6 +521,10 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Fog of War ──
+    this.visited = Array.from({ length: height }, () => new Array(width).fill(false));
+    this.revealArea(playerStart.x, playerStart.y, 4);
+
     // ── Camera ──
     const mapPixelW = width * TILE_DISPLAY;
     const mapPixelH = height * TILE_DISPLAY;
@@ -805,6 +811,20 @@ export class DungeonScene extends Phaser.Scene {
       this.skillButtons[i].setBackgroundColor("#1a1a2e");
     }
   }
+  /** Reveal tiles around a point (Chebyshev distance) */
+  private revealArea(cx: number, cy: number, radius: number) {
+    const { width, height } = this.dungeon;
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+          this.visited[ny][nx] = true;
+        }
+      }
+    }
+  }
+
   private createMinimap() {
     const { width, height, terrain } = this.dungeon;
     const t = this.MINIMAP_TILE;
@@ -840,22 +860,31 @@ export class DungeonScene extends Phaser.Scene {
     const my = this.MINIMAP_Y;
     const { width, height, terrain } = this.dungeon;
 
+    // Reveal area around player each update
+    this.revealArea(this.player.tileX, this.player.tileY, 4);
+
     this.minimapGfx.clear();
 
-    // Terrain
+    // Terrain (only visited tiles fully visible, unvisited = dark)
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         if (terrain[y][x] === TerrainType.GROUND) {
-          this.minimapGfx.fillStyle(0x334455, 1);
+          if (this.visited[y][x]) {
+            this.minimapGfx.fillStyle(0x334455, 1);
+          } else {
+            this.minimapGfx.fillStyle(0x1a1a2e, 0.5);
+          }
           this.minimapGfx.fillRect(mx + x * t, my + y * t, t, t);
         }
       }
     }
 
-    // Stairs
+    // Stairs (only if visited)
     const { stairsPos } = this.dungeon;
-    this.minimapGfx.fillStyle(0xfbbf24, 1);
-    this.minimapGfx.fillRect(mx + stairsPos.x * t, my + stairsPos.y * t, t, t);
+    if (this.visited[stairsPos.y]?.[stairsPos.x]) {
+      this.minimapGfx.fillStyle(0xfbbf24, 1);
+      this.minimapGfx.fillRect(mx + stairsPos.x * t, my + stairsPos.y * t, t, t);
+    }
 
     // Floor items (pink dots)
     this.minimapGfx.fillStyle(0xff6b9d, 1);
@@ -2113,7 +2142,8 @@ export class DungeonScene extends Phaser.Scene {
       }
 
       // ── Recruitment check (bosses can't be recruited) ──
-      if (!isBossKill && entity.speciesId && this.allies.length < MAX_ALLIES && tryRecruit(this.player.stats.level, entity.stats.level)) {
+      const recruitBonus = getUpgradeBonus(loadMeta(), "recruitRate") * 5;
+      if (!isBossKill && entity.speciesId && this.allies.length < MAX_ALLIES && tryRecruit(this.player.stats.level, entity.stats.level, recruitBonus)) {
         this.time.delayedCall(800, () => {
           this.recruitEnemy(entity);
         });
