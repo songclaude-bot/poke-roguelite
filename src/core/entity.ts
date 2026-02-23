@@ -1,5 +1,6 @@
 import { Direction, DIR_DX, DIR_DY } from "./direction";
 import { TerrainType } from "./dungeon-generator";
+import { PokemonType } from "./type-chart";
 
 export interface EntityStats {
   hp: number;
@@ -17,6 +18,9 @@ export interface Entity {
   alive: boolean;
   sprite?: Phaser.GameObjects.Sprite;
   spriteKey: string; // e.g. "mudkip" or "zubat"
+  name: string; // display name e.g. "Mudkip"
+  types: PokemonType[]; // pokemon types for effectiveness calc
+  attackType: PokemonType; // type of basic attack (STAB type)
 }
 
 /**

@@ -14,10 +14,13 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
+  render: {
+    preserveDrawingBuffer: true,
+  },
   scene: [BootScene, DungeonScene],
 };
 
 const game = new Phaser.Game(config);
 
 // Expose for debugging
-(window as Record<string, unknown>).__GAME = game;
+(window as unknown as Record<string, unknown>).__GAME = game;

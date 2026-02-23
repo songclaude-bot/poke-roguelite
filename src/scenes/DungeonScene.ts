@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import {
   GAME_HEIGHT,
+  GAME_WIDTH,
   TILE_SIZE,
   TILE_SCALE,
   TILE_DISPLAY,
@@ -11,9 +12,11 @@ import { Direction, DIR_DX, DIR_DY, angleToDirection } from "../core/direction";
 import { TurnManager } from "../core/turn-manager";
 import { Entity, canMoveTo, canMoveDiagonal, chebyshevDist } from "../core/entity";
 import { getEnemyMoveDirection, isAdjacentToPlayer, directionToPlayer } from "../core/enemy-ai";
+import { PokemonType, getEffectiveness, effectivenessText } from "../core/type-chart";
 
 const MOVE_DURATION = 150; // ms per tile movement
-const ENEMIES_PER_ROOM = 1; // enemies spawned per room (except player's room)
+const ENEMIES_PER_ROOM = 1; // base enemies per room (except player's room)
+const MAX_FLOOR = 5; // B5F is the last floor
 
 // Sprite frame counts (from AnimData.xml)
 const MUDKIP_WALK_FRAMES = 6;
@@ -21,21 +24,52 @@ const MUDKIP_IDLE_FRAMES = 7;
 const ZUBAT_WALK_FRAMES = 8;
 const ZUBAT_IDLE_FRAMES = 8;
 
+// Per-floor enemy scaling
+function getEnemyStats(floor: number) {
+  const scale = 1 + (floor - 1) * 0.25; // 1.0, 1.25, 1.5, 1.75, 2.0
+  return {
+    hp: Math.floor(20 * scale),
+    maxHp: Math.floor(20 * scale),
+    atk: Math.floor(8 * scale),
+    def: Math.floor(3 * scale),
+    level: 2 + floor,
+  };
+}
+
 export class DungeonScene extends Phaser.Scene {
   private dungeon!: DungeonData;
   private turnManager = new TurnManager();
+  private currentFloor = 1;
 
   private player!: Entity;
   private enemies: Entity[] = [];
   private allEntities: Entity[] = [];
 
+  // Persistent player HP across floors
+  private persistentHp = 50;
+  private persistentMaxHp = 50;
+
   // HUD references
   private hpText!: Phaser.GameObjects.Text;
   private turnText!: Phaser.GameObjects.Text;
+  private floorText!: Phaser.GameObjects.Text;
   private logText!: Phaser.GameObjects.Text;
+
+  // Game state
+  private gameOver = false;
 
   constructor() {
     super({ key: "DungeonScene" });
+  }
+
+  init(data?: { floor?: number; hp?: number; maxHp?: number }) {
+    this.currentFloor = data?.floor ?? 1;
+    this.persistentHp = data?.hp ?? 50;
+    this.persistentMaxHp = data?.maxHp ?? 50;
+    this.enemies = [];
+    this.allEntities = [];
+    this.gameOver = false;
+    this.turnManager = new TurnManager();
   }
 
   preload() {
@@ -83,18 +117,27 @@ export class DungeonScene extends Phaser.Scene {
     stairsGfx.fillTriangle(sx, sy + 14, sx + 10, sy, sx - 10, sy);
     stairsGfx.setDepth(5);
 
-    // ── Create animations ──
-    this.createAnimations("mudkip", MUDKIP_WALK_FRAMES, MUDKIP_IDLE_FRAMES);
-    this.createAnimations("zubat", ZUBAT_WALK_FRAMES, ZUBAT_IDLE_FRAMES);
+    // ── Create animations (only on first floor — they persist in cache) ──
+    if (!this.anims.exists("mudkip-walk-0")) {
+      this.createAnimations("mudkip", MUDKIP_WALK_FRAMES, MUDKIP_IDLE_FRAMES);
+      this.createAnimations("zubat", ZUBAT_WALK_FRAMES, ZUBAT_IDLE_FRAMES);
+    }
 
     // ── Player entity ──
     this.player = {
       tileX: playerStart.x,
       tileY: playerStart.y,
       facing: Direction.Down,
-      stats: { hp: 50, maxHp: 50, atk: 12, def: 6, level: 5 },
+      stats: {
+        hp: this.persistentHp,
+        maxHp: this.persistentMaxHp,
+        atk: 12, def: 6, level: 5,
+      },
       alive: true,
       spriteKey: "mudkip",
+      name: "Mudkip",
+      types: [PokemonType.Water],
+      attackType: PokemonType.Water,
     };
     this.player.sprite = this.add.sprite(
       this.tileToPixelX(this.player.tileX),
@@ -107,22 +150,25 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Spawn enemies in rooms (skip first room = player's room) ──
     const rooms = this.dungeon.rooms;
+    const enemyStats = getEnemyStats(this.currentFloor);
     for (let i = 1; i < rooms.length; i++) {
       const room = rooms[i];
       for (let e = 0; e < ENEMIES_PER_ROOM; e++) {
         const ex = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
         const ey = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
         if (terrain[ey][ex] !== TerrainType.GROUND) continue;
-        // Don't spawn on stairs
         if (ex === stairsPos.x && ey === stairsPos.y) continue;
 
         const enemy: Entity = {
           tileX: ex,
           tileY: ey,
           facing: Direction.Down,
-          stats: { hp: 20, maxHp: 20, atk: 8, def: 3, level: 3 },
+          stats: { ...enemyStats },
           alive: true,
           spriteKey: "zubat",
+          name: "Zubat",
+          types: [PokemonType.Poison, PokemonType.Flying],
+          attackType: PokemonType.Flying,
         };
         enemy.sprite = this.add.sprite(
           this.tileToPixelX(ex),
@@ -145,7 +191,7 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Input ──
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-      if (this.turnManager.isBusy || !this.player.alive) return;
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
 
       const dx = pointer.worldX - this.player.sprite!.x;
       const dy = pointer.worldY - this.player.sprite!.y;
@@ -157,11 +203,14 @@ export class DungeonScene extends Phaser.Scene {
     });
 
     // ── HUD ──
+    this.floorText = this.add
+      .text(8, 6, "", { fontSize: "11px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold" })
+      .setScrollFactor(0).setDepth(100);
     this.hpText = this.add
-      .text(8, 6, "", { fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace" })
+      .text(8, 22, "", { fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace" })
       .setScrollFactor(0).setDepth(100);
     this.turnText = this.add
-      .text(8, 22, "", { fontSize: "11px", color: "#60a5fa", fontFamily: "monospace" })
+      .text(8, 38, "", { fontSize: "11px", color: "#60a5fa", fontFamily: "monospace" })
       .setScrollFactor(0).setDepth(100);
     this.logText = this.add
       .text(8, GAME_HEIGHT - 120, "", {
@@ -186,6 +235,9 @@ export class DungeonScene extends Phaser.Scene {
     });
 
     this.updateHUD();
+
+    // Floor entrance message
+    this.showLog(`Beach Cave B${this.currentFloor}F`);
   }
 
   // ── Helpers ──
@@ -219,17 +271,111 @@ export class DungeonScene extends Phaser.Scene {
 
   private updateHUD() {
     const p = this.player.stats;
-    const hpBar = "█".repeat(Math.ceil((p.hp / p.maxHp) * 8));
+    const hpRatio = p.hp / p.maxHp;
+    const hpBar = "█".repeat(Math.ceil(hpRatio * 8));
     const hpEmpty = "░".repeat(8 - hpBar.length);
-    this.hpText.setText(`B1F  HP ${hpBar}${hpEmpty} ${p.hp}/${p.maxHp}`);
+    const hpColor = hpRatio > 0.5 ? "#4ade80" : hpRatio > 0.25 ? "#fbbf24" : "#ef4444";
+    this.floorText.setText(`Beach Cave  B${this.currentFloor}F`);
+    this.hpText.setText(`HP ${hpBar}${hpEmpty} ${p.hp}/${p.maxHp}`);
+    this.hpText.setColor(hpColor);
     this.turnText.setText(`Lv.${p.level}  Turn ${this.turnManager.turn}`);
   }
 
   private showLog(msg: string) {
     this.logText.setText(msg);
-    // Auto-clear after 2 seconds
-    this.time.delayedCall(2000, () => {
+    this.time.delayedCall(2500, () => {
       if (this.logText.text === msg) this.logText.setText("");
+    });
+  }
+
+  // ── Stairs ──
+
+  private checkStairs() {
+    const { stairsPos } = this.dungeon;
+    if (this.player.tileX === stairsPos.x && this.player.tileY === stairsPos.y) {
+      this.advanceFloor();
+    }
+  }
+
+  private advanceFloor() {
+    if (this.currentFloor >= MAX_FLOOR) {
+      // Dungeon clear!
+      this.showDungeonClear();
+      return;
+    }
+
+    this.gameOver = true; // prevent input during transition
+    this.showLog(`Went to B${this.currentFloor + 1}F!`);
+
+    this.cameras.main.fadeOut(500, 0, 0, 0);
+    this.time.delayedCall(600, () => {
+      this.scene.restart({
+        floor: this.currentFloor + 1,
+        hp: this.player.stats.hp,
+        maxHp: this.player.stats.maxHp,
+      });
+    });
+  }
+
+  private showDungeonClear() {
+    this.gameOver = true;
+
+    // Dark overlay
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2,
+      GAME_WIDTH, GAME_HEIGHT,
+      0x000000, 0.7
+    ).setScrollFactor(0).setDepth(200);
+
+    const titleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "DUNGEON CLEAR!", {
+      fontSize: "20px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    const detailText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `Beach Cave B${MAX_FLOOR}F cleared!`, {
+      fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, "[Tap to restart]", {
+      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
+
+    restartText.on("pointerdown", () => {
+      this.scene.start("DungeonScene", { floor: 1 });
+    });
+
+    // Pulsing animation on title
+    this.tweens.add({
+      targets: titleText,
+      alpha: { from: 1, to: 0.6 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  private showGameOver() {
+    this.gameOver = true;
+
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2,
+      GAME_WIDTH, GAME_HEIGHT,
+      0x000000, 0.7
+    ).setScrollFactor(0).setDepth(200);
+
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, "GAME OVER", {
+      fontSize: "22px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 5, `Fainted on B${this.currentFloor}F`, {
+      fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 45, "[Tap to retry]", {
+      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
+
+    restartText.on("pointerdown", () => {
+      this.scene.start("DungeonScene", { floor: 1 });
     });
   }
 
@@ -263,9 +409,17 @@ export class DungeonScene extends Phaser.Scene {
         () => this.moveEntity(this.player, dir),
         this.getEnemyActions()
       );
+
+      // After moving, check if player stepped on stairs
+      this.checkStairs();
     }
 
     this.updateHUD();
+
+    // Check game over (player died from enemy attack)
+    if (!this.player.alive && !this.gameOver) {
+      this.showGameOver();
+    }
   }
 
   private canEntityMove(entity: Entity, dir: Direction): boolean {
@@ -306,21 +460,28 @@ export class DungeonScene extends Phaser.Scene {
       attacker.facing = dir;
       attacker.sprite!.play(`${attacker.spriteKey}-idle-${dir}`);
 
-      // Damage calculation: atk - def/2, minimum 1
-      const dmg = Math.max(1, attacker.stats.atk - Math.floor(defender.stats.def / 2));
+      // Type effectiveness
+      const effectiveness = getEffectiveness(attacker.attackType, defender.types);
+      const effText = effectivenessText(effectiveness);
+
+      // Damage calculation: (atk - def/2) * type_effectiveness, minimum 1
+      const baseDmg = Math.max(1, attacker.stats.atk - Math.floor(defender.stats.def / 2));
+      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness));
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
-      // Flash the defender red
+      // Flash the defender — color based on effectiveness
       if (defender.sprite) {
-        defender.sprite.setTint(0xff4444);
+        const tintColor = effectiveness >= 2.0 ? 0xff2222 : effectiveness < 1.0 ? 0x8888ff : 0xff4444;
+        defender.sprite.setTint(tintColor);
         this.time.delayedCall(200, () => {
           if (defender.sprite) defender.sprite.clearTint();
         });
       }
 
-      const attackerName = attacker === this.player ? "Mudkip" : "Zubat";
-      const defenderName = defender === this.player ? "Mudkip" : "Zubat";
-      this.showLog(`${attackerName} attacks ${defenderName}! ${dmg} damage!`);
+      // Build log message
+      let logMsg = `${attacker.name} attacks ${defender.name}! ${dmg} damage!`;
+      if (effText) logMsg += `\n${effText}`;
+      this.showLog(logMsg);
 
       // Check death
       if (defender.stats.hp <= 0) {
@@ -337,9 +498,10 @@ export class DungeonScene extends Phaser.Scene {
           });
         }
         if (defender === this.player) {
-          this.showLog("Mudkip fainted!");
+          this.showLog(`${this.player.name} fainted!`);
         } else {
-          this.showLog(`${defenderName} fainted! +15 EXP`);
+          const expGain = 10 + this.currentFloor * 5;
+          this.showLog(`${defender.name} fainted! +${expGain} EXP`);
         }
       }
 
