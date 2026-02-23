@@ -28,6 +28,8 @@ export interface DungeonSaveData {
   skills: { id: string; currentPp: number }[];
   // Inventory (saved as IDs + counts)
   inventory: { itemId: string; count: number }[];
+  // Starter species
+  starter?: string;
 }
 
 export interface MetaSaveData {

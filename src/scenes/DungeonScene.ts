@@ -120,6 +120,9 @@ export class DungeonScene extends Phaser.Scene {
   private maxBelly = 100;
   private persistentBelly: number | null = null;
 
+  // Starter species
+  private starterId = "mudkip";
+
   // Boss state
   private bossEntity: Entity | null = null;
   private bossHpBar: Phaser.GameObjects.Graphics | null = null;
@@ -132,7 +135,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private persistentAllies: AllyData[] | null = null;
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string }) {
     // Apply upgrade bonuses on fresh run start (floor 1 from hub)
     const meta = loadMeta();
     const hpBonus = getUpgradeBonus(meta, "maxHp") * 5;
@@ -169,6 +172,7 @@ export class DungeonScene extends Phaser.Scene {
     this.floorTraps = [];
     this.belly = data?.belly ?? 100;
     this.maxBelly = 100;
+    this.starterId = data?.starter ?? "mudkip";
 
     // Give starter items on new run
     if (isNewRun) {
@@ -193,7 +197,7 @@ export class DungeonScene extends Phaser.Scene {
 
     // Load player + all enemy species + ally species for this dungeon
     const allySpeciesIds = (this.persistentAllies ?? []).map(a => a.speciesId);
-    const neededKeys = new Set<string>(["mudkip", ...this.dungeonDef.enemySpeciesIds, ...allySpeciesIds]);
+    const neededKeys = new Set<string>([this.starterId, ...this.dungeonDef.enemySpeciesIds, ...allySpeciesIds]);
     for (const key of neededKeys) {
       const dexNum = spriteMap[key];
       const sp = SPECIES[key];
@@ -235,7 +239,7 @@ export class DungeonScene extends Phaser.Scene {
     stairsGfx.setDepth(5);
 
     // ── Create animations for needed species ──
-    const neededKeys = new Set<string>(["mudkip", ...this.dungeonDef.enemySpeciesIds]);
+    const neededKeys = new Set<string>([this.starterId, ...this.dungeonDef.enemySpeciesIds]);
     for (const key of neededKeys) {
       const sp = SPECIES[key];
       if (!sp || this.anims.exists(`${key}-walk-0`)) continue;
@@ -243,7 +247,7 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     // ── Player entity ──
-    const playerSp = SPECIES.mudkip;
+    const playerSp = SPECIES[this.starterId] ?? SPECIES.mudkip;
     const playerSkills = this.persistentSkills ?? createSpeciesSkills(playerSp);
     this.player = {
       tileX: playerStart.x,
@@ -261,8 +265,8 @@ export class DungeonScene extends Phaser.Scene {
       attackType: playerSp.attackType,
       skills: playerSkills,
       statusEffects: [],
-      ability: SPECIES_ABILITIES["mudkip"],
-      speciesId: "mudkip",
+      ability: SPECIES_ABILITIES[this.starterId] ?? SPECIES_ABILITIES["mudkip"],
+      speciesId: this.starterId,
     };
     this.player.sprite = this.add.sprite(
       this.tileToPixelX(this.player.tileX),
@@ -1098,6 +1102,7 @@ export class DungeonScene extends Phaser.Scene {
       totalExp: this.totalExp,
       skills: serializeSkills(this.player.skills),
       inventory: serializeInventory(this.inventory),
+      starter: this.starterId,
     });
     this.showLog("Game saved!");
   }
@@ -1263,6 +1268,7 @@ export class DungeonScene extends Phaser.Scene {
         dungeonId: this.dungeonDef.id,
         allies: this.serializeAllies(),
         belly: this.belly,
+        starter: this.starterId,
       });
     });
   }

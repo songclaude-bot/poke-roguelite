@@ -210,6 +210,7 @@ export class HubScene extends Phaser.Scene {
         inventory: deserializeInventory(save.inventory),
         fromHub: true,
         dungeonId: save.dungeonId,
+        starter: save.starter ?? this.meta.starter ?? "mudkip",
       });
     });
   }
