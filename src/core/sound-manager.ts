@@ -391,6 +391,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [98, 98, 131, 131, 147, 147, 98, 98, 98, 98, 147, 147, 165, 165, 131, 131],
     tempo: 0.30, melodyType: "sawtooth", bassType: "square",
   },
+  // Moss Burrow — earthy, buzzing
+  mossBurrow: {
+    melody: [330, 349, 392, 440, 392, 349, 330, 294, 330, 392, 440, 494, 440, 392, 349, 330],
+    bass: [165, 165, 196, 196, 220, 220, 165, 165, 147, 147, 196, 196, 247, 247, 196, 196],
+    tempo: 0.28, melodyType: "triangle", bassType: "sine",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

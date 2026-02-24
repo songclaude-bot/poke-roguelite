@@ -1166,6 +1166,17 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 95,
     description: "Stomps the ground, hitting all nearby.",
   },
+  // ── Phase 51 Bug Skills ──
+  xScissor: {
+    id: "xScissor",
+    name: "X-Scissor",
+    type: PokemonType.Bug,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Front1,
+    accuracy: 95,
+    description: "Slashes the foe in an X pattern.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

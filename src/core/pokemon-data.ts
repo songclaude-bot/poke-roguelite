@@ -1017,6 +1017,32 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["bulldoze", "dig", "scratch"],
     floors: [],
   },
+  paras: {
+    id: "paras",
+    name: "Paras",
+    spriteKey: "paras",
+    types: [PokemonType.Bug, PokemonType.Grass],
+    attackType: PokemonType.Bug,
+    baseStats: { hp: 28, atk: 11, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 24,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["xScissor", "leechLife", "absorb"],
+    floors: [],
+  },
+  venonat: {
+    id: "venonat",
+    name: "Venonat",
+    spriteKey: "venonat",
+    types: [PokemonType.Bug, PokemonType.Poison],
+    attackType: PokemonType.Bug,
+    baseStats: { hp: 30, atk: 10, def: 7 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 2,
+    skillIds: ["signalBeam", "poisonSting", "tackle"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1108,6 +1134,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   ekans: { 7: "venoshock", 10: "sludgeBomb" },
   cubone: { 7: "boneRush", 10: "earthPower" },
   diglett: { 7: "bulldoze", 10: "earthPower" },
+  paras: { 7: "xScissor", 10: "absorb" },
+  venonat: { 7: "signalBeam", 10: "sleepPowder" },
 };
 
 /** Check if a species learns a new skill at this level */
