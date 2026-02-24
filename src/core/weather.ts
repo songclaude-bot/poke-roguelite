@@ -160,6 +160,9 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     abyssalDepths: [WeatherType.Rain],
     volcanicCore: [WeatherType.Sandstorm],
     ancientWoods: [WeatherType.Rain],
+    thunderDome: [WeatherType.Rain, WeatherType.Sandstorm],
+    miasmaSwamp: [WeatherType.Rain, WeatherType.Sandstorm],
+    tectonicRift: [WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

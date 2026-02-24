@@ -317,6 +317,10 @@ export class DungeonScene extends Phaser.Scene {
       bruxish: "0779", chewtle: "0833",
       litleo: "0667", torchic: "0255",
       gossifleur: "0829", bounsweet: "0761",
+      // Phase 121-123: Electric/Poison/Ground 5th
+      yamper: "0835", pincurchin: "0871",
+      skrelp: "0690", toxel: "0848",
+      drilbur: "0529", barboach: "0339",
     };
 
     // Load player + all enemy species + ally species for this dungeon

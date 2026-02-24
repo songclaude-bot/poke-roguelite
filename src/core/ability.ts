@@ -271,4 +271,10 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   torchic: AbilityId.Torrent, // Speed Boost → Torrent equivalent
   gossifleur: AbilityId.ShieldDust, // Cotton Down equivalent
   bounsweet: AbilityId.ShieldDust, // Leaf Guard equivalent
+  yamper: AbilityId.Static, // Ball Fetch equivalent
+  pincurchin: AbilityId.Static,
+  skrelp: AbilityId.ShieldDust, // Poison Point equivalent
+  toxel: AbilityId.Static, // Rattled equivalent
+  drilbur: AbilityId.Guts, // Sand Rush equivalent
+  barboach: AbilityId.SwiftSwim, // Oblivious equivalent
 };

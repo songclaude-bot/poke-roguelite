@@ -172,6 +172,11 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "torchic", to: "combusken", level: 14, newName: "Combusken", hpBonus: 12, atkBonus: 10, defBonus: 6, newSkillId: "blazeKick" },
   { from: "gossifleur", to: "eldegoss", level: 14, newName: "Eldegoss", hpBonus: 14, atkBonus: 6, defBonus: 10, newSkillId: "energyBall" },
   { from: "bounsweet", to: "steenee", level: 14, newName: "Steenee", hpBonus: 12, atkBonus: 10, defBonus: 6, newSkillId: "tropicalKick" },
+  // Phase 121-123: Electric/Poison/Ground 5th
+  { from: "yamper", to: "boltund", level: 14, newName: "Boltund", hpBonus: 12, atkBonus: 10, defBonus: 6, newSkillId: "wildCharge" },
+  { from: "toxel", to: "toxtricity", level: 14, newName: "Toxtricity", hpBonus: 14, atkBonus: 12, defBonus: 4, newSkillId: "nuzzle" },
+  { from: "skrelp", to: "dragalge", level: 14, newName: "Dragalge", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "sludgeBomb" },
+  { from: "drilbur", to: "excadrill", level: 14, newName: "Excadrill", hpBonus: 14, atkBonus: 12, defBonus: 8, newSkillId: "earthquake" },
 ];
 
 /** Check if a species can evolve at a given level */

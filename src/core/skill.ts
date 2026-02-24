@@ -1763,6 +1763,28 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 95,
     description: "A kick infused with tropical energy.",
   },
+  // Phase 121-123: Electric/Poison/Ground 5th
+  nuzzle: {
+    id: "nuzzle",
+    name: "Nuzzle",
+    type: PokemonType.Electric,
+    power: 8,
+    pp: 16,
+    range: SkillRange.Front1,
+    accuracy: 100,
+    effect: SkillEffect.Paralyze,
+    description: "An affectionate nuzzle that always paralyzes.",
+  },
+  muddyWater: {
+    id: "muddyWater",
+    name: "Muddy Water",
+    type: PokemonType.Ground,
+    power: 12,
+    pp: 12,
+    range: SkillRange.Room,
+    accuracy: 85,
+    description: "Floods the room with muddy water.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

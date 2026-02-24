@@ -653,6 +653,25 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [131, 131, 165, 165, 196, 196, 165, 165, 131, 131, 110, 110, 131, 131, 175, 175],
     tempo: 0.32, melodyType: "triangle", bassType: "sine",
   },
+  // Phase 121-123: Electric/Poison/Ground 5th
+  // Thunder Dome — fast, electric, crackling
+  thunderDome: {
+    melody: [523, 587, 659, 784, 659, 587, 523, 494, 523, 659, 784, 880, 784, 659, 523, 494],
+    bass: [262, 262, 330, 330, 392, 392, 262, 262, 247, 247, 330, 330, 440, 440, 330, 330],
+    tempo: 0.24, melodyType: "sawtooth", bassType: "square",
+  },
+  // Miasma Swamp — slow, eerie, dripping
+  miasmaSwamp: {
+    melody: [220, 208, 196, 185, 175, 185, 196, 220, 247, 233, 220, 196, 185, 175, 165, 185],
+    bass: [110, 110, 98, 98, 88, 88, 98, 98, 123, 123, 110, 110, 98, 98, 82, 82],
+    tempo: 0.36, melodyType: "sine", bassType: "triangle",
+  },
+  // Tectonic Rift — heavy, rumbling, powerful
+  tectonicRift: {
+    melody: [196, 220, 262, 294, 330, 294, 262, 220, 196, 175, 196, 220, 262, 330, 294, 262],
+    bass: [98, 98, 131, 131, 165, 165, 131, 131, 98, 98, 88, 88, 131, 131, 165, 165],
+    tempo: 0.28, melodyType: "square", bassType: "sawtooth",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],
