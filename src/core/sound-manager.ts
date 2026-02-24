@@ -337,6 +337,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [98, 98, 82, 82, 98, 98, 131, 131, 98, 98, 73, 73, 82, 82, 98, 98],
     tempo: 0.26, melodyType: "sawtooth", bassType: "sine",
   },
+  // Frozen Tundra — icy, sparse
+  frozenTundra: {
+    melody: [523, 494, 440, 392, 349, 392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330],
+    bass: [262, 262, 220, 220, 175, 175, 196, 196, 262, 262, 294, 294, 220, 220, 175, 175],
+    tempo: 0.34, melodyType: "sine", bassType: "triangle",
+  },
   // Destiny Tower — grand, final
   destinyTower: {
     melody: [262, 330, 392, 523, 392, 330, 262, 196, 262, 392, 523, 659, 523, 392, 330, 262],

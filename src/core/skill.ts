@@ -1030,6 +1030,28 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 80,
     description: "Launches sharp stones with high power.",
   },
+
+  // ── Additional Ice Skills ──
+  avalanche: {
+    id: "avalanche",
+    name: "Avalanche",
+    type: PokemonType.Ice,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Around,
+    accuracy: 85,
+    description: "Crashes down ice on all nearby foes.",
+  },
+  icyWind: {
+    id: "icyWind",
+    name: "Icy Wind",
+    type: PokemonType.Ice,
+    power: 12,
+    pp: 14,
+    range: SkillRange.FrontLine,
+    accuracy: 90,
+    description: "Chills foes in a line.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

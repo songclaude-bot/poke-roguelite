@@ -806,6 +806,33 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["rockThrow", "ironDefense", "stoneEdge"],
     floors: [],
   },
+  // ── Frozen Tundra ──
+  swinub: {
+    id: "swinub",
+    name: "Swinub",
+    spriteKey: "swinub",
+    types: [PokemonType.Ice, PokemonType.Ground],
+    attackType: PokemonType.Ice,
+    baseStats: { hp: 30, atk: 10, def: 7 },
+    walkFrameWidth: 24, walkFrameHeight: 24,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["iceShard", "dig", "avalanche"],
+    floors: [],
+  },
+  spheal: {
+    id: "spheal",
+    name: "Spheal",
+    spriteKey: "spheal",
+    types: [PokemonType.Ice, PokemonType.Water],
+    attackType: PokemonType.Ice,
+    baseStats: { hp: 32, atk: 9, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 6, idleFrames: 4,
+    skillIds: ["icyWind", "waterPulse", "iceBeam"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -881,6 +908,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   riolu: { 7: "auraSphere", 10: "focusPunch" },
   larvitar: { 7: "rockSlide", 10: "stoneEdge" },
   nosepass: { 7: "rockSlide", 10: "stoneEdge" },
+  swinub: { 7: "avalanche", 10: "earthPower" },
+  spheal: { 7: "icyWind", 10: "iceBeam" },
 };
 
 /** Check if a species learns a new skill at this level */
