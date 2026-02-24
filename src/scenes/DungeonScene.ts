@@ -55,7 +55,7 @@ const MOVE_DURATION = 150; // ms per tile movement
 function enemiesPerRoom(floor: number): number {
   return Math.min(3, 1 + Math.floor((floor - 1) / 3)); // 1→2→3
 }
-const MAX_ALLIES = 3; // max party members (excluding player)
+const MAX_ALLIES = 4; // max party members (excluding player)
 
 // Per-floor enemy scaling (uses species base stats + dungeon difficulty + NG+ bonus)
 function getEnemyStats(floor: number, difficulty: number, species?: PokemonSpecies, ngPlusBonus = 0) {
@@ -1522,6 +1522,32 @@ export class DungeonScene extends Phaser.Scene {
         this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
         if (this.player.sprite) this.player.sprite.setAlpha(0.3);
         this.showLog("Used Vanish Orb! You became invisible for 10 turns!");
+        break;
+      }
+      case "reviveSeed": {
+        const fainted = this.allies.find(a => !a.alive);
+        if (fainted) {
+          fainted.alive = true;
+          fainted.stats.hp = Math.floor(fainted.stats.maxHp / 2);
+          if (fainted.sprite) fainted.sprite.setAlpha(1);
+          this.showLog(`Used Revive Seed! ${fainted.speciesId} was revived!`);
+        } else {
+          this.showLog("No fainted allies to revive.");
+          return;
+        }
+        break;
+      }
+      case "allPowerOrb": {
+        this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 10 });
+        this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
+        this.showLog("Used All-Power Orb! ATK and DEF boosted for 10 turns!");
+        break;
+      }
+      case "escapeOrb": {
+        this.showLog("Used Escape Orb! Escaping the dungeon...");
+        this.time.delayedCall(800, () => {
+          this.scene.start("HubScene");
+        });
         break;
       }
       default: {
