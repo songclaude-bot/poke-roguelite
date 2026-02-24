@@ -433,6 +433,11 @@ export class DungeonPreviewScene extends Phaser.Scene {
     stopBgm();
     clearDungeonSave();
     this.meta.totalRuns++;
+    // Track last dungeon and per-dungeon run count
+    this.meta.lastDungeonId = this.dungeonId;
+    this.meta.lastChallenge = this.challengeMode ?? undefined;
+    if (!this.meta.dungeonRunCounts) this.meta.dungeonRunCounts = {};
+    this.meta.dungeonRunCounts[this.dungeonId] = (this.meta.dungeonRunCounts[this.dungeonId] ?? 0) + 1;
     saveMeta(this.meta);
 
     const modifierIds = modifiers.map(m => m.id);

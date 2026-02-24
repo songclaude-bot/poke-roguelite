@@ -71,6 +71,11 @@ export interface MetaSaveData {
   ngPlusLevel?: number;
   // Enchantment applied to the equipped held item
   enchantmentId?: string;
+  // Quick restart: last dungeon played
+  lastDungeonId?: string;
+  lastChallenge?: string;
+  // Per-dungeon run counts (dungeonId → count)
+  dungeonRunCounts?: Record<string, number>;
 }
 
 const SAVE_VERSION = 1;
@@ -147,6 +152,9 @@ export function loadMeta(): MetaSaveData {
     if (data.abilityLevels === undefined) data.abilityLevels = {};
     if (data.ngPlusLevel === undefined) data.ngPlusLevel = 0;
     if (data.enchantmentId === undefined) data.enchantmentId = undefined;
+    if (data.lastDungeonId === undefined) data.lastDungeonId = undefined;
+    if (data.lastChallenge === undefined) data.lastChallenge = undefined;
+    if (data.dungeonRunCounts === undefined) data.dungeonRunCounts = {};
     return data;
   } catch {
     return defaultMeta();

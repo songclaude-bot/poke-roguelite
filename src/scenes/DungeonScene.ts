@@ -65,6 +65,7 @@ import {
 } from "../core/sound-manager";
 import { DungeonEvent, EventChoice, rollDungeonEvent } from "../core/dungeon-events";
 import { FloorTheme, getDepthAdjustedTheme } from "../core/floor-themes";
+import { addToStorage } from "../core/crafting";
 
 interface AllyData {
   speciesId: string;
@@ -4837,8 +4838,13 @@ export class DungeonScene extends Phaser.Scene {
       difficulty: isNonNormalDifficulty(this.difficultyLevel) ? this.difficultyLevel : undefined,
     });
 
+    // Run counter for this dungeon
+    const clearMeta = loadMeta();
+    const clearDungeonRunCount = (clearMeta.dungeonRunCounts ?? {})[this.dungeonDef.id] ?? 0;
+
     // Stats summary
     const clearStats = [
+      `Run #${clearDungeonRunCount}`,
       `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
       this.allies.length > 0 ? `Team: ${this.allies.filter(a => a.alive).map(a => a.name).join(", ")}` : "",
       this.ngPlusLevel > 0 ? `NG+${this.ngPlusLevel}` : "",
@@ -4851,7 +4857,7 @@ export class DungeonScene extends Phaser.Scene {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 85, "[Return to Town]", {
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 95, "[Return to Town]", {
       fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
@@ -4868,6 +4874,15 @@ export class DungeonScene extends Phaser.Scene {
         pokemonSeen: Array.from(this.seenSpecies),
         inventory: serializeInventory(this.inventory),
       });
+    });
+
+    // Run Again button
+    const runAgainText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 117, "[Run Again]", {
+      fontSize: "14px", color: "#f59e0b", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
+
+    runAgainText.on("pointerdown", () => {
+      this.quickRetry(gold, true);
     });
 
     this.tweens.add({
@@ -4951,8 +4966,13 @@ export class DungeonScene extends Phaser.Scene {
       difficulty: isNonNormalDifficulty(this.difficultyLevel) ? this.difficultyLevel : undefined,
     });
 
+    // Run counter for this dungeon
+    const goMeta = loadMeta();
+    const goDungeonRunCount = (goMeta.dungeonRunCounts ?? {})[this.dungeonDef.id] ?? 0;
+
     // Stats summary
     const goStats = [
+      `Run #${goDungeonRunCount}`,
       `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
       this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
       this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
@@ -4962,7 +4982,7 @@ export class DungeonScene extends Phaser.Scene {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 60, "[Return to Town]", {
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 70, "[Return to Town]", {
       fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
@@ -4979,6 +4999,86 @@ export class DungeonScene extends Phaser.Scene {
         pokemonSeen: Array.from(this.seenSpecies),
         inventory: serializeInventory(this.inventory),
       });
+    });
+
+    // Quick Retry button
+    const retryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 92, "[Quick Retry]", {
+      fontSize: "14px", color: "#f59e0b", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
+
+    retryText.on("pointerdown", () => {
+      this.quickRetry(gold, false);
+    });
+  }
+
+  /**
+   * Quick Retry / Run Again — saves run results and immediately re-enters the same dungeon.
+   * Mirrors the gold/stats saving logic from HubScene.init + DungeonPreviewScene.launchDungeon.
+   */
+  private quickRetry(gold: number, cleared: boolean) {
+    const meta = loadMeta();
+
+    // 1. Save run results (same as HubScene.init)
+    meta.gold += gold;
+    meta.totalGold += gold;
+    meta.totalRuns++;
+    if (cleared) meta.totalClears++;
+    const bestFloor = cleared ? this.dungeonDef.floors : this.currentFloor;
+    if (bestFloor > meta.bestFloor) meta.bestFloor = bestFloor;
+    meta.totalEnemiesDefeated += this.enemiesDefeated;
+    meta.totalTurns += this.turnManager.turn;
+    if (this.dungeonDef.id === "endlessDungeon" && bestFloor > meta.endlessBestFloor) {
+      meta.endlessBestFloor = bestFloor;
+    }
+    if (cleared && this.challengeMode) {
+      meta.challengeClears++;
+    }
+    if (this.starterId && !meta.startersUsed.includes(this.starterId)) {
+      meta.startersUsed.push(this.starterId);
+    }
+    // Pokedex: merge seen Pokemon from this run
+    const seenSet = new Set(meta.pokemonSeen);
+    for (const id of this.seenSpecies) {
+      seenSet.add(id);
+    }
+    meta.pokemonSeen = Array.from(seenSet);
+    if (this.starterId && !meta.pokemonUsed.includes(this.starterId)) {
+      meta.pokemonUsed.push(this.starterId);
+    }
+    // Auto-store inventory items from dungeon run
+    const invData = serializeInventory(this.inventory);
+    for (const stack of invData) {
+      addToStorage(meta.storage, stack.itemId, stack.count);
+    }
+
+    // 2. Save last dungeon info
+    meta.lastDungeonId = this.dungeonDef.id;
+    meta.lastChallenge = this.challengeMode ?? undefined;
+
+    // 3. Increment per-dungeon run count for the NEW run
+    if (!meta.dungeonRunCounts) meta.dungeonRunCounts = {};
+    meta.dungeonRunCounts[this.dungeonDef.id] = (meta.dungeonRunCounts[this.dungeonDef.id] ?? 0) + 1;
+
+    // 4. Increment totalRuns for the new run (DungeonPreviewScene does this)
+    meta.totalRuns++;
+
+    saveMeta(meta);
+    clearDungeonSave();
+
+    // 5. Start new dungeon (same as DungeonPreviewScene.launchDungeon)
+    stopBgm();
+    this.cameras.main.fadeOut(400, 0, 0, 0);
+    this.time.delayedCall(450, () => {
+      const launchData: Record<string, unknown> = {
+        floor: 1,
+        fromHub: true,
+        dungeonId: this.dungeonDef.id,
+        starter: this.starterId,
+      };
+      if (this.challengeMode) {
+        launchData.challengeMode = this.challengeMode;
+      }
+      this.scene.start("DungeonScene", launchData);
     });
   }
 

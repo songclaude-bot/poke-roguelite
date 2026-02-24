@@ -88,6 +88,11 @@ export class HubScene extends Phaser.Scene {
           addToStorage(this.meta.storage, stack.itemId, stack.count);
         }
       }
+      // Track last dungeon for quick re-entry
+      if (data.dungeonId) {
+        this.meta.lastDungeonId = data.dungeonId;
+        this.meta.lastChallenge = data.challengeMode ?? undefined;
+      }
       saveMeta(this.meta);
     }
   }
@@ -145,6 +150,31 @@ export class HubScene extends Phaser.Scene {
         () => this.continueSave()
       );
       y += 52;
+    }
+
+    // Last Dungeon quick access (if player has a last dungeon)
+    if (this.meta.lastDungeonId && !hasSave) {
+      const lastDungeon = DUNGEONS[this.meta.lastDungeonId];
+      if (lastDungeon) {
+        const lastChallengeDef = this.meta.lastChallenge
+          ? CHALLENGE_MODES.find(c => c.id === this.meta.lastChallenge)
+          : null;
+        const challengeTag = lastChallengeDef ? ` [${lastChallengeDef.name}]` : "";
+        const runCount = (this.meta.dungeonRunCounts ?? {})[this.meta.lastDungeonId] ?? 0;
+        this.createButton(GAME_WIDTH / 2, y, btnW, 42,
+          `Last Dungeon: ${lastDungeon.name}${challengeTag}`,
+          `Quick re-enter  (${runCount} runs)`,
+          "#f59e0b",
+          () => {
+            if (this.meta.lastChallenge) {
+              this.enterDungeonWithChallenge(this.meta.lastDungeonId!, this.meta.lastChallenge);
+            } else {
+              this.enterDungeon(this.meta.lastDungeonId!);
+            }
+          }
+        );
+        y += 52;
+      }
     }
 
     // Daily Dungeon button (unlocked after 5 clears)
