@@ -1,11 +1,12 @@
 import { Direction, DIR_DX, DIR_DY } from "./direction";
 import { TerrainType } from "./dungeon-generator";
-import { Entity, canMoveTo, canMoveDiagonal, chebyshevDist } from "./entity";
+import { Entity, canMoveTo, canMoveDiagonal, chebyshevDist, AllyTactic } from "./entity";
 
 // ── Constants ──
 const LEASH_DIST = 5;        // max distance before forced follow
 const FOLLOW_DIST = 2;       // ideal follow distance
 const ATTACK_CHASE_RANGE = 3; // range to chase enemies
+const GO_AFTER_FOES_RANGE = 8; // range for GoAfterFoes tactic
 const MAX_PATH_SEARCH = 200;  // BFS node limit (keep fast)
 
 // ── FSM States ──
@@ -170,6 +171,33 @@ export function getAllyMoveDirection(
   height: number,
   allEntities: Entity[]
 ): { moveDir: Direction | null; attackTarget: Entity | null } {
+  const tactic = ally.allyTactic ?? AllyTactic.FollowMe;
+
+  // Dispatch to tactic-specific AI
+  switch (tactic) {
+    case AllyTactic.GoAfterFoes:
+      return allyAI_GoAfterFoes(ally, player, enemies, terrain, width, height, allEntities);
+    case AllyTactic.StayHere:
+      return allyAI_StayHere(ally, enemies);
+    case AllyTactic.Scatter:
+      return allyAI_Scatter(ally, player, enemies, terrain, width, height, allEntities);
+    case AllyTactic.FollowMe:
+    default:
+      return allyAI_FollowMe(ally, player, enemies, terrain, width, height, allEntities);
+  }
+}
+
+// ── Tactic: FollowMe (default — original behavior) ──
+
+function allyAI_FollowMe(
+  ally: Entity,
+  player: Entity,
+  enemies: Entity[],
+  terrain: TerrainType[][],
+  width: number,
+  height: number,
+  allEntities: Entity[]
+): { moveDir: Direction | null; attackTarget: Entity | null } {
   const distToPlayer = chebyshevDist(ally.tileX, ally.tileY, player.tileX, player.tileY);
 
   // Determine FSM state
@@ -217,6 +245,108 @@ export function getAllyMoveDirection(
       return { moveDir: bfsToPlayer(ally, player, terrain, width, height, allEntities), attackTarget: null };
     }
   }
+}
+
+// ── Tactic: GoAfterFoes — aggressively pursue enemies up to 8 tiles ──
+
+function allyAI_GoAfterFoes(
+  ally: Entity,
+  player: Entity,
+  enemies: Entity[],
+  terrain: TerrainType[][],
+  width: number,
+  height: number,
+  allEntities: Entity[]
+): { moveDir: Direction | null; attackTarget: Entity | null } {
+  const distToPlayer = chebyshevDist(ally.tileX, ally.tileY, player.tileX, player.tileY);
+
+  // Still yield to player if blocking
+  if (distToPlayer === 1 && isBlockingPlayer(ally, player)) {
+    const yieldDir = findYieldDirection(ally, player, terrain, width, height, allEntities);
+    return { moveDir: yieldDir, attackTarget: null };
+  }
+
+  // Attack adjacent enemy first
+  for (const e of enemies) {
+    if (!e.alive || e.isAlly) continue;
+    if (chebyshevDist(ally.tileX, ally.tileY, e.tileX, e.tileY) === 1) {
+      return { moveDir: null, attackTarget: e };
+    }
+  }
+
+  // Chase nearest enemy up to 8 tiles (ignoring leash)
+  const nearestEnemy = findNearestEnemy(ally, enemies, GO_AFTER_FOES_RANGE);
+  if (nearestEnemy) {
+    const dir = bfsPathDir(
+      ally.tileX, ally.tileY,
+      nearestEnemy.tileX, nearestEnemy.tileY,
+      terrain, width, height, allEntities, ally
+    );
+    if (dir !== null) return { moveDir: dir, attackTarget: null };
+  }
+
+  // No enemy in range — fall back to following player loosely
+  if (distToPlayer > LEASH_DIST) {
+    return { moveDir: bfsToPlayer(ally, player, terrain, width, height, allEntities), attackTarget: null };
+  }
+  return { moveDir: null, attackTarget: null };
+}
+
+// ── Tactic: StayHere — don't move, attack if adjacent ──
+
+function allyAI_StayHere(
+  ally: Entity,
+  enemies: Entity[]
+): { moveDir: Direction | null; attackTarget: Entity | null } {
+  // Attack adjacent enemy
+  for (const e of enemies) {
+    if (!e.alive || e.isAlly) continue;
+    if (chebyshevDist(ally.tileX, ally.tileY, e.tileX, e.tileY) === 1) {
+      return { moveDir: null, attackTarget: e };
+    }
+  }
+  // Don't move at all
+  return { moveDir: null, attackTarget: null };
+}
+
+// ── Tactic: Scatter — move randomly, attack adjacent enemies ──
+
+function allyAI_Scatter(
+  ally: Entity,
+  player: Entity,
+  enemies: Entity[],
+  terrain: TerrainType[][],
+  width: number,
+  height: number,
+  allEntities: Entity[]
+): { moveDir: Direction | null; attackTarget: Entity | null } {
+  // Attack adjacent enemy first
+  for (const e of enemies) {
+    if (!e.alive || e.isAlly) continue;
+    if (chebyshevDist(ally.tileX, ally.tileY, e.tileX, e.tileY) === 1) {
+      return { moveDir: null, attackTarget: e };
+    }
+  }
+
+  // Move in a random walkable direction
+  const shuffledDirs: Direction[] = [];
+  for (let d = 0; d < 8; d++) shuffledDirs.push(d as Direction);
+  // Fisher-Yates shuffle
+  for (let i = shuffledDirs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledDirs[i], shuffledDirs[j]] = [shuffledDirs[j], shuffledDirs[i]];
+  }
+
+  for (const dir of shuffledDirs) {
+    const nx = ally.tileX + DIR_DX[dir];
+    const ny = ally.tileY + DIR_DY[dir];
+    if (canMoveTo(nx, ny, terrain, width, height, allEntities, ally) &&
+        canMoveDiagonal(ally.tileX, ally.tileY, dir, terrain, width, height)) {
+      return { moveDir: dir, attackTarget: null };
+    }
+  }
+
+  return { moveDir: null, attackTarget: null };
 }
 
 // ── FSM State Resolution ──

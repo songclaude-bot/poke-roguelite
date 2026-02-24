@@ -12,6 +12,14 @@ import {
   getShieldDustDefBonus,
 } from "./ability-upgrade";
 
+/** Ally tactic modes for the command system */
+export enum AllyTactic {
+  FollowMe = "followMe",       // Default: follow player, attack nearby enemies
+  GoAfterFoes = "goAfterFoes", // Aggressively pursue enemies in range
+  StayHere = "stayHere",       // Stay in current position, attack if adjacent
+  Scatter = "scatter",         // Spread out, explore independently
+}
+
 export interface EntityStats {
   hp: number;
   maxHp: number;
@@ -44,6 +52,7 @@ export interface Entity {
   ability?: AbilityId; // passive ability
   abilityLevel?: number; // ability upgrade level (1-5, default 1)
   sturdyUsed?: boolean; // track if Sturdy was consumed this floor
+  allyTactic?: AllyTactic; // current tactic mode for ally command system
 }
 
 /** Get effective ATK (with buffs + abilities, scaled by ability level) */

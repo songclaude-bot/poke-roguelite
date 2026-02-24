@@ -13,6 +13,7 @@ import { TurnManager } from "../core/turn-manager";
 import {
   Entity, canMoveTo, canMoveDiagonal, chebyshevDist,
   getEffectiveAtk, getEffectiveDef, tickStatusEffects, isParalyzed, StatusEffect,
+  AllyTactic,
 } from "../core/entity";
 import { getEnemyMoveDirection, isAdjacentToPlayer, directionToPlayer } from "../core/enemy-ai";
 import { getAllyMoveDirection, tryRecruit, directionTo } from "../core/ally-ai";
@@ -220,6 +221,10 @@ export class DungeonScene extends Phaser.Scene {
   private menuOpen = false;
   private menuUI: Phaser.GameObjects.GameObject[] = [];
 
+  // Team (Ally Command) panel state
+  private teamPanelOpen = false;
+  private teamPanelUI: Phaser.GameObjects.GameObject[] = [];
+
   // Settings panel state
   private settingsOpen = false;
   private settingsUI: Phaser.GameObjects.GameObject[] = [];
@@ -361,6 +366,8 @@ export class DungeonScene extends Phaser.Scene {
     this.skillButtons = [];
     this.bagOpen = false;
     this.bagUI = [];
+    this.teamPanelOpen = false;
+    this.teamPanelUI = [];
     this.enemiesDefeated = 0;
     // Reset combo state on new floor
     this.recentSkillIds = [];
@@ -869,6 +876,7 @@ export class DungeonScene extends Phaser.Scene {
           skills: deserializeSkillsFn(allyData.skills),
           statusEffects: [], isAlly: true, speciesId: allyData.speciesId,
           ability: SPECIES_ABILITIES[allyData.speciesId],
+          allyTactic: AllyTactic.FollowMe,
         };
         const allyTex = `${sp.spriteKey}-idle`;
         if (this.textures.exists(allyTex)) {
@@ -1480,6 +1488,13 @@ export class DungeonScene extends Phaser.Scene {
         });
       });
 
+    // ── Team button (center-bottom, below Pickup/Wait) ──
+    this.add.text(menuCX, menuCY + 22, "Team", {
+      fontSize: "10px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
+      backgroundColor: "#1a1a2ecc", padding: { x: 8, y: 3 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
+      .on("pointerdown", () => this.openTeamPanel());
+
     // ── Hamburger menu button (under minimap, top-right) ──
     const hamX = this.MINIMAP_X_SMALL + 30;
     const hamY = this.MINIMAP_Y_SMALL + 70;
@@ -1607,7 +1622,7 @@ export class DungeonScene extends Phaser.Scene {
 
       btn.on("pointerdown", () => {
         if (this.autoExploring) { this.stopAutoExplore("Stopped."); return; }
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen) return;
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen) return;
         txt.setColor("#fbbf24");
         this.time.delayedCall(150, () => txt.setColor("#8899bb"));
         this.handlePlayerAction(d.dir);
@@ -1625,7 +1640,7 @@ export class DungeonScene extends Phaser.Scene {
 
     waitBtn.on("pointerdown", () => {
       if (this.autoExploring) { this.stopAutoExplore("Stopped."); return; }
-      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen) return;
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen) return;
       waitTxt.setAlpha(0.5);
       this.time.delayedCall(150, () => waitTxt.setAlpha(1));
       this.turnManager.executeTurn(
@@ -2085,7 +2100,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeMenu();
       return;
     }
-    if (this.bagOpen || this.settingsOpen || this.shopOpen) return;
+    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen) return;
 
     sfxMenuOpen();
     this.menuOpen = true;
@@ -2136,6 +2151,173 @@ export class DungeonScene extends Phaser.Scene {
     this.menuOpen = false;
     this.menuUI.forEach(obj => obj.destroy());
     this.menuUI = [];
+  }
+
+  // ── Team (Ally Command) Panel ──
+
+  private openTeamPanel() {
+    if (this.teamPanelOpen) {
+      this.closeTeamPanel();
+      return;
+    }
+    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.gameOver) return;
+
+    const liveAllies = this.allies.filter(a => a.alive);
+    if (liveAllies.length === 0) {
+      this.showLog("No allies in your team.");
+      return;
+    }
+
+    sfxMenuOpen();
+    this.teamPanelOpen = true;
+    this.buildTeamPanelUI();
+  }
+
+  private closeTeamPanel() {
+    sfxMenuClose();
+    this.teamPanelOpen = false;
+    this.teamPanelUI.forEach(obj => obj.destroy());
+    this.teamPanelUI = [];
+  }
+
+  /** Rebuild the team panel UI (called on open and after tactic change) */
+  private buildTeamPanelUI() {
+    // Destroy existing UI first
+    this.teamPanelUI.forEach(obj => obj.destroy());
+    this.teamPanelUI = [];
+
+    const liveAllies = this.allies.filter(a => a.alive);
+
+    // Semi-transparent backdrop
+    const backdrop = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6
+    ).setScrollFactor(0).setDepth(150).setInteractive();
+    backdrop.on("pointerdown", () => this.closeTeamPanel());
+    this.teamPanelUI.push(backdrop);
+
+    // Panel dimensions
+    const panelW = GAME_WIDTH - 24;
+    const rowH = 62;
+    const panelH = 40 + liveAllies.length * rowH + 36;
+    const panelX = 12;
+    const panelY = Math.max(30, (GAME_HEIGHT - panelH) / 2);
+
+    // Panel background
+    const panelGfx = this.add.graphics().setScrollFactor(0).setDepth(151);
+    panelGfx.fillStyle(0x1a1a2e, 0.95);
+    panelGfx.fillRoundedRect(panelX, panelY, panelW, panelH, 8);
+    panelGfx.lineStyle(2, 0x60a5fa, 0.8);
+    panelGfx.strokeRoundedRect(panelX, panelY, panelW, panelH, 8);
+    this.teamPanelUI.push(panelGfx);
+
+    // Title
+    const title = this.add.text(GAME_WIDTH / 2, panelY + 14, "Team Tactics", {
+      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(152);
+    this.teamPanelUI.push(title);
+
+    // Tactic definitions for buttons
+    const tacticDefs: { tactic: AllyTactic; label: string; short: string }[] = [
+      { tactic: AllyTactic.FollowMe, label: "Follow", short: "Follow" },
+      { tactic: AllyTactic.GoAfterFoes, label: "Attack", short: "Attack" },
+      { tactic: AllyTactic.StayHere, label: "Stay", short: "Stay" },
+      { tactic: AllyTactic.Scatter, label: "Scatter", short: "Scatter" },
+    ];
+
+    // Ally rows
+    liveAllies.forEach((ally, idx) => {
+      const rowY = panelY + 32 + idx * rowH;
+      const currentTactic = ally.allyTactic ?? AllyTactic.FollowMe;
+
+      // Ally name
+      const nameText = this.add.text(panelX + 10, rowY + 2, ally.name, {
+        fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace", fontStyle: "bold",
+      }).setScrollFactor(0).setDepth(152);
+      this.teamPanelUI.push(nameText);
+
+      // HP bar
+      const hpRatio = ally.stats.hp / ally.stats.maxHp;
+      const hpBarW = 80;
+      const hpBarX = panelX + 10;
+      const hpBarY = rowY + 18;
+
+      const hpBg = this.add.graphics().setScrollFactor(0).setDepth(152);
+      hpBg.fillStyle(0x333355, 1);
+      hpBg.fillRoundedRect(hpBarX, hpBarY, hpBarW, 6, 2);
+      this.teamPanelUI.push(hpBg);
+
+      const hpFill = this.add.graphics().setScrollFactor(0).setDepth(153);
+      const hpColor = hpRatio > 0.5 ? 0x4ade80 : hpRatio > 0.25 ? 0xfbbf24 : 0xef4444;
+      const fillW = Math.max(0, Math.floor(hpBarW * hpRatio));
+      hpFill.fillStyle(hpColor, 1);
+      hpFill.fillRoundedRect(hpBarX, hpBarY, fillW, 6, 2);
+      this.teamPanelUI.push(hpFill);
+
+      // HP text
+      const hpText = this.add.text(hpBarX + hpBarW + 4, hpBarY - 2, `${ally.stats.hp}/${ally.stats.maxHp}`, {
+        fontSize: "8px", color: "#aab0c8", fontFamily: "monospace",
+      }).setScrollFactor(0).setDepth(152);
+      this.teamPanelUI.push(hpText);
+
+      // Current tactic label
+      const tacticLabel = tacticDefs.find(t => t.tactic === currentTactic)?.label ?? "Follow";
+      const tacticText = this.add.text(panelX + panelW - 10, rowY + 2, tacticLabel, {
+        fontSize: "9px", color: "#fbbf24", fontFamily: "monospace",
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(152);
+      this.teamPanelUI.push(tacticText);
+
+      // Tactic buttons row
+      const btnY = rowY + 30;
+      const btnW = 70;
+      const totalBtnW = tacticDefs.length * btnW + (tacticDefs.length - 1) * 4;
+      const btnStartX = panelX + (panelW - totalBtnW) / 2;
+
+      tacticDefs.forEach((td, ti) => {
+        const bx = btnStartX + ti * (btnW + 4);
+        const isActive = currentTactic === td.tactic;
+        const bgColor = isActive ? "#2a4a3e" : "#2a2a4e";
+        const textColor = isActive ? "#4ade80" : "#8899bb";
+        const borderHighlight = isActive;
+
+        const btn = this.add.text(bx + btnW / 2, btnY, td.short, {
+          fontSize: "9px", color: textColor, fontFamily: "monospace",
+          fontStyle: isActive ? "bold" : "normal",
+          backgroundColor: bgColor,
+          padding: { x: 4, y: 4 },
+          fixedWidth: btnW - 4, align: "center",
+        }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(153).setInteractive();
+
+        btn.on("pointerdown", () => {
+          ally.allyTactic = td.tactic;
+          // Rebuild UI to reflect change
+          this.buildTeamPanelUI();
+        });
+
+        btn.on("pointerover", () => { if (!isActive) btn.setColor("#fbbf24"); });
+        btn.on("pointerout", () => { if (!isActive) btn.setColor(textColor); });
+
+        this.teamPanelUI.push(btn);
+
+        // Draw active indicator border
+        if (borderHighlight) {
+          const borderGfx = this.add.graphics().setScrollFactor(0).setDepth(152);
+          borderGfx.lineStyle(1, 0x4ade80, 0.8);
+          borderGfx.strokeRoundedRect(bx + 1, btnY - 1, btnW - 2, 22, 3);
+          this.teamPanelUI.push(borderGfx);
+        }
+      });
+    });
+
+    // Close button
+    const closeBtnY = panelY + panelH - 30;
+    const closeBtn = this.add.text(GAME_WIDTH / 2, closeBtnY, "[ Close ]", {
+      fontSize: "12px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
+      backgroundColor: "#3a1a2e", padding: { x: 14, y: 5 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(153).setInteractive();
+    closeBtn.on("pointerdown", () => this.closeTeamPanel());
+    closeBtn.on("pointerover", () => closeBtn.setColor("#fbbf24"));
+    closeBtn.on("pointerout", () => closeBtn.setColor("#ef4444"));
+    this.teamPanelUI.push(closeBtn);
   }
 
   private confirmGiveUp() {
@@ -2413,7 +2595,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private openBag() {
-    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen) return;
+    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen) return;
     sfxMenuOpen();
     this.bagOpen = true;
 
@@ -4983,6 +5165,7 @@ export class DungeonScene extends Phaser.Scene {
       skills: createSpeciesSkills(sp),
       statusEffects: [], isAlly: true, speciesId: entity.speciesId,
       ability: entity.ability,
+      allyTactic: AllyTactic.FollowMe,
     };
 
     const recruitTex = `${sp.spriteKey}-idle`;
@@ -5258,7 +5441,7 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (this.turnManager.isBusy || !this.player.alive || this.gameOver ||
-        this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen) return;
+        this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen) return;
 
     // Check stop conditions before even starting
     const preCheck = this.checkAutoExploreStop();
