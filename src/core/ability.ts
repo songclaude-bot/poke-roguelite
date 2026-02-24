@@ -305,4 +305,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   swablu: AbilityId.ShieldDust, // Natural Cure equivalent
   lechonk: AbilityId.Pickup, // Aroma Veil equivalent
   tandemaus: AbilityId.Pickup, // Run Away equivalent
+  // Phase 137-139: Water/Fire/Grass/Electric/Poison/Ground 6th
+  buizel: AbilityId.SwiftSwim,
+  finizen: AbilityId.SwiftSwim, // Water Veil equivalent
+  fletchinder: AbilityId.FlameBody, // Flame Body
+  heatmor: AbilityId.FlameBody, // Flash Fire equivalent
+  smoliv: AbilityId.ShieldDust, // Harvest equivalent
+  deerling: AbilityId.RunAway, // Sap Sipper equivalent
+  pachirisu: AbilityId.Static, // Volt Absorb equivalent
+  emolga: AbilityId.Static, // Motor Drive equivalent
+  glimmet: AbilityId.Sturdy, // Toxic Debris equivalent
+  koffing: AbilityId.Levitate,
+  wooper: AbilityId.SwiftSwim, // Water Absorb equivalent
+  baltoy: AbilityId.Levitate,
 };

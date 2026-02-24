@@ -336,6 +336,13 @@ export class DungeonScene extends Phaser.Scene {
       cyclizar: "0967", tatsugiri: "0978",
       wingull: "0278", swablu: "0333",
       lechonk: "0915", tandemaus: "0921",
+      // Phase 137-139: Water/Fire/Grass/Electric/Poison/Ground 6th
+      buizel: "0418", finizen: "0963",
+      fletchinder: "0662", heatmor: "0631",
+      smoliv: "0928", deerling: "0585",
+      pachirisu: "0417", emolga: "0587",
+      glimmet: "0969", koffing: "0109",
+      wooper: "0194", baltoy: "0343",
     };
 
     // Load player + all enemy species + ally species for this dungeon

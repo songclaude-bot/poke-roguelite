@@ -748,6 +748,37 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [196, 196, 247, 247, 262, 262, 196, 196, 165, 165, 175, 175, 247, 247, 294, 294],
     tempo: 0.32, melodyType: "triangle", bassType: "sine",
   },
+  // Phase 137-139: Water/Fire/Grass/Electric/Poison/Ground 6th
+  // Tidal Trench — deep, aquatic, flowing
+  tidalTrench: {
+    melody: [196, 220, 262, 294, 330, 294, 262, 220, 196, 175, 196, 220, 262, 330, 294, 262],
+    bass: [98, 98, 131, 131, 165, 165, 131, 131, 98, 98, 88, 88, 131, 131, 165, 165],
+    tempo: 0.34, melodyType: "sine", bassType: "triangle",
+  },
+  // Inferno Peak — aggressive, fiery, intense
+  infernoPeak: {
+    melody: [330, 392, 440, 523, 494, 440, 392, 330, 294, 330, 392, 440, 523, 587, 523, 440],
+    bass: [165, 165, 220, 220, 262, 262, 196, 196, 147, 147, 196, 196, 262, 262, 220, 220],
+    tempo: 0.22, melodyType: "sawtooth", bassType: "square",
+  },
+  // Eterna Forest — lush, mystical, verdant
+  eternaForest: {
+    melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 523],
+    bass: [196, 196, 247, 247, 294, 294, 247, 247, 196, 196, 175, 175, 196, 196, 247, 247],
+    tempo: 0.32, melodyType: "triangle", bassType: "sine",
+  },
+  // Volt Chamber — electronic, pulsing, high energy
+  voltChamber: {
+    melody: [523, 587, 659, 784, 880, 784, 659, 587, 523, 494, 440, 494, 523, 659, 784, 880],
+    bass: [262, 262, 330, 330, 440, 440, 330, 330, 262, 262, 220, 220, 262, 262, 392, 392],
+    tempo: 0.20, melodyType: "square", bassType: "sawtooth",
+  },
+  // Faultline Chasm — heavy, rumbling, seismic
+  faultlineChasm: {
+    melody: [175, 196, 220, 262, 294, 262, 220, 196, 175, 165, 175, 196, 220, 262, 294, 330],
+    bass: [88, 88, 110, 110, 131, 131, 110, 110, 88, 88, 82, 82, 98, 98, 131, 131],
+    tempo: 0.30, melodyType: "sawtooth", bassType: "square",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

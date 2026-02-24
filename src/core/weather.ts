@@ -179,6 +179,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     dragonsDen: [WeatherType.Sandstorm, WeatherType.Hail],
     stormySkies: [WeatherType.Rain, WeatherType.Sandstorm],
     verdantMeadow: [WeatherType.Rain],
+    // Phase 137-139: Water/Fire/Grass/Electric/Poison/Ground 6th
+    tidalTrench: [WeatherType.Rain],
+    infernoPeak: [WeatherType.Sandstorm],
+    eternaForest: [WeatherType.Rain],
+    voltChamber: [WeatherType.Rain, WeatherType.Sandstorm],
+    // venomDepths already defined above
+    faultlineChasm: [WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

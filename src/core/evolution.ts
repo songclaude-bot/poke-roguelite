@@ -201,6 +201,16 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "swablu", to: "altaria", level: 35, newName: "Altaria", hpBonus: 16, atkBonus: 10, defBonus: 8, newSkillId: "moonblast" },
   { from: "lechonk", to: "oinkologne", level: 18, newName: "Oinkologne", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "hyperVoice" },
   { from: "tandemaus", to: "maushold", level: 25, newName: "Maushold", hpBonus: 14, atkBonus: 10, defBonus: 6, newSkillId: "hyperVoice" },
+  // Phase 137-139: Water/Fire/Grass/Electric/Poison/Ground 6th
+  { from: "buizel", to: "floatzel", level: 26, newName: "Floatzel", hpBonus: 14, atkBonus: 10, defBonus: 6, newSkillId: "liquidation" },
+  { from: "finizen", to: "palafin", level: 38, newName: "Palafin", hpBonus: 18, atkBonus: 12, defBonus: 8, newSkillId: "liquidation" },
+  { from: "fletchinder", to: "talonflame", level: 35, newName: "Talonflame", hpBonus: 14, atkBonus: 12, defBonus: 6, newSkillId: "braveBird" },
+  { from: "smoliv", to: "dolliv", level: 25, newName: "Dolliv", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "energyBall" },
+  { from: "deerling", to: "sawsbuck", level: 34, newName: "Sawsbuck", hpBonus: 16, atkBonus: 10, defBonus: 8, newSkillId: "bodySlam" },
+  { from: "glimmet", to: "glimmora", level: 35, newName: "Glimmora", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "sludgeBomb" },
+  { from: "koffing", to: "weezing", level: 35, newName: "Weezing", hpBonus: 16, atkBonus: 8, defBonus: 12, newSkillId: "sludgeBomb" },
+  { from: "wooper", to: "quagsire", level: 20, newName: "Quagsire", hpBonus: 16, atkBonus: 8, defBonus: 8, newSkillId: "earthquake" },
+  { from: "baltoy", to: "claydol", level: 36, newName: "Claydol", hpBonus: 14, atkBonus: 8, defBonus: 12, newSkillId: "psychic" },
 ];
 
 /** Check if a species can evolve at a given level */

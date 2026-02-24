@@ -1861,6 +1861,28 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Shoots scales at distant foes.",
   },
+
+  // ── Phase 137-139: 6th Tier Skills ──
+  discharge: {
+    id: "discharge",
+    name: "Discharge",
+    type: PokemonType.Electric,
+    power: 12,
+    pp: 12,
+    range: SkillRange.Around,
+    accuracy: 100,
+    description: "Releases electricity in all directions.",
+  },
+  earthquake: {
+    id: "earthquake",
+    name: "Earthquake",
+    type: PokemonType.Ground,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Room,
+    accuracy: 90,
+    description: "Causes a massive quake that hits the entire room.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
