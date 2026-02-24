@@ -30,6 +30,8 @@ export interface DungeonSaveData {
   inventory: { itemId: string; count: number }[];
   // Starter species
   starter?: string;
+  // Challenge mode (if any)
+  challengeMode?: string;
 }
 
 export interface MetaSaveData {

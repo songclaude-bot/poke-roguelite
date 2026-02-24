@@ -5845,6 +5845,22 @@ export const DUNGEONS: Record<string, DungeonDef> = {
   },
 };
 
+// ── Challenge Modes ──
+
+export interface ChallengeMode {
+  id: string;
+  name: string;
+  description: string;
+  color: string;  // hex color for UI
+  unlockClears: number;
+}
+
+export const CHALLENGE_MODES: ChallengeMode[] = [
+  { id: "speedrun", name: "Speed Run", description: "Complete within turn limit!", color: "#fbbf24", unlockClears: 15 },
+  { id: "noItems", name: "No Items", description: "Cannot use or pick up items.", color: "#ef4444", unlockClears: 20 },
+  { id: "solo", name: "Solo", description: "No allies. +30% stats.", color: "#a855f7", unlockClears: 25 },
+];
+
 /** Get dungeon by ID */
 export function getDungeon(id: string): DungeonDef {
   return DUNGEONS[id] ?? DUNGEONS.beachCave;

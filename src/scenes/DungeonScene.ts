@@ -22,7 +22,7 @@ import { getSkillTargetTiles } from "../core/skill-targeting";
 import { getEvolution } from "../core/evolution";
 import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY, ITEM_DB } from "../core/item";
 import { SPECIES, PokemonSpecies, createSpeciesSkills, getLearnableSkill } from "../core/pokemon-data";
-import { DungeonDef, BossDef, getDungeon, getDungeonFloorEnemies } from "../core/dungeon-data";
+import { DungeonDef, BossDef, getDungeon, getDungeonFloorEnemies, CHALLENGE_MODES } from "../core/dungeon-data";
 import { expFromEnemy, processLevelUp } from "../core/leveling";
 import {
   saveDungeon, clearDungeonSave, serializeSkills, serializeInventory,
@@ -174,13 +174,18 @@ export class DungeonScene extends Phaser.Scene {
   private dpadUI: Phaser.GameObjects.GameObject[] = [];
   private dpadSide: "right" | "left" = "right"; // default: right (국룰 UX)
 
+  // Challenge mode state
+  private challengeMode: string | null = null;
+  private challengeTurnLimit = 0; // speedrun: max turns allowed
+  private challengeBadgeText: Phaser.GameObjects.Text | null = null;
+
   constructor() {
     super({ key: "DungeonScene" });
   }
 
   private persistentAllies: AllyData[] | null = null;
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string }) {
     // Load D-Pad side preference
     try {
       const side = localStorage.getItem("poke-roguelite-dpadSide");
@@ -241,6 +246,27 @@ export class DungeonScene extends Phaser.Scene {
     this.monsterHouseTriggered = false;
     this.ngPlusLevel = Math.min(10, meta.totalClears); // Cap at NG+10
     this.gold = meta.gold;
+
+    // ── Challenge Mode ──
+    this.challengeMode = data?.challengeMode ?? null;
+    this.challengeTurnLimit = 0;
+    this.challengeBadgeText = null;
+
+    if (this.challengeMode === "speedrun") {
+      this.challengeTurnLimit = this.dungeonDef.floors * 50;
+    }
+
+    if (this.challengeMode === "noItems") {
+      // Reduce enemy difficulty by 15%
+      this.dungeonDef = { ...this.dungeonDef };
+      this.dungeonDef.difficulty = this.dungeonDef.difficulty * 0.85;
+    }
+
+    if (this.challengeMode === "solo" && isNewRun) {
+      // Boost player stats by 30%
+      this.persistentAtk = Math.floor(this.persistentAtk * 1.3);
+      this.persistentDef = Math.floor(this.persistentDef * 1.3);
+    }
 
     // Give starter items on new run
     if (isNewRun) {
@@ -992,6 +1018,25 @@ export class DungeonScene extends Phaser.Scene {
       this.showLog(`The weather is ${wd.name}!`);
     }
 
+    // ── Challenge Mode Badge ──
+    if (this.challengeMode) {
+      const chDef = CHALLENGE_MODES.find(c => c.id === this.challengeMode);
+      if (chDef) {
+        this.challengeBadgeText = this.add.text(GAME_WIDTH / 2, 36, `[${chDef.name.toUpperCase()}]`, {
+          fontSize: "9px", color: chDef.color, fontFamily: "monospace", fontStyle: "bold",
+          backgroundColor: "#00000088", padding: { x: 4, y: 1 },
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(103);
+
+        if (this.challengeMode === "speedrun") {
+          this.showLog(`Speed Run! Complete in ${this.challengeTurnLimit} turns!`);
+        } else if (this.challengeMode === "noItems") {
+          this.showLog("No Items challenge! Items are forbidden!");
+        } else if (this.challengeMode === "solo") {
+          this.showLog("Solo challenge! No allies, +30% stats!");
+        }
+      }
+    }
+
     // ── Minimap ──
     this.minimapBg = this.add.graphics().setScrollFactor(0).setDepth(100);
     this.minimapGfx = this.add.graphics().setScrollFactor(0).setDepth(101);
@@ -1492,6 +1537,20 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Challenge Mode HUD updates ──
+    if (this.challengeMode === "speedrun" && this.challengeBadgeText) {
+      const remaining = this.challengeTurnLimit - this.turnManager.turn;
+      const urgentColor = remaining <= 20 ? "#ef4444" : "#fbbf24";
+      this.challengeBadgeText.setText(`[SPEED RUN] ${remaining} turns left`);
+      this.challengeBadgeText.setColor(urgentColor);
+
+      // Check turn limit exceeded
+      if (remaining <= 0 && !this.gameOver) {
+        this.showLog("Time's up! You ran out of turns!");
+        this.showGameOver();
+      }
+    }
+
     this.updateSkillButtons();
     this.updateMinimap();
   }
@@ -1776,6 +1835,11 @@ export class DungeonScene extends Phaser.Scene {
   private pickupItem() {
     if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
 
+    if (this.challengeMode === "noItems") {
+      this.showLog("Items are forbidden!");
+      return;
+    }
+
     const idx = this.floorItems.findIndex(
       fi => fi.x === this.player.tileX && fi.y === this.player.tileY
     );
@@ -1882,6 +1946,11 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private useItem(index: number) {
+    if (this.challengeMode === "noItems") {
+      this.showLog("Items are forbidden!");
+      return;
+    }
+
     const stack = this.inventory[index];
     if (!stack) return;
 
@@ -2174,6 +2243,7 @@ export class DungeonScene extends Phaser.Scene {
       skills: serializeSkills(this.player.skills),
       inventory: serializeInventory(this.inventory),
       starter: this.starterId,
+      challengeMode: this.challengeMode ?? undefined,
     });
     this.showLog("Game saved!");
   }
@@ -2195,6 +2265,7 @@ export class DungeonScene extends Phaser.Scene {
       skills: serializeSkills(this.player.skills),
       inventory: serializeInventory(this.inventory),
       starter: this.starterId,
+      challengeMode: this.challengeMode ?? undefined,
     });
   }
 
@@ -2616,6 +2687,7 @@ export class DungeonScene extends Phaser.Scene {
         allies: this.serializeAllies(),
         belly: this.belly,
         starter: this.starterId,
+        challengeMode: this.challengeMode ?? undefined,
       });
     });
   }
@@ -2629,7 +2701,8 @@ export class DungeonScene extends Phaser.Scene {
     // Boss bonus: +50% gold if dungeon has a boss
     const baseGold = goldFromRun(this.currentFloor, this.enemiesDefeated, true);
     const ngGoldBonus = 1 + this.ngPlusLevel * 0.15; // +15% gold per NG+ level
-    const gold = Math.floor((this.dungeonDef.boss ? baseGold * 1.5 : baseGold) * ngGoldBonus);
+    const challengeGoldMultiplier = this.challengeMode === "speedrun" ? 2 : 1; // Speed Run = 2x gold
+    const gold = Math.floor((this.dungeonDef.boss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -2649,11 +2722,22 @@ export class DungeonScene extends Phaser.Scene {
       fontSize: "13px", color: "#fde68a", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
+    // Challenge mode info on clear screen
+    if (this.challengeMode) {
+      const chDef = CHALLENGE_MODES.find(c => c.id === this.challengeMode);
+      if (chDef) {
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, `Challenge: ${chDef.name}`, {
+          fontSize: "10px", color: chDef.color, fontFamily: "monospace", fontStyle: "bold",
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+      }
+    }
+
     // Stats summary
     const clearStats = [
       `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
       this.allies.length > 0 ? `Team: ${this.allies.filter(a => a.alive).map(a => a.name).join(", ")}` : "",
       this.ngPlusLevel > 0 ? `NG+${this.ngPlusLevel}` : "",
+      this.challengeMode === "speedrun" ? "Speed Run Bonus: 2x Gold!" : "",
     ].filter(Boolean).join("\n");
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 38, clearStats, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
@@ -3378,8 +3462,8 @@ export class DungeonScene extends Phaser.Scene {
         });
       }
 
-      // ── Ability: Pickup — 10% chance to find item ──
-      if (this.player.ability === AbilityId.Pickup && Math.random() < 0.1) {
+      // ── Ability: Pickup — 10% chance to find item (disabled in No Items challenge) ──
+      if (this.challengeMode !== "noItems" && this.player.ability === AbilityId.Pickup && Math.random() < 0.1) {
         if (this.inventory.length < MAX_INVENTORY) {
           const found = rollFloorItem();
           const existing = this.inventory.find(s => s.item.id === found.id && found.stackable);
@@ -3389,9 +3473,9 @@ export class DungeonScene extends Phaser.Scene {
         }
       }
 
-      // ── Recruitment check (bosses can't be recruited) ──
+      // ── Recruitment check (bosses can't be recruited, solo challenge blocks recruitment) ──
       const recruitBonus = getUpgradeBonus(loadMeta(), "recruitRate") * 5;
-      if (!isBossKill && entity.speciesId && this.allies.length < MAX_ALLIES && tryRecruit(this.player.stats.level, entity.stats.level, recruitBonus)) {
+      if (this.challengeMode !== "solo" && !isBossKill && entity.speciesId && this.allies.length < MAX_ALLIES && tryRecruit(this.player.stats.level, entity.stats.level, recruitBonus)) {
         this.time.delayedCall(800, () => {
           this.recruitEnemy(entity);
         });

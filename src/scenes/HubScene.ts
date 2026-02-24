@@ -5,7 +5,7 @@ import {
   hasDungeonSave, deserializeSkills, deserializeInventory,
   MetaSaveData,
 } from "../core/save-system";
-import { DUNGEONS, DungeonDef, getUnlockedDungeons } from "../core/dungeon-data";
+import { DUNGEONS, DungeonDef, getUnlockedDungeons, CHALLENGE_MODES } from "../core/dungeon-data";
 import { initAudio, startBgm, stopBgm } from "../core/sound-manager";
 
 /**
@@ -80,10 +80,12 @@ export class HubScene extends Phaser.Scene {
     if (hasSave) {
       const save = loadDungeon();
       const saveName = save ? (DUNGEONS[save.dungeonId]?.name ?? save.dungeonId) : "Unknown";
+      const saveChallenge = save?.challengeMode ? CHALLENGE_MODES.find(c => c.id === save.challengeMode) : null;
+      const challengeTag = saveChallenge ? ` [${saveChallenge.name}]` : "";
       this.createButton(GAME_WIDTH / 2, y, btnW, 42,
-        `Continue: ${saveName} B${save?.floor ?? "?"}F`,
-        "Resume your saved run",
-        "#4ade80",
+        `Continue: ${saveName} B${save?.floor ?? "?"}F${challengeTag}`,
+        saveChallenge ? `Resume ${saveChallenge.name} challenge run` : "Resume your saved run",
+        saveChallenge ? saveChallenge.color : "#4ade80",
         () => this.continueSave()
       );
       y += 52;
@@ -98,6 +100,20 @@ export class HubScene extends Phaser.Scene {
         () => this.enterDungeon("endlessDungeon")
       );
       y += 52;
+    }
+
+    // ── Challenge Mode Buttons ──
+    const challengeIcons: Record<string, string> = { speedrun: "\u26A1", noItems: "\uD83D\uDEAB", solo: "\uD83D\uDC64" };
+    for (const ch of CHALLENGE_MODES) {
+      if (this.meta.totalClears >= ch.unlockClears) {
+        this.createButton(GAME_WIDTH / 2, y, btnW, 42,
+          `${challengeIcons[ch.id] ?? ""} ${ch.name} Challenge`,
+          ch.description,
+          ch.color,
+          () => this.enterChallengeMode(ch.id)
+        );
+        y += 52;
+      }
     }
 
     // ── Bottom fixed buttons (high depth to stay on top) ──
@@ -415,6 +431,31 @@ export class HubScene extends Phaser.Scene {
     });
   }
 
+  private enterChallengeMode(challengeId: string) {
+    // Pick a random unlocked dungeon (excluding endless and destiny tower)
+    const unlocked = getUnlockedDungeons(this.meta.totalClears)
+      .filter(d => d.id !== "endlessDungeon" && d.id !== "destinyTower");
+    if (unlocked.length === 0) return;
+    const pick = unlocked[Math.floor(Math.random() * unlocked.length)];
+    this.enterDungeonWithChallenge(pick.id, challengeId);
+  }
+
+  private enterDungeonWithChallenge(dungeonId: string, challengeMode: string) {
+    stopBgm();
+    clearDungeonSave();
+    this.meta.totalRuns++;
+    saveMeta(this.meta);
+
+    this.cameras.main.fadeOut(400, 0, 0, 0);
+    this.time.delayedCall(450, () => {
+      this.scene.start("DungeonScene", {
+        floor: 1, fromHub: true, dungeonId,
+        starter: this.meta.starter ?? "mudkip",
+        challengeMode,
+      });
+    });
+  }
+
   private continueSave() {
     const save = loadDungeon();
     if (!save) {
@@ -437,6 +478,7 @@ export class HubScene extends Phaser.Scene {
         fromHub: true,
         dungeonId: save.dungeonId,
         starter: save.starter ?? this.meta.starter ?? "mudkip",
+        challengeMode: save.challengeMode,
       });
     });
   }
