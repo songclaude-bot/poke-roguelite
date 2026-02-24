@@ -51,6 +51,7 @@ import {
 import {
   getNGPlusLevel, getNGPlusBonusEffects, NGPlusBonusEffects,
 } from "../core/new-game-plus";
+import { checkCombo, ComboEffect, SkillCombo } from "../core/skill-combos";
 import {
   initAudio, startBgm, stopBgm,
   sfxHit, sfxSuperEffective, sfxNotEffective, sfxMove, sfxPickup,
@@ -256,6 +257,12 @@ export class DungeonScene extends Phaser.Scene {
   private autoExploreText: Phaser.GameObjects.Text | null = null;
   private autoExploreTween: Phaser.Tweens.Tween | null = null;
 
+  // Skill Combo state
+  private recentSkillIds: string[] = [];  // last 3 skill IDs used by player
+  private comboDoubleDamage = false;      // next skill does 2x damage
+  private comboCritGuarantee = false;     // next attack is guaranteed crit
+  private comboSpeedBoost = false;        // get 2 actions next turn
+
   constructor() {
     super({ key: "DungeonScene" });
   }
@@ -355,6 +362,11 @@ export class DungeonScene extends Phaser.Scene {
     this.bagOpen = false;
     this.bagUI = [];
     this.enemiesDefeated = 0;
+    // Reset combo state on new floor
+    this.recentSkillIds = [];
+    this.comboDoubleDamage = false;
+    this.comboCritGuarantee = false;
+    this.comboSpeedBoost = false;
     this.turnManager = new TurnManager();
     this.persistentAllies = data?.allies ?? null;
     this.floorTraps = [];
@@ -4101,6 +4113,23 @@ export class DungeonScene extends Phaser.Scene {
       this.getEnemyActions()
     );
 
+    // ── Skill Combo tracking ──
+    this.recentSkillIds.push(skill.id);
+    if (this.recentSkillIds.length > 3) this.recentSkillIds.shift();
+    const combo = checkCombo(this.recentSkillIds);
+    if (combo) {
+      this.triggerSkillCombo(combo);
+      this.recentSkillIds = []; // reset to prevent infinite chaining
+    }
+
+    // If combo gave speed boost, grant an extra action
+    if (this.comboSpeedBoost) {
+      this.comboSpeedBoost = false;
+      // Don't tick belly/weather/status for the bonus turn — just allow another action
+      this.updateHUD();
+      return;
+    }
+
     this.tickBelly();
     this.tickWeather();
     this.tickEntityStatus(this.player);
@@ -4109,6 +4138,99 @@ export class DungeonScene extends Phaser.Scene {
     if (!this.player.alive && !this.gameOver) {
       this.showGameOver();
     }
+  }
+
+  /** Trigger a skill combo effect: popup, camera shake, SFX, and apply effect */
+  private triggerSkillCombo(combo: SkillCombo) {
+    // SFX
+    sfxCombo();
+
+    // Camera shake
+    this.cameras.main.shake(200, 0.01);
+
+    // Gold "COMBO: {name}!" popup at player position
+    const px = this.player.sprite ? this.player.sprite.x : this.tileToPixelX(this.player.tileX);
+    const py = this.player.sprite ? this.player.sprite.y : this.tileToPixelY(this.player.tileY);
+    const comboText = this.add.text(px, py - 30, `COMBO: ${combo.name}!`, {
+      fontSize: "14px",
+      color: "#ffd700",
+      fontFamily: "monospace",
+      fontStyle: "bold",
+      stroke: "#000000",
+      strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(310);
+
+    this.tweens.add({
+      targets: comboText,
+      y: py - 70,
+      alpha: { from: 1, to: 0 },
+      scaleX: { from: 1.2, to: 0.8 },
+      scaleY: { from: 1.2, to: 0.8 },
+      duration: 1200,
+      ease: "Quad.easeOut",
+      onComplete: () => comboText.destroy(),
+    });
+
+    // Log message
+    this.showLog(`COMBO: ${combo.name}! ${combo.description}`);
+
+    // Apply combo effect
+    switch (combo.effect) {
+      case ComboEffect.DoubleDamage:
+        this.comboDoubleDamage = true;
+        this.showLog("Next skill will deal 2x damage!");
+        break;
+
+      case ComboEffect.AreaBlast: {
+        // Deal damage to all enemies in the current room (or radius 3)
+        const blastDmg = Math.max(1, Math.floor(getEffectiveAtk(this.player) * 0.6));
+        let hitCount = 0;
+        for (const enemy of this.enemies) {
+          if (!enemy.alive) continue;
+          const dist = chebyshevDist(this.player.tileX, this.player.tileY, enemy.tileX, enemy.tileY);
+          if (dist <= 5) { // room-ish radius
+            enemy.stats.hp = Math.max(0, enemy.stats.hp - blastDmg);
+            hitCount++;
+            if (enemy.sprite) {
+              this.showDamagePopup(enemy.sprite.x, enemy.sprite.y, blastDmg, 1.0);
+              this.showEnemyHpBar(enemy);
+              this.flashEntity(enemy, 1.5);
+            }
+            this.checkDeath(enemy);
+          }
+        }
+        if (hitCount > 0) {
+          this.showLog(`Area blast hit ${hitCount} enemies for ${blastDmg} damage each!`);
+        }
+        break;
+      }
+
+      case ComboEffect.HealBurst: {
+        const healAmt = Math.floor(this.player.stats.maxHp * 0.3);
+        this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + healAmt);
+        this.showLog(`Heal burst restored ${healAmt} HP!`);
+        if (this.player.sprite) {
+          this.player.sprite.setTint(0x44ff44);
+          this.showHealPopup(this.player.sprite.x, this.player.sprite.y, healAmt);
+          this.time.delayedCall(300, () => {
+            if (this.player.sprite) this.player.sprite.clearTint();
+          });
+        }
+        break;
+      }
+
+      case ComboEffect.SpeedBoost:
+        this.comboSpeedBoost = true;
+        this.showLog("Speed Boost! You can act again this turn!");
+        break;
+
+      case ComboEffect.CritGuarantee:
+        this.comboCritGuarantee = true;
+        this.showLog("Next attack is a guaranteed critical hit!");
+        break;
+    }
+
+    this.updateHUD();
   }
 
   private canEntityMove(entity: Entity, dir: Direction): boolean {
@@ -4357,11 +4479,13 @@ export class DungeonScene extends Phaser.Scene {
           const wMult = weatherDamageMultiplier(this.currentWeather, skill.type);
           // Held item: crit chance (user is player)
           const skillCritChance = this.heldItemEffect.critChance ?? 0;
-          const skillIsCrit = user === this.player && skillCritChance > 0 && Math.random() * 100 < skillCritChance;
+          const skillIsCrit = user === this.player && (this.comboCritGuarantee || (skillCritChance > 0 && Math.random() * 100 < skillCritChance));
           const skillCritMult = skillIsCrit ? 1.5 : 1.0;
+          // Skill Combo: double damage multiplier
+          const comboMult = (user === this.player && this.comboDoubleDamage) ? 2.0 : 1.0;
           // Apply difficulty playerDamageMult when target is the player
           const skillDiffDmgMult = target === this.player ? this.difficultyMods.playerDamageMult : 1.0;
-          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * wMult * skillCritMult * skillDiffDmgMult));
+          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * wMult * skillCritMult * comboMult * skillDiffDmgMult));
           target.stats.hp = Math.max(0, target.stats.hp - dmg);
 
           this.flashEntity(target, effectiveness);
@@ -4384,6 +4508,12 @@ export class DungeonScene extends Phaser.Scene {
         this.applySkillEffect(user, target, skill);
         this.updateHUD();
         this.checkDeath(target);
+      }
+
+      // Consume combo flags after applying them
+      if (user === this.player) {
+        if (this.comboDoubleDamage) this.comboDoubleDamage = false;
+        if (this.comboCritGuarantee) this.comboCritGuarantee = false;
       }
 
       if (totalHits === 0 && skill.power > 0) {

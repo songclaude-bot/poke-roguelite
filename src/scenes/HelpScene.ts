@@ -1,9 +1,23 @@
 import Phaser from "phaser";
 import { GAME_WIDTH, GAME_HEIGHT } from "../config";
+import { getAvailableCombos } from "../core/skill-combos";
 
 interface HelpSection {
   title: string;
   body: string;
+}
+
+function buildComboHelpText(): string {
+  const combos = getAvailableCombos();
+  const lines = [
+    "Using certain skills in sequence triggers combos!\n" +
+    "Combo effects activate after your skill resolves.\n" +
+    "The skill history resets after each combo.\n",
+  ];
+  for (const combo of combos) {
+    lines.push(`${combo.name}: ${combo.description}`);
+  }
+  return lines.join("\n");
 }
 
 const HELP_SECTIONS: HelpSection[] = [
@@ -59,6 +73,10 @@ const HELP_SECTIONS: HelpSection[] = [
       "When PP runs out, you can't use that skill.\n" +
       "Elixirs restore PP. Max Elixir restores all PP.\n" +
       "Learn new skills at level up or from the Move Tutor.",
+  },
+  {
+    title: "Skill Combos",
+    body: buildComboHelpText(),
   },
   {
     title: "Held Items",
