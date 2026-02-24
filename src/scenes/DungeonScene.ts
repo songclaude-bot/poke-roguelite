@@ -123,6 +123,13 @@ export class DungeonScene extends Phaser.Scene {
   private hpBarFill!: Phaser.GameObjects.Graphics;
   private portraitSprite!: Phaser.GameObjects.Sprite;
 
+  // Belly Bar graphics
+  private bellyBarBg!: Phaser.GameObjects.Graphics;
+  private bellyBarFill!: Phaser.GameObjects.Graphics;
+  private bellyText!: Phaser.GameObjects.Text;
+  private bellyWarningShown = false; // track if 20% warning was shown this drain cycle
+  private bellyUrgentShown = false;  // track if 10% warning was shown
+
   // Skill state
   private activeSkillIndex = -1; // -1 = no skill selected
 
@@ -285,6 +292,8 @@ export class DungeonScene extends Phaser.Scene {
     const bellyBonus = getUpgradeBonus(meta, "bellyMax") * 20;
     this.maxBelly = 100 + bellyBonus;
     this.belly = data?.belly ?? this.maxBelly;
+    this.bellyWarningShown = this.belly <= this.maxBelly * 0.2;
+    this.bellyUrgentShown = this.belly <= this.maxBelly * 0.1;
     this.starterId = data?.starter ?? "mudkip";
     this.seenSpecies = new Set<string>();
     this.seenSpecies.add(this.starterId); // starter is always "seen"
@@ -1092,6 +1101,21 @@ export class DungeonScene extends Phaser.Scene {
     // HP Bar fill
     this.hpBarFill = this.add.graphics().setScrollFactor(0).setDepth(101);
 
+    // Belly Bar background (below HP bar)
+    this.bellyBarBg = this.add.graphics().setScrollFactor(0).setDepth(100);
+    this.bellyBarBg.fillStyle(0x1a1a2e, 0.9);
+    this.bellyBarBg.fillRoundedRect(38, 19, 100, 6, 2);
+    this.bellyBarBg.lineStyle(1, 0x333355);
+    this.bellyBarBg.strokeRoundedRect(38, 19, 100, 6, 2);
+
+    // Belly Bar fill
+    this.bellyBarFill = this.add.graphics().setScrollFactor(0).setDepth(101);
+
+    // Belly text label (on the bar)
+    this.bellyText = this.add.text(40, 19, "", {
+      fontSize: "5px", color: "#ffffff", fontFamily: "monospace",
+    }).setScrollFactor(0).setDepth(102);
+
     this.floorText = this.add
       .text(8, 6, "", { fontSize: "11px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold" })
       .setScrollFactor(0).setDepth(100);
@@ -1746,19 +1770,27 @@ export class DungeonScene extends Phaser.Scene {
     this.hpBarFill.fillStyle(barColor, 1);
     this.hpBarFill.fillRoundedRect(39, 9, barWidth, 8, 2);
 
+    // Update Belly bar graphics
+    const bellyRatio = this.maxBelly > 0 ? this.belly / this.maxBelly : 0;
+    this.bellyBarFill.clear();
+    const bellyBarColor = bellyRatio > 0.5 ? 0x4ade80 : bellyRatio > 0.2 ? 0xfbbf24 : 0xef4444;
+    const bellyBarWidth = Math.max(0, Math.floor(98 * bellyRatio));
+    this.bellyBarFill.fillStyle(bellyBarColor, 1);
+    this.bellyBarFill.fillRoundedRect(39, 20, bellyBarWidth, 4, 1);
+    this.bellyText.setText(`${Math.floor(this.belly)}/${this.maxBelly}`);
+
     const ngStr = this.ngPlusLevel > 0 ? ` NG+${this.ngPlusLevel}` : "";
     this.floorText.setText(`${this.dungeonDef.name}  B${this.currentFloor}F${ngStr}`);
-    this.floorText.setPosition(40, 22);
+    this.floorText.setPosition(40, 27);
     this.hpText.setText(`${p.hp}/${p.maxHp}`);
 
     // Show active buffs
     const buffs = this.player.statusEffects.map(s => `${s.type}(${s.turnsLeft})`).join(" ");
     const buffStr = buffs ? `  ${buffs}` : "";
-    const bellyColor = this.belly > 30 ? "" : this.belly > 0 ? " ⚠" : " ☠";
     const abilityName = this.player.ability ? ABILITIES[this.player.ability]?.name ?? "" : "";
     const abilityStr = abilityName ? ` [${abilityName}]` : "";
     const goldStr = this.gold > 0 ? ` ${this.gold}G` : "";
-    this.turnText.setText(`Lv.${p.level} Belly:${this.belly}${bellyColor}${goldStr} T${this.turnManager.turn}${abilityStr}${buffStr}`);
+    this.turnText.setText(`Lv.${p.level}${goldStr} T${this.turnManager.turn}${abilityStr}${buffStr}`);
 
     // Status effect visual tint on player sprite
     this.updateStatusTint(this.player);
@@ -2312,12 +2344,34 @@ export class DungeonScene extends Phaser.Scene {
       case "apple": {
         const restore = Math.min(50, this.maxBelly - this.belly);
         this.belly += restore;
-        this.showLog(`Ate an Apple! Belly +${restore}. (${this.belly}/${this.maxBelly})`);
+        this.resetBellyWarnings();
+        this.showLog(`Ate an Apple! Belly +${restore}. (${Math.floor(this.belly)}/${this.maxBelly})`);
         break;
       }
       case "bigApple": {
         this.belly = this.maxBelly;
+        this.resetBellyWarnings();
         this.showLog(`Ate a Big Apple! Belly fully restored!`);
+        break;
+      }
+      case "grimyFood": {
+        const grimyRestore = Math.min(30, this.maxBelly - this.belly);
+        this.belly += grimyRestore;
+        this.resetBellyWarnings();
+        this.showLog(`Ate Grimy Food... Belly +${grimyRestore}. (${Math.floor(this.belly)}/${this.maxBelly})`);
+        // 50% chance to cause Burn (poison-like DoT)
+        if (Math.random() < 0.5) {
+          if (!this.player.statusEffects.some(s => s.type === SkillEffect.Burn)) {
+            this.player.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
+            this.showLog("Ugh! The food was bad... You got burned!");
+          }
+        } else {
+          // 50% chance: lose some HP directly
+          const grimyDmg = Math.max(1, Math.floor(this.player.stats.maxHp * 0.1));
+          this.player.stats.hp = Math.max(1, this.player.stats.hp - grimyDmg);
+          if (this.player.sprite) this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, grimyDmg, 0.8);
+          this.showLog(`The food was rotten! Lost ${grimyDmg} HP!`);
+        }
         break;
       }
       case "warpOrb": {
@@ -2761,17 +2815,46 @@ export class DungeonScene extends Phaser.Scene {
 
   private tickBelly() {
     if (this.belly > 0) {
-      this.belly = Math.max(0, this.belly - 1);
-      if (this.belly === 0) {
-        this.showLog("You're starving! HP will drain each turn.");
-      } else if (this.belly === 20) {
-        this.showLog("Getting hungry...");
+      // Difficulty-based drain: higher difficulty = faster hunger
+      const drainRate = 0.5 + this.dungeonDef.difficulty * 0.1;
+      const prevBelly = this.belly;
+      this.belly = Math.max(0, this.belly - drainRate);
+
+      if (this.belly <= 0) {
+        // Just hit 0 this tick
+        this.belly = 0;
+        this.showLog("Your belly is empty! HP will drain each turn!");
+        this.bellyWarningShown = true;
+        this.bellyUrgentShown = true;
+      } else if (this.belly <= this.maxBelly * 0.1 && !this.bellyUrgentShown) {
+        // Urgent warning at 10%
+        this.showLog("You're starving! Find food quickly!");
+        this.bellyUrgentShown = true;
+      } else if (this.belly <= this.maxBelly * 0.2 && prevBelly > this.maxBelly * 0.2 && !this.bellyWarningShown) {
+        // Warning at 20%
+        this.showLog("Your belly is getting empty...");
+        this.bellyWarningShown = true;
       }
     } else {
-      // Starving: lose HP each turn
-      this.player.stats.hp = Math.max(0, this.player.stats.hp - 2);
-      if (this.player.sprite) this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, 2, 0.5);
+      // Starving: lose HP based on max HP (min 1, ~2% of maxHp)
+      const starveDmg = Math.max(1, Math.floor(this.player.stats.maxHp * 0.02));
+      this.player.stats.hp = Math.max(0, this.player.stats.hp - starveDmg);
+      if (this.player.sprite) this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, starveDmg, 0.5);
+      // Show periodic reminders
+      if (this.turnManager.turn % 5 === 0) {
+        this.showLog(`Starving! Took ${starveDmg} damage!`);
+      }
       this.checkPlayerDeath();
+    }
+  }
+
+  /** Reset belly warning flags (call when belly is restored by food) */
+  private resetBellyWarnings() {
+    if (this.belly > this.maxBelly * 0.2) {
+      this.bellyWarningShown = false;
+      this.bellyUrgentShown = false;
+    } else if (this.belly > this.maxBelly * 0.1) {
+      this.bellyUrgentShown = false;
     }
   }
 

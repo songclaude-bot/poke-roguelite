@@ -123,6 +123,14 @@ export const ITEM_DB: Record<string, ItemDef> = {
     description: "Fully restores Belly.",
     stackable: true,
   },
+  grimyFood: {
+    id: "grimyFood",
+    name: "Grimy Food",
+    category: ItemCategory.Berry,
+    target: ItemTarget.Self,
+    description: "Restores 30 Belly, but may cause sickness.",
+    stackable: true,
+  },
   // ── Additional items ──
   warpOrb: {
     id: "warpOrb",
@@ -248,6 +256,7 @@ export const FLOOR_ITEM_TABLE: { itemId: string; weight: number }[] = [
   { itemId: "reviveSeed", weight: 5 },
   { itemId: "apple", weight: 20 },
   { itemId: "bigApple", weight: 5 },
+  { itemId: "grimyFood", weight: 8 },
   { itemId: "escapeOrb", weight: 3 },
   { itemId: "luminousOrb", weight: 5 },
   { itemId: "allPowerOrb", weight: 4 },
