@@ -334,12 +334,36 @@
 
 ---
 
-## 현재 게임 규모 (v0.50.0)
+## Phase 55: Wyrm Abyss
+
+### 55. Dragon 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Axew/Deino, dragonRush 스킬, Wyrm Abyss 13층, Titan Haxorus 보스
+
+---
+
+## Phase 56: Enchanted Glade
+
+### 56. Fairy 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Snubbull/Togepi, playRough 스킬, Enchanted Glade 10층, Radiant Granbull 보스
+
+---
+
+## Phase 57: Glacial Cavern
+
+### 57. Ice 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Snover/Bergmite, iceHammer 스킬, Glacial Cavern 12층, Frost Abomasnow 보스
+
+---
+
+## 현재 게임 규모 (v0.55.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **40개 던전**: Beach Cave → Phantom Crypt + Destiny Tower
-- **96종+ 포켓몬** (진화 포함 112종+)
-- **116종+ 기술**
+- **43개 던전**: Beach Cave → Glacial Cavern + Destiny Tower
+- **102종+ 포켓몬** (진화 포함 118종+)
+- **119종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **44종 스타터** (클리어 수로 해금)
-- **76종+ 진화 경로**
+- **50종 스타터** (클리어 수로 해금)
+- **82종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
