@@ -383,4 +383,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   xatu: AbilityId.ShieldDust, // Synchronize equivalent
   kangaskhan: AbilityId.Guts, // Scrappy equivalent
   tauros: AbilityId.Guts, // Intimidate equivalent
+  // Phase 158-160: 8th Tier
+  psyduck: AbilityId.SwiftSwim, // Cloud Nine equivalent
+  seel: AbilityId.SwiftSwim, // Thick Fat equivalent
+  cyndaquil: AbilityId.FlameBody, // Blaze equivalent
+  fennekin: AbilityId.FlameBody, // Blaze equivalent
+  sunkern: AbilityId.ShieldDust, // Chlorophyll equivalent
+  cacnea: AbilityId.Guts, // Sand Veil equivalent
+  pichu: AbilityId.Static,
+  chinchou: AbilityId.Static, // Volt Absorb equivalent
+  weedle: AbilityId.ShieldDust, // Shield Dust
+  qwilfish: AbilityId.Guts, // Intimidate equivalent
+  donphan: AbilityId.Sturdy,
+  marowak: AbilityId.RockHead, // Lightning Rod equivalent
 };

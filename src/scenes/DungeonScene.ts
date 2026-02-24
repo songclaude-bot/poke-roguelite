@@ -378,6 +378,13 @@ export class DungeonScene extends Phaser.Scene {
       shelgon: "0372", gabite: "0444",
       noctowl: "0164", xatu: "0178",
       kangaskhan: "0115", tauros: "0128",
+      // Phase 158-160: 8th Tier
+      psyduck: "0054", seel: "0086",
+      cyndaquil: "0155", fennekin: "0653",
+      sunkern: "0191", cacnea: "0331",
+      pichu: "0172", chinchou: "0170",
+      weedle: "0013", qwilfish: "0211",
+      donphan: "0232", marowak: "0105",
     };
 
     // Load player + all enemy species + ally species for this dungeon

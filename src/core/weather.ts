@@ -221,6 +221,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     dragonsSpine: [WeatherType.Sandstorm, WeatherType.Hail],
     stratosphere: [WeatherType.Rain, WeatherType.Sandstorm],
     sovereignHall: [WeatherType.Rain, WeatherType.Sandstorm],
+    // Phase 158-160: 8th Tier
+    hadopelagicTrench: [WeatherType.Rain],
+    primordialCaldera: [WeatherType.Sandstorm],
+    worldTreeRoots: [WeatherType.Rain],
+    teslaSpire: [WeatherType.Rain, WeatherType.Sandstorm],
+    bileswamp: [WeatherType.Rain, WeatherType.Sandstorm],
+    tectonicAbyss: [WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

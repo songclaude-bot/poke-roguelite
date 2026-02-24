@@ -244,6 +244,16 @@ export const EVOLUTIONS: EvolutionDef[] = [
   // Phase 154-156: Ice/Dark/Fairy/Dragon/Flying/Normal 7th tier
   { from: "shelgon", to: "salamence", level: 50, newName: "Salamence", hpBonus: 20, atkBonus: 14, defBonus: 10, newSkillId: "outrage" },
   { from: "gabite", to: "garchomp", level: 48, newName: "Garchomp", hpBonus: 18, atkBonus: 16, defBonus: 8, newSkillId: "outrage" },
+  // Phase 158-160: 8th Tier
+  { from: "psyduck", to: "golduck", level: 33, newName: "Golduck", hpBonus: 18, atkBonus: 14, defBonus: 10, newSkillId: "originPulse" },
+  { from: "seel", to: "dewgong", level: 34, newName: "Dewgong", hpBonus: 20, atkBonus: 12, defBonus: 14, newSkillId: "iceBeam" },
+  { from: "cyndaquil", to: "quilava", level: 14, newName: "Quilava", hpBonus: 16, atkBonus: 14, defBonus: 8, newSkillId: "sacredFire" },
+  { from: "fennekin", to: "braixen", level: 16, newName: "Braixen", hpBonus: 14, atkBonus: 14, defBonus: 8, newSkillId: "sacredFire" },
+  { from: "sunkern", to: "sunflora", level: 20, newName: "Sunflora", hpBonus: 16, atkBonus: 14, defBonus: 10, newSkillId: "seedFlare" },
+  { from: "cacnea", to: "cacturne", level: 32, newName: "Cacturne", hpBonus: 14, atkBonus: 16, defBonus: 8, newSkillId: "seedFlare" },
+  { from: "pichu", to: "pikachu", level: 16, newName: "Pikachu", hpBonus: 12, atkBonus: 12, defBonus: 8, newSkillId: "thunderCage" },
+  { from: "chinchou", to: "lanturn", level: 27, newName: "Lanturn", hpBonus: 20, atkBonus: 12, defBonus: 12, newSkillId: "thunderCage" },
+  { from: "weedle", to: "kakuna", level: 7, newName: "Kakuna", hpBonus: 10, atkBonus: 6, defBonus: 10, newSkillId: "toxicThread" },
 ];
 
 /** Check if a species can evolve at a given level */

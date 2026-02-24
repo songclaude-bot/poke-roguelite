@@ -962,6 +962,42 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [165, 165, 220, 220, 262, 262, 165, 165, 147, 147, 196, 196, 294, 294, 220, 220],
     tempo: 0.28, melodyType: "triangle", bassType: "triangle",
   },
+  // Hadopelagic Trench — deep oceanic, pressure, haunting
+  hadopelagicTrench: {
+    melody: [196, 220, 262, 196, 175, 196, 220, 262, 294, 262, 220, 196, 175, 165, 175, 196],
+    bass: [98, 98, 131, 131, 87, 87, 98, 98, 131, 131, 110, 110, 87, 87, 82, 82],
+    tempo: 0.36, melodyType: "sine", bassType: "triangle",
+  },
+  // Primordial Caldera — volcanic, ancient, intense
+  primordialCaldera: {
+    melody: [330, 392, 440, 494, 440, 392, 330, 262, 330, 392, 494, 587, 494, 440, 392, 330],
+    bass: [165, 165, 196, 196, 220, 220, 165, 165, 131, 131, 196, 196, 247, 247, 196, 165],
+    tempo: 0.20, melodyType: "sawtooth", bassType: "square",
+  },
+  // World Tree Roots — mystical, ancient, deep
+  worldTreeRoots: {
+    melody: [262, 330, 392, 440, 392, 330, 262, 220, 262, 330, 392, 494, 440, 392, 330, 262],
+    bass: [131, 131, 165, 165, 196, 196, 131, 131, 110, 110, 165, 165, 220, 220, 165, 131],
+    tempo: 0.30, melodyType: "triangle", bassType: "sine",
+  },
+  // Tesla Spire — electric, crackling, frenetic
+  teslaSpire: {
+    melody: [440, 523, 587, 659, 587, 523, 440, 392, 440, 523, 659, 784, 659, 587, 523, 440],
+    bass: [220, 220, 262, 262, 330, 330, 220, 220, 196, 196, 262, 262, 330, 330, 262, 220],
+    tempo: 0.18, melodyType: "square", bassType: "sine",
+  },
+  // Bileswamp — toxic, oppressive, murky
+  bileswamp: {
+    melody: [220, 247, 262, 294, 262, 247, 220, 196, 220, 247, 294, 330, 294, 262, 247, 220],
+    bass: [110, 110, 123, 123, 131, 131, 110, 110, 98, 98, 123, 123, 147, 147, 123, 110],
+    tempo: 0.30, melodyType: "sawtooth", bassType: "triangle",
+  },
+  // Tectonic Abyss — seismic, rumbling, vast
+  tectonicAbyss: {
+    melody: [196, 220, 262, 330, 262, 220, 196, 165, 196, 262, 330, 392, 330, 262, 220, 196],
+    bass: [98, 98, 110, 110, 131, 131, 98, 98, 82, 82, 131, 131, 165, 165, 110, 98],
+    tempo: 0.26, melodyType: "sawtooth", bassType: "square",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],
