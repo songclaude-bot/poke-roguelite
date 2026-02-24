@@ -265,6 +265,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [110, 110, 131, 131, 98, 98, 123, 123, 131, 131, 110, 110, 98, 98, 110, 110],
     tempo: 0.28, melodyType: "sawtooth", bassType: "triangle",
   },
+  // Moonlit Cave — magical, twinkling
+  moonlitCave: {
+    melody: [523, 587, 659, 784, 659, 587, 523, 494, 523, 587, 659, 784, 880, 784, 659, 523],
+    bass: [262, 262, 294, 294, 330, 330, 262, 262, 247, 247, 294, 294, 330, 330, 262, 262],
+    tempo: 0.32, melodyType: "sine", bassType: "triangle",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

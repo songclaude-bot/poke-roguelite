@@ -425,6 +425,45 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["poisonSting", "waterPulse", "acidSpray"],
     floors: [],
   },
+  clefairy: {
+    id: "clefairy",
+    name: "Clefairy",
+    spriteKey: "clefairy",
+    types: [PokemonType.Fairy],
+    attackType: PokemonType.Fairy,
+    baseStats: { hp: 35, atk: 9, def: 7 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 8, idleFrames: 6,
+    skillIds: ["fairyWind", "disarmingVoice", "tackle"],
+    floors: [],
+  },
+  jigglypuff: {
+    id: "jigglypuff",
+    name: "Jigglypuff",
+    spriteKey: "jigglypuff",
+    types: [PokemonType.Fairy, PokemonType.Normal],
+    attackType: PokemonType.Fairy,
+    baseStats: { hp: 40, atk: 8, def: 5 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 5, idleFrames: 5,
+    skillIds: ["disarmingVoice", "drainingKiss", "tackle"],
+    floors: [],
+  },
+  ralts: {
+    id: "ralts",
+    name: "Ralts",
+    spriteKey: "ralts",
+    types: [PokemonType.Psychic, PokemonType.Fairy],
+    attackType: PokemonType.Fairy,
+    baseStats: { hp: 25, atk: 13, def: 4 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 2,
+    skillIds: ["confusion", "disarmingVoice", "tackle"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -471,6 +510,9 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   grimer: { 7: "sludgeBomb", 10: "toxicSpikes" },
   nidoranM: { 7: "acidSpray", 10: "venoshock" },
   tentacool: { 7: "acidSpray", 10: "sludgeBomb" },
+  clefairy: { 7: "drainingKiss", 10: "moonblast" },
+  jigglypuff: { 7: "fairyWind", 10: "dazzlingGleam" },
+  ralts: { 7: "drainingKiss", 10: "moonblast" },
 };
 
 /** Check if a species learns a new skill at this level */

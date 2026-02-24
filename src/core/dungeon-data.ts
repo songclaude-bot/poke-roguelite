@@ -273,6 +273,31 @@ export const DUNGEONS: Record<string, DungeonDef> = {
     description: "B1F~B14F. Poison and Water. Toxic miasma!",
     boss: { speciesId: "grimer", name: "Toxic Muk", statMultiplier: 5.5 },
   },
+  moonlitCave: {
+    id: "moonlitCave",
+    name: "Moonlit Cave",
+    tilesetPath: "tilesets/BeachCave/tileset_0.png",
+    tilesetKey: "beachcave-tiles",
+    floors: 10,
+    enemySpeciesIds: ["clefairy", "jigglypuff", "ralts", "drowzee", "snorunt"],
+    floorEnemies: {
+      1: ["clefairy"],
+      2: ["clefairy", "jigglypuff"],
+      3: ["jigglypuff", "clefairy"],
+      4: ["jigglypuff", "ralts"],
+      5: ["ralts", "clefairy"],
+      6: ["ralts", "drowzee", "jigglypuff"],
+      7: ["drowzee", "ralts"],
+      8: ["ralts", "snorunt", "clefairy"],
+      9: ["snorunt", "ralts"],
+      10: ["ralts"],
+    },
+    difficulty: 2.4,
+    itemsPerFloor: 4,
+    unlockClears: 11,
+    description: "B1F~B10F. Fairy and Psychic. Enchanted moonlight!",
+    boss: { speciesId: "ralts", name: "Mystic Gardevoir", statMultiplier: 5.5 },
+  },
 };
 
 /** Get dungeon by ID */

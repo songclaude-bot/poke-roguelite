@@ -125,4 +125,7 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   grimer: AbilityId.Guts,
   nidoranM: AbilityId.PurePower,
   tentacool: AbilityId.SwiftSwim,
+  clefairy: AbilityId.ShieldDust,
+  jigglypuff: AbilityId.ShieldDust,
+  ralts: AbilityId.Static, // Trace equivalent
 };
