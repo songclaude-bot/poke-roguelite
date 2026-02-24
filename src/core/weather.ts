@@ -327,6 +327,7 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     harmonyHall: [WeatherType.None],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
     endlessDungeon: [WeatherType.None, WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
+    dailyDungeon: [WeatherType.None, WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 
   const pool = pools[dungeonId] ?? [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail];

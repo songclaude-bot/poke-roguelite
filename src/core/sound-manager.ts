@@ -335,6 +335,8 @@ const DUNGEON_BGM_MAP: Record<string, string> = {
   destinyTower: "destiny",
   // Endless Abyss — cycles through dark theme
   endlessDungeon: "dungeon-dark",
+  // Daily Dungeon — uses mystery/psychic theme
+  dailyDungeon: "dungeon-psychic",
 };
 
 function getDungeonBgmFile(dungeonId: string): string {

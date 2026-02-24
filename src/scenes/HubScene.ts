@@ -7,6 +7,7 @@ import {
 } from "../core/save-system";
 import { DUNGEONS, DungeonDef, getUnlockedDungeons, CHALLENGE_MODES } from "../core/dungeon-data";
 import { initAudio, startBgm, stopBgm } from "../core/sound-manager";
+import { getDailyConfig, hasDailyAttempt, loadDailyScores } from "../core/daily-dungeon";
 
 /**
  * HubScene — the town between dungeon runs.
@@ -130,6 +131,20 @@ export class HubScene extends Phaser.Scene {
       y += 52;
     }
 
+    // Daily Dungeon button (unlocked after 5 clears)
+    if (this.meta.totalClears >= 5) {
+      const dailyConfig = getDailyConfig();
+      const attempted = hasDailyAttempt(dailyConfig.date);
+      const modText = dailyConfig.modifiers.join(", ");
+      this.createButton(GAME_WIDTH / 2, y, btnW, 42,
+        attempted ? "Daily Done!" : "Daily Dungeon",
+        attempted ? "Come back tomorrow!" : `${dailyConfig.floors}F  Diff ${dailyConfig.difficulty.toFixed(1)}  [${modText}]`,
+        attempted ? "#444460" : "#10b981",
+        attempted ? undefined : () => this.enterDungeon("dailyDungeon")
+      );
+      y += 52;
+    }
+
     // Endless Dungeon button (unlocked after 10 clears)
     if (this.meta.totalClears >= 10) {
       this.createButton(GAME_WIDTH / 2, y, btnW, 42,
@@ -216,8 +231,8 @@ export class HubScene extends Phaser.Scene {
     const tierGroups: { tier: typeof TIER_DEFS[0]; dungeons: DungeonDef[] }[] = TIER_DEFS.map(t => ({ tier: t, dungeons: [] }));
 
     for (const dg of allDungeons) {
-      // Special case: Endless Dungeon is shown as a separate button above the tier list
-      if (dg.id === "endlessDungeon") continue;
+      // Special case: Endless Dungeon and Daily Dungeon are shown as separate buttons above the tier list
+      if (dg.id === "endlessDungeon" || dg.id === "dailyDungeon") continue;
       // Special case: Destiny Tower always goes to the "Special" tier
       if (dg.id === "destinyTower") {
         tierGroups[tierGroups.length - 1].dungeons.push(dg);
@@ -476,7 +491,7 @@ export class HubScene extends Phaser.Scene {
   private enterChallengeMode(challengeId: string) {
     // Pick a random unlocked dungeon (excluding endless and destiny tower)
     const unlocked = getUnlockedDungeons(this.meta.totalClears)
-      .filter(d => d.id !== "endlessDungeon" && d.id !== "destinyTower");
+      .filter(d => d.id !== "endlessDungeon" && d.id !== "destinyTower" && d.id !== "dailyDungeon");
     if (unlocked.length === 0) return;
     const pick = unlocked[Math.floor(Math.random() * unlocked.length)];
     this.enterDungeonWithChallenge(pick.id, challengeId);

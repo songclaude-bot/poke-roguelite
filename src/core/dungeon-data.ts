@@ -5843,6 +5843,19 @@ export const DUNGEONS: Record<string, DungeonDef> = {
     unlockClears: 10,
     description: "Infinite floors. How deep can you go?",
   },
+  dailyDungeon: {
+    id: "dailyDungeon",
+    name: "Daily Dungeon",
+    tilesetPath: "tilesets/BeachCave/tileset_0.png",
+    tilesetKey: "beachcave-tiles",
+    floors: 20,  // overridden by daily config
+    enemySpeciesIds: [],  // dynamically populated from base dungeon
+    floorEnemies: {},
+    difficulty: 4.0,  // overridden by daily config
+    itemsPerFloor: 4,
+    unlockClears: 5,
+    description: "Today's challenge dungeon!",
+  },
 };
 
 // ── Challenge Modes ──

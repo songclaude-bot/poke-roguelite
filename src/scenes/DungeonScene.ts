@@ -34,6 +34,7 @@ import { AbilityId, SPECIES_ABILITIES, ABILITIES } from "../core/ability";
 import { WeatherType, WEATHERS, weatherDamageMultiplier, isWeatherImmune, rollFloorWeather } from "../core/weather";
 import { ShopItem, generateShopItems, shouldSpawnShop } from "../core/shop";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
+import { getDailyConfig, calculateDailyScore, saveDailyScore } from "../core/daily-dungeon";
 import {
   initAudio, startBgm, stopBgm,
   sfxHit, sfxSuperEffective, sfxNotEffective, sfxMove, sfxPickup,
@@ -210,6 +211,21 @@ export class DungeonScene extends Phaser.Scene {
       this.dungeonDef = { ...this.dungeonDef }; // shallow copy to avoid mutating original
       this.dungeonDef.difficulty = 1.0 + (this.currentFloor * 0.1);
       this.dungeonDef.itemsPerFloor = Math.min(7, 3 + Math.floor(this.currentFloor / 15));
+    }
+
+    // Daily dungeon: apply seed-based config and modifiers
+    if (this.dungeonDef.id === "dailyDungeon") {
+      const dailyConfig = getDailyConfig();
+      this.dungeonDef = { ...this.dungeonDef, floors: dailyConfig.floors, difficulty: dailyConfig.difficulty };
+      // Apply modifiers
+      if (dailyConfig.modifiers.includes("strongEnemies")) this.dungeonDef.difficulty *= 1.3;
+      if (dailyConfig.modifiers.includes("fewItems")) this.dungeonDef.itemsPerFloor = 2;
+      if (dailyConfig.modifiers.includes("toughBoss")) {
+        // Boost boss stats if present
+        if (this.dungeonDef.boss) {
+          this.dungeonDef.boss = { ...this.dungeonDef.boss, statMultiplier: this.dungeonDef.boss.statMultiplier * 1.5 };
+        }
+      }
     }
     this.persistentHp = data?.hp ?? (50 + hpBonus);
     this.persistentMaxHp = data?.maxHp ?? (50 + hpBonus);
@@ -681,7 +697,7 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Spawn enemies (dungeon + floor specific) ──
     const rooms = this.dungeon.rooms;
-    const floorSpeciesIds = this.dungeonDef.id === "endlessDungeon"
+    const floorSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
       ? this.getEndlessEnemies(this.currentFloor)
       : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
     const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
@@ -2546,7 +2562,7 @@ export class DungeonScene extends Phaser.Scene {
 
       // Spawn 4-6 extra enemies in this room
       const count = 4 + Math.floor(Math.random() * 3);
-      const floorSpeciesIds = this.dungeonDef.id === "endlessDungeon"
+      const floorSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
         ? this.getEndlessEnemies(this.currentFloor)
         : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
       const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
@@ -2699,6 +2715,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private advanceFloor() {
     // Endless dungeon never shows clear screen — always advance
+    // Daily dungeon and other dungeons show clear when floors are completed
     if (this.dungeonDef.id !== "endlessDungeon" && this.currentFloor >= this.dungeonDef.floors) {
       this.showDungeonClear();
       return;
@@ -2772,12 +2789,31 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // Daily dungeon: calculate and save score
+    let dailyScoreValue = 0;
+    if (this.dungeonDef.id === "dailyDungeon") {
+      const dailyConfig = getDailyConfig();
+      dailyScoreValue = calculateDailyScore(
+        this.currentFloor, this.enemiesDefeated, this.turnManager.turn, true
+      );
+      saveDailyScore({
+        date: dailyConfig.date,
+        floorsReached: this.currentFloor,
+        enemiesDefeated: this.enemiesDefeated,
+        turnsUsed: this.turnManager.turn,
+        score: dailyScoreValue,
+        cleared: true,
+        starter: this.starterId,
+      });
+    }
+
     // Stats summary
     const clearStats = [
       `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
       this.allies.length > 0 ? `Team: ${this.allies.filter(a => a.alive).map(a => a.name).join(", ")}` : "",
       this.ngPlusLevel > 0 ? `NG+${this.ngPlusLevel}` : "",
       this.challengeMode === "speedrun" ? "Speed Run Bonus: 2x Gold!" : "",
+      this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
     ].filter(Boolean).join("\n");
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 38, clearStats, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
@@ -2834,8 +2870,29 @@ export class DungeonScene extends Phaser.Scene {
       fontSize: "11px", color: "#fde68a", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
+    // Daily dungeon: calculate and save score on game over
+    let dailyScoreValue = 0;
+    if (this.dungeonDef.id === "dailyDungeon") {
+      const dailyConfig = getDailyConfig();
+      dailyScoreValue = calculateDailyScore(
+        this.currentFloor, this.enemiesDefeated, this.turnManager.turn, false
+      );
+      saveDailyScore({
+        date: dailyConfig.date,
+        floorsReached: this.currentFloor,
+        enemiesDefeated: this.enemiesDefeated,
+        turnsUsed: this.turnManager.turn,
+        score: dailyScoreValue,
+        cleared: false,
+        starter: this.starterId,
+      });
+    }
+
     // Stats summary
-    const goStats = `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`;
+    const goStats = [
+      `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
+      this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
+    ].filter(Boolean).join("\n");
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 38, goStats, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
