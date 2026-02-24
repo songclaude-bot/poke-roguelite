@@ -453,6 +453,13 @@ export class DungeonScene extends Phaser.Scene {
       corviknight: "0823", bastiodon: "0411",
       aegislash: "0681", jellicent: "0593",
       slowking: "0199", bronzong: "0437",
+      // Phase 184-186: 10th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+      froslass: "0478", abomasnow: "0460",
+      sharpedo: "0319", zoroark: "0571",
+      primarina: "0730", diancie: "0719",
+      dragapult: "0887", duraludon: "0884",
+      swellow: "0277", talonflame: "0663",
+      slaking: "0289", lopunny: "0428",
     };
 
     // Load player + all enemy species + ally species for this dungeon

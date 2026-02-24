@@ -277,6 +277,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     adamantineCitadel: [WeatherType.Sandstorm, WeatherType.Hail],
     etherealSanctum: [WeatherType.Hail],
     transcendenceSpire: [WeatherType.Rain, WeatherType.Hail],
+    // Phase 184-186: 10th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+    frozenNether: [WeatherType.Hail],
+    abyssalEclipse: [WeatherType.Sandstorm, WeatherType.Hail],
+    radiantCrystalGarden: [WeatherType.Rain],
+    voidDragonSpire: [WeatherType.Sandstorm, WeatherType.Hail],
+    celestialGalefort: [WeatherType.Rain, WeatherType.Sandstorm],
+    primordialColossus: [WeatherType.Rain, WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

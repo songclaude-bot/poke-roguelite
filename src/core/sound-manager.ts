@@ -245,10 +245,12 @@ const DUNGEON_BGM_MAP: Record<string, string> = {
   frostyForest: "dungeon-ice", frozenPeak: "dungeon-ice", glacialCavern: "dungeon-ice",
   permafrostDepths: "dungeon-ice", blizzardSummit: "dungeon-ice", eternaFrost: "dungeon-ice",
   glacialDominion: "dungeon-ice", frozenEternity: "dungeon-ice", absoluteZero: "dungeon-ice",
+  frozenNether: "dungeon-ice",
   // Dark-type dungeons
   shadowForest: "dungeon-dark", darkWasteland: "dungeon-dark", obsidianCrypt: "dungeon-dark",
   abyssalVoid: "dungeon-dark", eclipseDepths: "dungeon-dark", voidOfDespair: "dungeon-dark",
   stygianAbyss: "dungeon-dark", umbralDominion: "dungeon-dark", eclipsedRealm: "dungeon-dark",
+  abyssalEclipse: "dungeon-dark",
   // Rock-type dungeons
   mtSteel: "dungeon-rock", buriedRuins: "dungeon-rock", rockfallCavern: "dungeon-rock",
   petrifiedCavern: "dungeon-rock", tectonicFault: "dungeon-rock", ancientGeode: "dungeon-rock",
@@ -269,10 +271,12 @@ const DUNGEON_BGM_MAP: Record<string, string> = {
   dragonsLair: "dungeon-dragon", draconsHollow: "dungeon-dragon", wyrmsAbyss: "dungeon-dragon",
   dragonspireKeep: "dungeon-dragon", draconicSanctuary: "dungeon-dragon", ancientDragonhold: "dungeon-dragon",
   draconicDominion: "dungeon-dragon", wyrmheartSanctum: "dungeon-dragon", draconicApex: "dungeon-dragon",
+  voidDragonSpire: "dungeon-dragon",
   // Fairy-type dungeons
   enchantedMeadow: "dungeon-fairy", sylvanGlade: "dungeon-fairy", faeWilds: "dungeon-fairy",
   stardustGrove: "dungeon-fairy", luminousSanctum: "dungeon-fairy", etherealParadise: "dungeon-fairy",
   faeDominion: "dungeon-fairy", celestialGrove: "dungeon-fairy", stardustParadise: "dungeon-fairy",
+  radiantCrystalGarden: "dungeon-fairy",
   // Ghost-type dungeons
   sinisterWoods: "dungeon-ghost", hauntedManor: "dungeon-ghost", spectersCrypt: "dungeon-ghost",
   phantomCitadel: "dungeon-ghost", liminalVoid: "dungeon-ghost", netherRealm: "dungeon-ghost",
@@ -293,10 +297,12 @@ const DUNGEON_BGM_MAP: Record<string, string> = {
   skyTower: "dungeon-flying", windySummit: "dungeon-flying", cumulusSpire: "dungeon-flying",
   stormcallersPeak: "dungeon-flying", celestialAerie: "dungeon-flying", skywardDominion: "dungeon-flying",
   stormcallersDominion: "dungeon-flying", celestialZenith: "dungeon-flying", skywardApex: "dungeon-flying",
+  celestialGalefort: "dungeon-flying",
   // Normal-type dungeons
   tranquilPlains: "dungeon-normal", sereneValley: "dungeon-normal", harvestFields: "dungeon-normal",
   idyllicMeadow: "dungeon-normal", elysianFields: "dungeon-normal", paradiseReach: "dungeon-normal",
   elysianDominion: "dungeon-normal", paradiseApex: "dungeon-normal", primordialPlains: "dungeon-normal",
+  primordialColossus: "dungeon-normal",
   // Destiny Tower
   destinyTower: "destiny",
 };
@@ -1375,6 +1381,43 @@ const _LEGACY_BGM_UNUSED = {
     melody: [330, 392, 494, 587, 659, 587, 494, 392, 349, 440, 523, 659, 587, 523, 440, 349],
     bass: [165, 165, 247, 247, 294, 294, 247, 196, 175, 175, 262, 262, 294, 294, 220, 175],
     tempo: 0.22, melodyType: "triangle", bassType: "sine",
+  },
+  // Phase 184-186: 10th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+  // Frozen Nether — icy, spectral, ethereal
+  frozenNether: {
+    melody: [196, 233, 262, 294, 262, 233, 196, 175, 220, 262, 330, 294, 262, 220, 196, 175],
+    bass: [98, 98, 131, 131, 147, 147, 98, 98, 110, 110, 131, 131, 165, 165, 98, 88],
+    tempo: 0.24, melodyType: "sine", bassType: "triangle",
+  },
+  // Abyssal Eclipse — dark, menacing, fast
+  abyssalEclipse: {
+    melody: [220, 262, 294, 349, 294, 262, 220, 196, 233, 294, 349, 392, 349, 294, 233, 220],
+    bass: [110, 110, 147, 147, 175, 175, 110, 110, 117, 117, 147, 147, 196, 196, 117, 110],
+    tempo: 0.16, melodyType: "sawtooth", bassType: "square",
+  },
+  // Radiant Crystal Garden — sparkling, magical, enchanting
+  radiantCrystalGarden: {
+    melody: [523, 587, 659, 784, 659, 587, 523, 494, 587, 659, 784, 880, 784, 659, 587, 523],
+    bass: [262, 262, 330, 330, 392, 392, 262, 262, 294, 294, 330, 330, 440, 440, 330, 262],
+    tempo: 0.22, melodyType: "triangle", bassType: "sine",
+  },
+  // Void Dragon Spire — draconic, powerful, dimensional
+  voidDragonSpire: {
+    melody: [175, 220, 262, 330, 262, 220, 175, 147, 196, 262, 330, 392, 330, 262, 196, 175],
+    bass: [88, 88, 131, 131, 165, 165, 88, 88, 98, 98, 131, 131, 196, 196, 131, 88],
+    tempo: 0.18, melodyType: "sawtooth", bassType: "square",
+  },
+  // Celestial Galefort — windswept, blazing, intense
+  celestialGalefort: {
+    melody: [392, 440, 523, 587, 523, 440, 392, 349, 440, 523, 587, 659, 587, 523, 440, 392],
+    bass: [196, 196, 262, 262, 294, 294, 196, 196, 220, 220, 262, 262, 330, 330, 262, 196],
+    tempo: 0.15, melodyType: "square", bassType: "sawtooth",
+  },
+  // Primordial Colossus — heavy, primal, ground-shaking
+  primordialColossus: {
+    melody: [262, 294, 330, 392, 330, 294, 262, 220, 294, 349, 392, 440, 392, 349, 294, 262],
+    bass: [131, 131, 165, 165, 196, 196, 131, 131, 147, 147, 175, 175, 220, 220, 147, 131],
+    tempo: 0.20, melodyType: "sawtooth", bassType: "square",
   },
   // Hub — peaceful town
   hub: {

@@ -490,4 +490,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   jellicent: AbilityId.SwiftSwim, // Water Absorb equivalent
   slowking: AbilityId.ShieldDust, // Own Tempo equivalent
   bronzong: AbilityId.Levitate, // Levitate
+  // Phase 184-186: 10th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+  froslass: AbilityId.Levitate, // Snow Cloak equivalent
+  abomasnow: AbilityId.Sturdy, // Snow Warning equivalent
+  sharpedo: AbilityId.PurePower, // Speed Boost equivalent
+  zoroark: AbilityId.PurePower, // Illusion equivalent
+  primarina: AbilityId.Torrent, // Torrent
+  diancie: AbilityId.Sturdy, // Clear Body equivalent
+  dragapult: AbilityId.Levitate, // Clear Body equivalent
+  duraludon: AbilityId.Sturdy, // Stalwart equivalent
+  swellow: AbilityId.Guts, // Guts
+  talonflame: AbilityId.FlameBody, // Flame Body
+  slaking: AbilityId.PurePower, // Truant → compensated with raw power
+  lopunny: AbilityId.Guts, // Limber equivalent
 };
