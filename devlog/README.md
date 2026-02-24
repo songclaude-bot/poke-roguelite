@@ -139,3 +139,27 @@
 - 날짜: 2026-02-24
 - [상세 기록](./21-dark-sinisterwoods.md)
 - 핵심: Dark 타입 + 5종 스킬, Murkrow/Sableye/Absol, Sinister Woods 14층, D-Pad Wait 버튼
+
+## Phase 16: Grass 타입 + Overgrown Forest
+
+### 16-1. Grass 포켓몬 + 9번째 던전
+- 날짜: 2026-02-24
+- 핵심: Chikorita/Bellsprout/Shroomish, 5종 Grass 스킬, Overgrown Forest 12층, 4종 진화 경로, 3종 새 스타터
+
+## Phase 17: Poison 강화 + Toxic Swamp
+
+### 17-1. Poison 포켓몬 + 10번째 던전
+- 날짜: 2026-02-24
+- 핵심: Grimer/Nidoran♂/Tentacool, 5종 Poison 스킬, Toxic Swamp 14층, Poison Sting 강화(40% 독)
+
+## Phase 18: Fairy 타입 + Moonlit Cave
+
+### 18-1. Fairy 타입 + 11번째 던전
+- 날짜: 2026-02-24
+- 핵심: Fairy 타입 상성(Fighting/Dark/Dragon 2x), Clefairy/Jigglypuff/Ralts, 5종 Fairy 스킬, Moonlit Cave 10층
+
+## Phase 19: Dragon 타입 + Dragon's Lair
+
+### 19-1. Dragon 타입 + 12번째 던전
+- 날짜: 2026-02-24
+- 핵심: Dragon 타입 상성(Dragon 2x, Fairy 면역), Dratini/Bagon/Gible, 5종 Dragon 스킬, Dragon's Lair 16층, Elder Garchomp 보스(6.0x)
