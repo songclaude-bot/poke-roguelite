@@ -242,6 +242,7 @@ export class DungeonScene extends Phaser.Scene {
       chikorita: "0152", bellsprout: "0069", shroomish: "0285",
       grimer: "0088", nidoranM: "0032", tentacool: "0072",
       clefairy: "0035", jigglypuff: "0039", ralts: "0280",
+      dratini: "0147", bagon: "0371", gible: "0443",
     };
 
     // Load player + all enemy species + ally species for this dungeon
@@ -2277,6 +2278,7 @@ export class DungeonScene extends Phaser.Scene {
       Ice: { color: 0x67e8f9, symbol: "❄" },
       Dark: { color: 0x6b21a8, symbol: "🌑" },
       Fairy: { color: 0xf9a8d4, symbol: "✿" },
+      Dragon: { color: 0x7c3aed, symbol: "🐉" },
       Normal: { color: 0xd1d5db, symbol: "✦" },
     };
     const tc = typeColors[skill.type] ?? typeColors.Normal;

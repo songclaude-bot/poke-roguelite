@@ -128,4 +128,7 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   clefairy: AbilityId.ShieldDust,
   jigglypuff: AbilityId.ShieldDust,
   ralts: AbilityId.Static, // Trace equivalent
+  dratini: AbilityId.ShieldDust,
+  bagon: AbilityId.RockHead,
+  gible: AbilityId.RockHead,
 };

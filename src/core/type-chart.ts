@@ -21,6 +21,7 @@ export enum PokemonType {
   Ice = "Ice",
   Dark = "Dark",
   Fairy = "Fairy",
+  Dragon = "Dragon",
 }
 
 /**
@@ -143,9 +144,15 @@ const EFFECTIVENESS: Partial<Record<PokemonType, Partial<Record<PokemonType, num
   [PokemonType.Fairy]: {
     [PokemonType.Fighting]: 2.0,
     [PokemonType.Dark]: 2.0,
+    [PokemonType.Dragon]: 2.0,
     [PokemonType.Poison]: 0.5,
     [PokemonType.Steel]: 0.5,
     [PokemonType.Fire]: 0.5,
+  },
+  [PokemonType.Dragon]: {
+    [PokemonType.Dragon]: 2.0,
+    [PokemonType.Steel]: 0.5,
+    [PokemonType.Fairy]: 0,
   },
 };
 

@@ -464,6 +464,45 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["confusion", "disarmingVoice", "tackle"],
     floors: [],
   },
+  dratini: {
+    id: "dratini",
+    name: "Dratini",
+    spriteKey: "dratini",
+    types: [PokemonType.Dragon],
+    attackType: PokemonType.Dragon,
+    baseStats: { hp: 30, atk: 12, def: 5 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 5, idleFrames: 4,
+    skillIds: ["dragonBreath", "twister", "tackle"],
+    floors: [],
+  },
+  bagon: {
+    id: "bagon",
+    name: "Bagon",
+    spriteKey: "bagon",
+    types: [PokemonType.Dragon],
+    attackType: PokemonType.Dragon,
+    baseStats: { hp: 32, atk: 14, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["dragonClaw", "dragonBreath", "tackle"],
+    floors: [],
+  },
+  gible: {
+    id: "gible",
+    name: "Gible",
+    spriteKey: "gible",
+    types: [PokemonType.Dragon, PokemonType.Ground],
+    attackType: PokemonType.Dragon,
+    baseStats: { hp: 35, atk: 15, def: 5 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["dragonClaw", "mudShot", "tackle"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -513,6 +552,9 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   clefairy: { 7: "drainingKiss", 10: "moonblast" },
   jigglypuff: { 7: "fairyWind", 10: "dazzlingGleam" },
   ralts: { 7: "drainingKiss", 10: "moonblast" },
+  dratini: { 7: "twister", 10: "dragonPulse" },
+  bagon: { 7: "dragonBreath", 10: "dragonPulse" },
+  gible: { 7: "dragonBreath", 10: "dracoMeteor" },
 };
 
 /** Check if a species learns a new skill at this level */

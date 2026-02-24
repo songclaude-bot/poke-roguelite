@@ -271,6 +271,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [262, 262, 294, 294, 330, 330, 262, 262, 247, 247, 294, 294, 330, 330, 262, 262],
     tempo: 0.32, melodyType: "sine", bassType: "triangle",
   },
+  // Dragon's Lair — epic, intense
+  dragonsLair: {
+    melody: [196, 220, 262, 330, 262, 220, 196, 175, 196, 262, 330, 392, 330, 262, 196, 175],
+    bass: [98, 98, 131, 131, 165, 165, 98, 98, 110, 110, 165, 165, 196, 196, 131, 98],
+    tempo: 0.22, melodyType: "sawtooth", bassType: "square",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],
