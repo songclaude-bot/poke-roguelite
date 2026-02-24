@@ -925,6 +925,43 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [262, 262, 330, 330, 392, 392, 294, 294, 247, 247, 294, 294, 392, 392, 330, 330],
     tempo: 0.34, melodyType: "sine", bassType: "sine",
   },
+  // Phase 154-156: Ice/Dark/Fairy/Dragon/Flying/Normal 7th
+  // Glacier Fortress — frigid, crystalline, imposing
+  glacierFortress: {
+    melody: [494, 440, 392, 349, 330, 349, 392, 494, 523, 494, 440, 392, 349, 330, 294, 330],
+    bass: [247, 247, 196, 196, 165, 165, 196, 196, 262, 262, 220, 220, 175, 175, 147, 147],
+    tempo: 0.34, melodyType: "sine", bassType: "triangle",
+  },
+  // Umbral Citadel — dark, oppressive, ominous
+  umbralCitadel: {
+    melody: [175, 196, 220, 208, 196, 175, 165, 156, 175, 196, 220, 247, 233, 220, 196, 175],
+    bass: [88, 88, 110, 110, 98, 98, 82, 82, 88, 88, 123, 123, 110, 110, 98, 98],
+    tempo: 0.32, melodyType: "sawtooth", bassType: "triangle",
+  },
+  // Sylvan Sanctuary — enchanting, fairy-like, gentle
+  sylvanSanctuary: {
+    melody: [587, 659, 698, 784, 698, 659, 587, 523, 587, 659, 784, 880, 784, 698, 659, 587],
+    bass: [294, 294, 349, 349, 392, 392, 262, 262, 294, 294, 392, 392, 440, 440, 330, 330],
+    tempo: 0.36, melodyType: "triangle", bassType: "sine",
+  },
+  // Dragon's Spine — epic, draconic, powerful
+  dragonsSpine: {
+    melody: [196, 233, 262, 330, 392, 330, 262, 233, 196, 220, 262, 330, 392, 440, 392, 330],
+    bass: [98, 98, 131, 131, 196, 196, 131, 131, 98, 98, 110, 110, 165, 165, 220, 220],
+    tempo: 0.24, melodyType: "sawtooth", bassType: "square",
+  },
+  // Stratosphere — airy, soaring, vast
+  stratosphere: {
+    melody: [523, 587, 659, 784, 880, 784, 659, 587, 523, 494, 523, 587, 659, 784, 880, 784],
+    bass: [262, 262, 330, 330, 440, 440, 330, 330, 262, 262, 247, 247, 330, 330, 440, 440],
+    tempo: 0.28, melodyType: "sine", bassType: "triangle",
+  },
+  // Sovereign Hall — regal, steady, powerful
+  sovereignHall: {
+    melody: [330, 392, 440, 523, 440, 392, 330, 294, 330, 392, 440, 523, 587, 523, 440, 392],
+    bass: [165, 165, 220, 220, 262, 262, 165, 165, 147, 147, 196, 196, 294, 294, 220, 220],
+    tempo: 0.28, melodyType: "triangle", bassType: "triangle",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

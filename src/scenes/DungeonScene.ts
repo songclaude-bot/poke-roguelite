@@ -371,6 +371,13 @@ export class DungeonScene extends Phaser.Scene {
       steelix: "0208", scizor: "0212",
       banette: "0354", shedinja: "0292",
       slowpoke: "0079", girafarig: "0203",
+      // Phase 154-156: Ice/Dark/Fairy/Dragon/Flying/Normal 7th
+      glaceon: "0471", beartic: "0614",
+      umbreon: "0197", cacturne: "0332",
+      granbull: "0210", togekiss: "0468",
+      shelgon: "0372", gabite: "0444",
+      noctowl: "0164", xatu: "0178",
+      kangaskhan: "0115", tauros: "0128",
     };
 
     // Load player + all enemy species + ally species for this dungeon

@@ -370,4 +370,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   shedinja: AbilityId.ShieldDust, // Wonder Guard equivalent
   slowpoke: AbilityId.ShieldDust, // Own Tempo equivalent
   girafarig: AbilityId.ShieldDust, // Inner Focus equivalent
+  // Phase 154-156: Ice/Dark/Fairy/Dragon/Flying/Normal 7th
+  glaceon: AbilityId.ShieldDust, // Ice Body equivalent
+  beartic: AbilityId.Guts, // Snow Cloak equivalent
+  umbreon: AbilityId.ShieldDust, // Synchronize equivalent
+  cacturne: AbilityId.Pickup, // Sand Veil equivalent
+  granbull: AbilityId.Guts, // Intimidate equivalent
+  togekiss: AbilityId.ShieldDust, // Serene Grace equivalent
+  shelgon: AbilityId.RockHead, // Rock Head
+  gabite: AbilityId.RockHead, // Rough Skin equivalent
+  noctowl: AbilityId.ShieldDust, // Insomnia equivalent
+  xatu: AbilityId.ShieldDust, // Synchronize equivalent
+  kangaskhan: AbilityId.Guts, // Scrappy equivalent
+  tauros: AbilityId.Guts, // Intimidate equivalent
 };

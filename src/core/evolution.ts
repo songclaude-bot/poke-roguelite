@@ -241,6 +241,9 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "boldore", to: "gigalith", level: 40, newName: "Gigalith", hpBonus: 18, atkBonus: 12, defBonus: 12, newSkillId: "headSmash" },
   { from: "pineco", to: "forretress", level: 31, newName: "Forretress", hpBonus: 16, atkBonus: 8, defBonus: 14, newSkillId: "signalBeam" },
   { from: "slowpoke", to: "slowbro", level: 37, newName: "Slowbro", hpBonus: 18, atkBonus: 10, defBonus: 12, newSkillId: "zenHeadbutt" },
+  // Phase 154-156: Ice/Dark/Fairy/Dragon/Flying/Normal 7th tier
+  { from: "shelgon", to: "salamence", level: 50, newName: "Salamence", hpBonus: 20, atkBonus: 14, defBonus: 10, newSkillId: "outrage" },
+  { from: "gabite", to: "garchomp", level: 48, newName: "Garchomp", hpBonus: 18, atkBonus: 16, defBonus: 8, newSkillId: "outrage" },
 ];
 
 /** Check if a species can evolve at a given level */

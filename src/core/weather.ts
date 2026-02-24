@@ -214,6 +214,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     steelAbyss: [WeatherType.Sandstorm, WeatherType.Hail],
     necropolisDepths: [WeatherType.Hail],
     cosmicLibrary: [WeatherType.Rain, WeatherType.Hail],
+    // Phase 154-156: Ice/Dark/Fairy/Dragon/Flying/Normal 7th
+    glacierFortress: [WeatherType.Hail],
+    umbralCitadel: [WeatherType.Sandstorm, WeatherType.Hail],
+    sylvanSanctuary: [WeatherType.Rain],
+    dragonsSpine: [WeatherType.Sandstorm, WeatherType.Hail],
+    stratosphere: [WeatherType.Rain, WeatherType.Sandstorm],
+    sovereignHall: [WeatherType.Rain, WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

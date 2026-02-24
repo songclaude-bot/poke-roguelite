@@ -2031,6 +2031,38 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Focuses psychic power into a headbutt.",
   },
+
+  // ── Phase 154-156: Ice/Dark/Fairy/Dragon/Flying/Normal 7th Skills ──
+  blizzard: {
+    id: "blizzard",
+    name: "Blizzard",
+    type: PokemonType.Ice,
+    power: 18,
+    pp: 6,
+    range: SkillRange.Room,
+    accuracy: 80,
+    description: "Engulfs the room in a fierce blizzard.",
+  },
+  skyAttack: {
+    id: "skyAttack",
+    name: "Sky Attack",
+    type: PokemonType.Flying,
+    power: 18,
+    pp: 6,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Dives from the sky with great force.",
+  },
+  extremeSpeed: {
+    id: "extremeSpeed",
+    name: "Extreme Speed",
+    type: PokemonType.Normal,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front1,
+    accuracy: 100,
+    description: "Attacks at blinding speed.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
