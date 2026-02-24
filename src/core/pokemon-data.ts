@@ -1217,6 +1217,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["bravebird", "aerialAce", "hurricane"],
     floors: [],
   },
+
+  // ── Phase 63 Fighting 2nd ──
+  tyrogue: {
+    id: "tyrogue", name: "Tyrogue", spriteKey: "tyrogue",
+    types: [PokemonType.Fighting], attackType: PokemonType.Fighting,
+    baseStats: { hp: 26, atk: 12, def: 8 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["hammerArm", "closeCombat", "machPunch"],
+    floors: [],
+  },
+  crabrawler: {
+    id: "crabrawler", name: "Crabrawler", spriteKey: "crabrawler",
+    types: [PokemonType.Fighting], attackType: PokemonType.Fighting,
+    baseStats: { hp: 30, atk: 14, def: 6 },
+    walkFrameWidth: 40, walkFrameHeight: 40,
+    idleFrameWidth: 40, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 3,
+    skillIds: ["drainPunch", "hammerArm", "closeCombat"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1325,6 +1347,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   purrloin: { 7: "nightSlash", 10: "foulPlay" },
   pidove: { 7: "airSlash", 10: "hurricane" },
   rufflet: { 7: "bravebird", 10: "hurricane" },
+  tyrogue: { 7: "hammerArm", 10: "closeCombat" },
+  crabrawler: { 7: "drainPunch", 10: "hammerArm" },
 };
 
 /** Check if a species learns a new skill at this level */

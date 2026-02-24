@@ -439,6 +439,11 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [247, 247, 294, 294, 349, 349, 294, 294, 247, 247, 196, 196, 247, 247, 294, 294],
     tempo: 0.30, melodyType: "square", bassType: "triangle",
   },
+  brawlDojo: {
+    melody: [262, 294, 330, 349, 392, 349, 330, 294, 262, 294, 330, 392, 440, 392, 330, 294],
+    bass: [131, 131, 165, 165, 196, 196, 165, 165, 131, 131, 165, 165, 220, 220, 165, 165],
+    tempo: 0.28, melodyType: "square", bassType: "square",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

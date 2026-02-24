@@ -187,4 +187,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   purrloin: AbilityId.NoGuard,
   pidove: AbilityId.ShieldDust,
   rufflet: AbilityId.Guts,
+  tyrogue: AbilityId.Guts,
+  crabrawler: AbilityId.Guts,
 };

@@ -1271,6 +1271,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 70,
     description: "Summons a devastating hurricane in the room.",
   },
+
+  // ── Phase 63 Fighting Skills ──
+  hammerArm: {
+    id: "hammerArm",
+    name: "Hammer Arm",
+    type: PokemonType.Fighting,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Front1,
+    accuracy: 85,
+    description: "Smashes down with a heavy fist.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
