@@ -200,13 +200,32 @@
 - 날짜: 2026-02-24
 - 핵심: Sandshrew/Trapinch/Phanpy, 2종 Ground 스킬(dig/sandTomb), Buried Ruins 12층, Ancient Flygon 보스, 20종 스타터, 스크롤 가능 스타터 선택
 
+## Phase 28-29: Stormy Sea + Amp Plains
+
+### 28-29. Water + Electric 포켓몬 + 던전
+- 날짜: 2026-02-24
+- 핵심: Horsea/Lotad/Carvanha (Water), Elekid/Mareep (Electric), brine/aquaJet/thunderbolt/thunderPunch 스킬, Stormy Sea 18층 + Amp Plains 10층
+
+## Phase 30-31: Verdant Forest
+
+### 30-31. Bug 포켓몬 + 20번째 던전
+- 날짜: 2026-02-24
+- 핵심: Wurmple/Spinarak, signalBeam/pinMissile 스킬, Verdant Forest 8층, Matriarch Ariados 보스
+
+## Phase 32: Mystic Sanctum
+
+### 32. Psychic 포켓몬 + 21번째 던전
+- 날짜: 2026-02-24
+- 핵심: Abra/Natu, psychic 스킬, Mystic Sanctum 12층, Grand Alakazam 보스(5.5x)
+
 ---
 
-## 현재 게임 규모 (v0.22.0)
+## 현재 게임 규모 (v0.25.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **16개 던전**: Beach Cave → Destiny Tower
-- **40종+ 포켓몬** (진화 포함 55종+)
-- **70종+ 기술**
+- **21개 던전**: Beach Cave → Mystic Sanctum
+- **50종+ 포켓몬** (진화 포함 60종+)
+- **80종+ 기술**
 - **20종 아이템** (6종 TM 포함)
 - **20종 스타터** (클리어 수로 해금)
+- **40종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
