@@ -270,6 +270,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     voltexPinnacle: [WeatherType.Rain, WeatherType.Sandstorm],
     miasmaticCore: [WeatherType.Rain, WeatherType.Sandstorm],
     pangaeaFault: [WeatherType.Sandstorm],
+    // Phase 181-183: 10th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+    titansGeode: [WeatherType.Sandstorm],
+    sovereignHive: [WeatherType.Rain],
+    apexColosseum: [WeatherType.Sandstorm, WeatherType.Rain],
+    adamantineCitadel: [WeatherType.Sandstorm, WeatherType.Hail],
+    etherealSanctum: [WeatherType.Hail],
+    transcendenceSpire: [WeatherType.Rain, WeatherType.Hail],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

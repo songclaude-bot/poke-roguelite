@@ -477,4 +477,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   vileplume: AbilityId.ShieldDust, // Effect Spore equivalent
   rhyperior: AbilityId.Sturdy, // Solid Rock equivalent
   dugtrio: AbilityId.NoGuard, // Arena Trap equivalent
+  // Phase 181-183: 10th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+  golem: AbilityId.Sturdy, // Sturdy
+  terrakion: AbilityId.PurePower, // Justified equivalent
+  pheromosa: AbilityId.PurePower, // Beast Boost equivalent
+  escavalier: AbilityId.Sturdy, // Shell Armor equivalent
+  kommoo: AbilityId.Guts, // Bulletproof equivalent
+  gallade: AbilityId.PurePower, // Sharpness equivalent
+  corviknight: AbilityId.Sturdy, // Mirror Armor equivalent
+  bastiodon: AbilityId.Sturdy, // Sturdy
+  aegislash: AbilityId.NoGuard, // Stance Change equivalent
+  jellicent: AbilityId.SwiftSwim, // Water Absorb equivalent
+  slowking: AbilityId.ShieldDust, // Own Tempo equivalent
+  bronzong: AbilityId.Levitate, // Levitate
 };

@@ -221,14 +221,112 @@ export function sfxShop() {
   ], "square", sfxVolume * 0.3);
 }
 
-// ── Dungeon-specific BGM melodies ──
+// ── OGG BGM System (Pokemon Mystery Dungeon tracks from PokeAutoChess) ──
 
-interface BgmPattern {
-  melody: number[];
-  bass: number[];
-  tempo: number; // note duration in seconds
-  melodyType: OscillatorType;
-  bassType: OscillatorType;
+let bgmAudio: HTMLAudioElement | null = null;
+
+// Map dungeon IDs to BGM type files (audio/bgm/{type}.ogg)
+const DUNGEON_BGM_MAP: Record<string, string> = {
+  hub: "hub",
+  // Water-type dungeons
+  beachCave: "dungeon-water", stormySea: "dungeon-water", tidalReef: "dungeon-water",
+  coralDepths: "dungeon-water", abyssalTrench: "dungeon-water", deepSeaTrench: "dungeon-water",
+  marineSanctuary: "dungeon-water", pelagicAbyss: "dungeon-water", oceanicVortex: "dungeon-water",
+  // Fire-type dungeons
+  magmaCavern: "dungeon-fire", volcanicPeak: "dungeon-fire", smolderingCaldera: "dungeon-fire",
+  infernoChasm: "dungeon-fire", moltenCore: "dungeon-fire", blazingAbyss: "dungeon-fire",
+  scorchedBastion: "dungeon-fire", pyreOfAshes: "dungeon-fire", volcanicInferno: "dungeon-fire",
+  // Grass-type dungeons
+  tinyWoods: "dungeon-grass", overgrownForest: "dungeon-grass", emeraldGrove: "dungeon-grass",
+  verdantForest: "dungeon-grass", ancientWoodlands: "dungeon-grass", primordialGrove: "dungeon-grass",
+  etherealCanopy: "dungeon-grass", elderGroveSanctum: "dungeon-grass", verdantParadise: "dungeon-grass",
+  // Electric-type dungeons
+  thunderwaveCave: "dungeon-electric", ampPlains: "dungeon-electric", stormPeak: "dungeon-electric",
+  voltageSpire: "dungeon-electric", fulguriteCavern: "dungeon-electric", thunderstormNexus: "dungeon-electric",
+  plasmaCitadel: "dungeon-electric", tempestSpire: "dungeon-electric", voltaicStorm: "dungeon-electric",
+  // Ice-type dungeons
+  frostyForest: "dungeon-ice", frozenPeak: "dungeon-ice", glacialCavern: "dungeon-ice",
+  permafrostDepths: "dungeon-ice", blizzardSummit: "dungeon-ice", eternaFrost: "dungeon-ice",
+  glacialDominion: "dungeon-ice", frozenEternity: "dungeon-ice", absoluteZero: "dungeon-ice",
+  // Dark-type dungeons
+  shadowForest: "dungeon-dark", darkWasteland: "dungeon-dark", obsidianCrypt: "dungeon-dark",
+  abyssalVoid: "dungeon-dark", eclipseDepths: "dungeon-dark", voidOfDespair: "dungeon-dark",
+  stygianAbyss: "dungeon-dark", umbralDominion: "dungeon-dark", eclipsedRealm: "dungeon-dark",
+  // Rock-type dungeons
+  mtSteel: "dungeon-rock", buriedRuins: "dungeon-rock", rockfallCavern: "dungeon-rock",
+  petrifiedCavern: "dungeon-rock", tectonicFault: "dungeon-rock", ancientGeode: "dungeon-rock",
+  megalithicDepths: "dungeon-rock", primordialBasalt: "dungeon-rock", tectonicMonolith: "dungeon-rock",
+  // Psychic-type dungeons
+  moonlitCave: "dungeon-psychic", mysticSanctum: "dungeon-psychic", astralRift: "dungeon-psychic",
+  cosmicSpire: "dungeon-psychic", mindPalace: "dungeon-psychic", psychicNexus: "dungeon-psychic",
+  astralDominion: "dungeon-psychic", cosmicSanctum: "dungeon-psychic", transcendentSpire: "dungeon-psychic",
+  // Poison-type dungeons
+  toxicSwamp: "dungeon-poison", venomousMarsh: "dungeon-poison", miasmaDepths: "dungeon-poison",
+  corrosiveCavern: "dungeon-poison", blightedMire: "dungeon-poison", toxicWasteland: "dungeon-poison",
+  venomousDominion: "dungeon-poison", pestilentAbyss: "dungeon-poison", miasmaHeart: "dungeon-poison",
+  // Ground-type dungeons
+  aridDesert: "dungeon-ground", sunscorchedBadlands: "dungeon-ground", terraFissure: "dungeon-ground",
+  subterraneanLabyrinth: "dungeon-ground", seismicAbyss: "dungeon-ground", earthenCatacombs: "dungeon-ground",
+  tectonicLabyrinth: "dungeon-ground", earthenDominion: "dungeon-ground", seismicHeart: "dungeon-ground",
+  // Dragon-type dungeons
+  dragonsLair: "dungeon-dragon", draconsHollow: "dungeon-dragon", wyrmsAbyss: "dungeon-dragon",
+  dragonspireKeep: "dungeon-dragon", draconicSanctuary: "dungeon-dragon", ancientDragonhold: "dungeon-dragon",
+  draconicDominion: "dungeon-dragon", wyrmheartSanctum: "dungeon-dragon", draconicApex: "dungeon-dragon",
+  // Fairy-type dungeons
+  enchantedMeadow: "dungeon-fairy", sylvanGlade: "dungeon-fairy", faeWilds: "dungeon-fairy",
+  stardustGrove: "dungeon-fairy", luminousSanctum: "dungeon-fairy", etherealParadise: "dungeon-fairy",
+  faeDominion: "dungeon-fairy", celestialGrove: "dungeon-fairy", stardustParadise: "dungeon-fairy",
+  // Ghost-type dungeons
+  sinisterWoods: "dungeon-ghost", hauntedManor: "dungeon-ghost", spectersCrypt: "dungeon-ghost",
+  phantomCitadel: "dungeon-ghost", liminalVoid: "dungeon-ghost", netherRealm: "dungeon-ghost",
+  spectralDominion: "dungeon-ghost", etherealVoid: "dungeon-ghost", phantasmalNexus: "dungeon-ghost",
+  // Steel-type dungeons
+  steelFortress: "dungeon-steel", ironworks: "dungeon-steel", titaniumVault: "dungeon-steel",
+  adamantineForge: "dungeon-steel", chromiumCitadel: "dungeon-steel", steelheartEngine: "dungeon-steel",
+  adamantineDominion: "dungeon-steel", steelheartBastion: "dungeon-steel", forgedApex: "dungeon-steel",
+  // Bug-type dungeons
+  mossyCavern: "dungeon-bug", silkwoodThicket: "dungeon-bug", chitinousWarren: "dungeon-bug",
+  hivemindNest: "dungeon-bug", entomophageDepths: "dungeon-bug", swarmCatacombs: "dungeon-bug",
+  hivemindDominion: "dungeon-bug", entomophageNexus: "dungeon-bug", chitinousApex: "dungeon-bug",
+  // Fighting-type dungeons
+  dojoRuins: "dungeon-fighting", battleArena: "dungeon-fighting", martialPeak: "dungeon-fighting",
+  warlordsKeep: "dungeon-fighting", titansFist: "dungeon-fighting", battleSanctum: "dungeon-fighting",
+  martialDominion: "dungeon-fighting", titansFistApex: "dungeon-fighting", warlordsDomain: "dungeon-fighting",
+  // Flying-type dungeons
+  skyTower: "dungeon-flying", windySummit: "dungeon-flying", cumulusSpire: "dungeon-flying",
+  stormcallersPeak: "dungeon-flying", celestialAerie: "dungeon-flying", skywardDominion: "dungeon-flying",
+  stormcallersDominion: "dungeon-flying", celestialZenith: "dungeon-flying", skywardApex: "dungeon-flying",
+  // Normal-type dungeons
+  tranquilPlains: "dungeon-normal", sereneValley: "dungeon-normal", harvestFields: "dungeon-normal",
+  idyllicMeadow: "dungeon-normal", elysianFields: "dungeon-normal", paradiseReach: "dungeon-normal",
+  elysianDominion: "dungeon-normal", paradiseApex: "dungeon-normal", primordialPlains: "dungeon-normal",
+  // Destiny Tower
+  destinyTower: "destiny",
+};
+
+function getDungeonBgmFile(dungeonId: string): string {
+  if (DUNGEON_BGM_MAP[dungeonId]) return DUNGEON_BGM_MAP[dungeonId];
+  // Fallback: try to guess type from name keywords
+  const id = dungeonId.toLowerCase();
+  if (id.includes("cave") || id.includes("sea") || id.includes("reef") || id.includes("ocean") || id.includes("tidal") || id.includes("water") || id.includes("abyss")) return "dungeon-water";
+  if (id.includes("volcano") || id.includes("fire") || id.includes("magma") || id.includes("blaze") || id.includes("inferno") || id.includes("smolder") || id.includes("scorch")) return "dungeon-fire";
+  if (id.includes("forest") || id.includes("wood") || id.includes("grove") || id.includes("canopy") || id.includes("verdant")) return "dungeon-grass";
+  if (id.includes("thunder") || id.includes("electric") || id.includes("volt") || id.includes("storm") || id.includes("plasma")) return "dungeon-electric";
+  if (id.includes("ice") || id.includes("frost") || id.includes("frozen") || id.includes("glacial") || id.includes("blizzard") || id.includes("snow")) return "dungeon-ice";
+  if (id.includes("dark") || id.includes("shadow") || id.includes("obsidian") || id.includes("void") || id.includes("eclipse")) return "dungeon-dark";
+  if (id.includes("rock") || id.includes("steel") || id.includes("mt") || id.includes("ruin") || id.includes("petri")) return "dungeon-rock";
+  if (id.includes("psychic") || id.includes("moonlit") || id.includes("mystic") || id.includes("astral") || id.includes("cosmic") || id.includes("mind")) return "dungeon-psychic";
+  if (id.includes("toxic") || id.includes("poison") || id.includes("venom") || id.includes("swamp") || id.includes("marsh") || id.includes("miasma")) return "dungeon-poison";
+  if (id.includes("desert") || id.includes("ground") || id.includes("arid") || id.includes("terra") || id.includes("seismic") || id.includes("earthen")) return "dungeon-ground";
+  if (id.includes("dragon") || id.includes("wyrm") || id.includes("dracon")) return "dungeon-dragon";
+  if (id.includes("fairy") || id.includes("enchant") || id.includes("fae") || id.includes("sylvan") || id.includes("stardust") || id.includes("meadow")) return "dungeon-fairy";
+  if (id.includes("ghost") || id.includes("haunt") || id.includes("specter") || id.includes("phantom") || id.includes("sinister")) return "dungeon-ghost";
+  if (id.includes("iron") || id.includes("titan") || id.includes("chrome") || id.includes("forge") || id.includes("adamant")) return "dungeon-steel";
+  if (id.includes("bug") || id.includes("silk") || id.includes("chitin") || id.includes("hive") || id.includes("mossy")) return "dungeon-bug";
+  if (id.includes("fight") || id.includes("dojo") || id.includes("arena") || id.includes("martial") || id.includes("warlord")) return "dungeon-fighting";
+  if (id.includes("sky") || id.includes("wind") || id.includes("fly") || id.includes("cloud") || id.includes("cumulus") || id.includes("aerie")) return "dungeon-flying";
+  if (id.includes("destiny")) return "destiny";
+  return "dungeon-normal";
 }
 
 const BGM_PATTERNS: Record<string, BgmPattern> = {
@@ -1243,6 +1341,43 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     melody: [175, 220, 262, 330, 294, 262, 220, 175, 165, 196, 262, 330, 392, 330, 262, 196],
     bass: [88, 88, 131, 131, 147, 147, 110, 88, 82, 82, 131, 131, 196, 196, 131, 98],
     tempo: 0.20, melodyType: "sawtooth", bassType: "square",
+  },
+  // Phase 181-183: 10th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+  // Titan's Geode — rumbling, crystalline, heavy
+  titansGeode: {
+    melody: [165, 196, 262, 294, 262, 196, 165, 147, 175, 220, 294, 330, 294, 220, 175, 165],
+    bass: [82, 82, 131, 131, 147, 147, 82, 82, 88, 88, 110, 110, 165, 165, 110, 82],
+    tempo: 0.20, melodyType: "sawtooth", bassType: "square",
+  },
+  // Sovereign Hive — buzzing, frantic, alien
+  sovereignHive: {
+    melody: [440, 523, 587, 659, 587, 523, 440, 392, 494, 587, 659, 784, 659, 587, 494, 440],
+    bass: [220, 220, 262, 262, 294, 294, 220, 220, 247, 247, 294, 294, 392, 392, 294, 220],
+    tempo: 0.14, melodyType: "square", bassType: "sawtooth",
+  },
+  // Apex Colosseum — martial, epic, driving
+  apexColosseum: {
+    melody: [294, 349, 440, 523, 440, 349, 294, 262, 330, 392, 494, 587, 494, 392, 330, 294],
+    bass: [147, 147, 220, 220, 262, 262, 147, 147, 165, 165, 196, 196, 294, 294, 196, 147],
+    tempo: 0.16, melodyType: "sawtooth", bassType: "square",
+  },
+  // Adamantine Citadel — metallic, imposing, fortress
+  adamantineCitadel: {
+    melody: [262, 330, 392, 440, 392, 330, 262, 220, 294, 349, 440, 494, 440, 349, 294, 262],
+    bass: [131, 131, 196, 196, 220, 220, 131, 131, 147, 147, 175, 175, 220, 220, 147, 131],
+    tempo: 0.18, melodyType: "square", bassType: "square",
+  },
+  // Ethereal Sanctum — ghostly, haunting, otherworldly
+  etherealSanctum: {
+    melody: [220, 262, 330, 294, 262, 220, 196, 175, 196, 262, 294, 349, 294, 262, 196, 175],
+    bass: [110, 110, 131, 131, 147, 147, 98, 98, 98, 98, 131, 131, 147, 147, 98, 88],
+    tempo: 0.26, melodyType: "sine", bassType: "triangle",
+  },
+  // Transcendence Spire — psychic, ascending, ethereal
+  transcendenceSpire: {
+    melody: [330, 392, 494, 587, 659, 587, 494, 392, 349, 440, 523, 659, 587, 523, 440, 349],
+    bass: [165, 165, 247, 247, 294, 294, 247, 196, 175, 175, 262, 262, 294, 294, 220, 175],
+    tempo: 0.22, melodyType: "triangle", bassType: "sine",
   },
   // Hub — peaceful town
   hub: {

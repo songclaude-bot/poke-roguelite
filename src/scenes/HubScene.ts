@@ -14,6 +14,8 @@ import { initAudio, startBgm, stopBgm } from "../core/sound-manager";
  */
 export class HubScene extends Phaser.Scene {
   private meta!: MetaSaveData;
+  private starterLabel: Phaser.GameObjects.Text | null = null;
+  private starterDesc: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super({ key: "HubScene" });
@@ -97,10 +99,12 @@ export class HubScene extends Phaser.Scene {
     const fixedBgH = GAME_HEIGHT - fixedBgTop;
     this.add.rectangle(GAME_WIDTH / 2, fixedBgTop + fixedBgH / 2, GAME_WIDTH, fixedBgH, 0x1a2744).setDepth(50);
 
-    this.createFixedButton(GAME_WIDTH / 2, fixedY, btnW, 32,
+    const starterBtnResult = this.createFixedButton(GAME_WIDTH / 2, fixedY, btnW, 32,
       `Starter: ${starterName}`, "Tap to change", "#f472b6",
       () => this.showStarterSelect()
     );
+    this.starterLabel = starterBtnResult.titleText;
+    this.starterDesc = starterBtnResult.descText;
     this.createFixedButton(GAME_WIDTH / 2, fixedY + 36, btnW, 32,
       "Upgrade Shop", `Gold: ${this.meta.gold}`, "#fbbf24",
       () => this.scene.start("UpgradeScene")
@@ -228,7 +232,7 @@ export class HubScene extends Phaser.Scene {
     x: number, y: number, w: number, h: number,
     title: string, desc: string, color: string,
     callback?: () => void
-  ) {
+  ): { titleText: Phaser.GameObjects.Text; descText: Phaser.GameObjects.Text } {
     const bg = this.add.rectangle(x, y, w, h, 0x1a1a2e, 0.9)
       .setStrokeStyle(1, callback ? 0x334155 : 0x222233)
       .setDepth(51);
@@ -239,12 +243,13 @@ export class HubScene extends Phaser.Scene {
       bg.on("pointerdown", callback);
     }
 
-    this.add.text(x - w / 2 + 12, y - 8, title, {
+    const titleText = this.add.text(x - w / 2 + 12, y - 8, title, {
       fontSize: "11px", color, fontFamily: "monospace", fontStyle: "bold",
     }).setDepth(52);
-    this.add.text(x - w / 2 + 12, y + 5, desc, {
+    const descText = this.add.text(x - w / 2 + 12, y + 5, desc, {
       fontSize: "8px", color: "#666680", fontFamily: "monospace",
     }).setDepth(52);
+    return { titleText, descText };
   }
 
   private enterDungeon(dungeonId: string) {
@@ -308,6 +313,7 @@ export class HubScene extends Phaser.Scene {
 
   private showStarterSelect() {
     const uiItems: Phaser.GameObjects.GameObject[] = [];
+    let starterSelectActive = true;
 
     const overlay = this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.85
@@ -319,8 +325,150 @@ export class HubScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(201);
     uiItems.push(title);
 
-    // Starter options: id, name, unlock condition (clears needed)
-    const starters: { id: string; name: string; unlock: number }[] = [
+    // Starter options
+    const starters = this.getStarterList();
+    const current = this.meta.starter ?? "mudkip";
+
+    // Virtual scroll configuration
+    const ITEM_H = 36;
+    const VISIBLE_TOP = 50;
+    const VISIBLE_BOTTOM = GAME_HEIGHT - 50;
+    const VISIBLE_H = VISIBLE_BOTTOM - VISIBLE_TOP;
+    const POOL_SIZE = Math.ceil(VISIBLE_H / ITEM_H) + 2; // enough to fill screen + buffer
+    const TOTAL_H = starters.length * ITEM_H + 40; // +40 for close button
+    const MAX_SCROLL = Math.max(0, TOTAL_H - VISIBLE_H);
+
+    // Mask for scroll area
+    const maskShape = this.make.graphics({ x: 0, y: 0 });
+    maskShape.fillRect(0, VISIBLE_TOP, GAME_WIDTH, VISIBLE_H);
+    uiItems.push(maskShape as unknown as Phaser.GameObjects.GameObject);
+    const mask = maskShape.createGeometryMask();
+
+    // Create object pool (only POOL_SIZE rows, not 164!)
+    const pool: { bg: Phaser.GameObjects.Rectangle; nameT: Phaser.GameObjects.Text; descT: Phaser.GameObjects.Text; idx: number }[] = [];
+    const poolContainer = this.add.container(0, 0).setDepth(202).setMask(mask);
+    uiItems.push(poolContainer);
+
+    for (let i = 0; i < POOL_SIZE; i++) {
+      const bg = this.add.rectangle(GAME_WIDTH / 2, 0, 300, 30, 0x1a1a2e, 0.95)
+        .setStrokeStyle(1, 0x334155);
+      const nameT = this.add.text(GAME_WIDTH / 2 - 130, 0, "", {
+        fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace", fontStyle: "bold",
+      });
+      const descT = this.add.text(GAME_WIDTH / 2 - 130, 0, "", {
+        fontSize: "7px", color: "#666680", fontFamily: "monospace",
+      });
+      poolContainer.add([bg, nameT, descT]);
+      bg.setInteractive({ useHandCursor: true });
+      pool.push({ bg, nameT, descT, idx: -1 });
+    }
+
+    // Close button
+    const closeBtn = this.add.text(GAME_WIDTH / 2, 0, "[Close]", {
+      fontSize: "13px", color: "#60a5fa", fontFamily: "monospace",
+    }).setOrigin(0.5).setInteractive().setDepth(202);
+    poolContainer.add(closeBtn);
+
+    let scrollOffset = 0;
+
+    // Find current starter and scroll to it
+    const currentIdx = starters.findIndex(s => s.id === current);
+    if (currentIdx > 5) {
+      scrollOffset = Math.min(MAX_SCROLL, (currentIdx - 3) * ITEM_H);
+    }
+
+    const cleanup = () => {
+      if (!starterSelectActive) return;
+      starterSelectActive = false;
+      // Remove our specific pointermove listener
+      this.input.off("pointermove", scrollHandler);
+      uiItems.forEach(o => o.destroy());
+    };
+
+    const bindRow = (row: typeof pool[0], dataIdx: number, yPos: number) => {
+      row.idx = dataIdx;
+      row.bg.setY(yPos);
+      row.nameT.setY(yPos - 7);
+      row.descT.setY(yPos + 5);
+
+      if (dataIdx < 0 || dataIdx >= starters.length) {
+        row.bg.setVisible(false);
+        row.nameT.setVisible(false);
+        row.descT.setVisible(false);
+        return;
+      }
+
+      const s = starters[dataIdx];
+      const isUnlocked = this.meta.totalClears >= s.unlock;
+      const isCurrent = s.id === (this.meta.starter ?? "mudkip");
+      const color = isCurrent ? "#fbbf24" : isUnlocked ? "#e0e0e0" : "#444460";
+
+      row.bg.setVisible(true).setFillStyle(0x1a1a2e, 0.95)
+        .setStrokeStyle(1, isCurrent ? 0xfbbf24 : isUnlocked ? 0x334155 : 0x222233);
+      row.nameT.setVisible(true).setText(isCurrent ? `★ ${s.name}` : s.name).setColor(color);
+      row.descT.setVisible(true).setText(
+        isUnlocked ? (isCurrent ? "Currently selected" : "Tap to select")
+          : `Need ${s.unlock} clears (have ${this.meta.totalClears})`
+      );
+
+      row.bg.removeAllListeners("pointerdown");
+      row.bg.removeAllListeners("pointerover");
+      row.bg.removeAllListeners("pointerout");
+
+      if (isUnlocked && !isCurrent) {
+        row.bg.on("pointerover", () => row.bg.setFillStyle(0x2a2a4e, 1));
+        row.bg.on("pointerout", () => row.bg.setFillStyle(0x1a1a2e, 0.95));
+        row.bg.on("pointerdown", () => {
+          this.meta.starter = s.id;
+          saveMeta(this.meta);
+          // Update hub starter label without scene restart
+          const name = s.name.charAt(0).toUpperCase() + s.name.slice(1);
+          if (this.starterLabel) this.starterLabel.setText(`Starter: ${name}`);
+          // Refresh visible rows to show new selection
+          renderVisible();
+        });
+      }
+    };
+
+    const renderVisible = () => {
+      const startIdx = Math.floor(scrollOffset / ITEM_H);
+      for (let i = 0; i < POOL_SIZE; i++) {
+        const dataIdx = startIdx + i;
+        const yPos = VISIBLE_TOP + 10 + dataIdx * ITEM_H - scrollOffset;
+        bindRow(pool[i], dataIdx, yPos);
+      }
+      // Position close button after last item
+      const closeBtnY = VISIBLE_TOP + 10 + starters.length * ITEM_H - scrollOffset + 10;
+      closeBtn.setY(closeBtnY);
+    };
+
+    renderVisible();
+    closeBtn.on("pointerdown", cleanup);
+
+    // Scroll handling
+    let dragStartY = 0;
+    let isDragging = false;
+
+    overlay.on("pointerdown", (ptr: Phaser.Input.Pointer) => {
+      dragStartY = ptr.y;
+      isDragging = true;
+    });
+
+    // Use named function for clean removal
+    const scrollHandler = (ptr: Phaser.Input.Pointer) => {
+      if (!starterSelectActive || !ptr.isDown || !isDragging) return;
+      const dy = ptr.y - dragStartY;
+      dragStartY = ptr.y;
+      scrollOffset = Math.max(0, Math.min(MAX_SCROLL, scrollOffset - dy));
+      renderVisible();
+    };
+    this.input.on("pointermove", scrollHandler);
+
+    this.input.on("pointerup", () => { isDragging = false; });
+  }
+
+  private getStarterList(): { id: string; name: string; unlock: number }[] {
+    return [
       { id: "mudkip", name: "Mudkip", unlock: 0 },
       { id: "pikachu", name: "Pikachu", unlock: 1 },
       { id: "caterpie", name: "Caterpie", unlock: 0 },
@@ -418,7 +566,6 @@ export class HubScene extends Phaser.Scene {
       { id: "vullaby", name: "Vullaby", unlock: 13 },
       { id: "stufful", name: "Stufful", unlock: 14 },
       { id: "furfrou", name: "Furfrou", unlock: 12 },
-      // 4th dungeon starters (Phase 96-104)
       { id: "wimpod", name: "Wimpod", unlock: 15 },
       { id: "tympole", name: "Tympole", unlock: 14 },
       { id: "salandit", name: "Salandit", unlock: 15 },
@@ -437,28 +584,24 @@ export class HubScene extends Phaser.Scene {
       { id: "sizzlipede", name: "Sizzlipede", unlock: 14 },
       { id: "pancham", name: "Pancham", unlock: 15 },
       { id: "hawlucha", name: "Hawlucha", unlock: 14 },
-      // Phase 106-108 starters
       { id: "durant", name: "Durant", unlock: 16 },
       { id: "togedemaru", name: "Togedemaru", unlock: 15 },
       { id: "drifloon", name: "Drifloon", unlock: 14 },
       { id: "golett", name: "Golett", unlock: 15 },
       { id: "hatenna", name: "Hatenna", unlock: 16 },
       { id: "indeedee", name: "Indeedee", unlock: 15 },
-      // Phase 109-111 starters
       { id: "vanillite", name: "Vanillite", unlock: 16 },
       { id: "snom", name: "Snom", unlock: 15 },
       { id: "nickit", name: "Nickit", unlock: 14 },
       { id: "impidimp", name: "Impidimp", unlock: 15 },
       { id: "milcery", name: "Milcery", unlock: 16 },
       { id: "comfey", name: "Comfey", unlock: 15 },
-      // Phase 112-114 starters
       { id: "turtonator", name: "Turtonator", unlock: 16 },
       { id: "drampa", name: "Drampa", unlock: 15 },
       { id: "rookidee", name: "Rookidee", unlock: 14 },
       { id: "archen", name: "Archen", unlock: 15 },
       { id: "wooloo", name: "Wooloo", unlock: 14 },
       { id: "skwovet", name: "Skwovet", unlock: 15 },
-      // 5th dungeon starters
       { id: "bruxish", name: "Bruxish", unlock: 17 },
       { id: "chewtle", name: "Chewtle", unlock: 16 },
       { id: "litleo", name: "Litleo", unlock: 15 },
@@ -495,7 +638,6 @@ export class HubScene extends Phaser.Scene {
       { id: "swablu", name: "Swablu", unlock: 16 },
       { id: "lechonk", name: "Lechonk", unlock: 15 },
       { id: "tandemaus", name: "Tandemaus", unlock: 16 },
-      // 6th dungeon starters
       { id: "buizel", name: "Buizel", unlock: 18 },
       { id: "finizen", name: "Finizen", unlock: 17 },
       { id: "fletchinder", name: "Fletchinder", unlock: 18 },
@@ -532,7 +674,6 @@ export class HubScene extends Phaser.Scene {
       { id: "tropius", name: "Tropius", unlock: 17 },
       { id: "aipom", name: "Aipom", unlock: 16 },
       { id: "smeargle", name: "Smeargle", unlock: 17 },
-      // 7th dungeon starters
       { id: "poliwag", name: "Poliwag", unlock: 19 },
       { id: "corphish", name: "Corphish", unlock: 18 },
       { id: "magby", name: "Magby", unlock: 19 },
@@ -569,7 +710,6 @@ export class HubScene extends Phaser.Scene {
       { id: "xatu", name: "Xatu", unlock: 18 },
       { id: "kangaskhan", name: "Kangaskhan", unlock: 19 },
       { id: "tauros", name: "Tauros", unlock: 18 },
-      // 8th dungeon starters
       { id: "psyduck", name: "Psyduck", unlock: 20 },
       { id: "seel", name: "Seel", unlock: 19 },
       { id: "cyndaquil", name: "Cyndaquil", unlock: 20 },
@@ -606,7 +746,6 @@ export class HubScene extends Phaser.Scene {
       { id: "braviary", name: "Braviary", unlock: 19 },
       { id: "snorlax", name: "Snorlax", unlock: 20 },
       { id: "zangoose", name: "Zangoose", unlock: 19 },
-      // 9th dungeon starters
       { id: "gyarados", name: "Gyarados", unlock: 22 },
       { id: "kingdra", name: "Kingdra", unlock: 21 },
       { id: "blaziken", name: "Blaziken", unlock: 22 },
@@ -644,85 +783,5 @@ export class HubScene extends Phaser.Scene {
       { id: "blissey", name: "Blissey", unlock: 22 },
       { id: "porygonZ", name: "Porygon-Z", unlock: 21 },
     ];
-
-    const current = this.meta.starter ?? "mudkip";
-
-    // Scrollable container for starters
-    const scrollTop2 = 50;
-    const scrollBottom2 = GAME_HEIGHT - 50;
-    const scrollH2 = scrollBottom2 - scrollTop2;
-    const container2 = this.add.container(0, 0).setDepth(202);
-    uiItems.push(container2);
-
-    let sy = scrollTop2 + 10;
-    for (const s of starters) {
-      const isUnlocked = this.meta.totalClears >= s.unlock;
-      const isCurrent = s.id === current;
-      const color = isCurrent ? "#fbbf24" : isUnlocked ? "#e0e0e0" : "#444460";
-      const label = isCurrent ? `★ ${s.name}` : s.name;
-      const desc = isUnlocked
-        ? (isCurrent ? "Currently selected" : "Tap to select")
-        : `Need ${s.unlock} clears (have ${this.meta.totalClears})`;
-
-      const bg2 = this.add.rectangle(GAME_WIDTH / 2, sy, 300, 30, 0x1a1a2e, 0.95)
-        .setStrokeStyle(1, isCurrent ? 0xfbbf24 : isUnlocked ? 0x334155 : 0x222233);
-      container2.add(bg2);
-
-      const nameText = this.add.text(GAME_WIDTH / 2 - 130, sy - 7, label, {
-        fontSize: "11px", color, fontFamily: "monospace", fontStyle: "bold",
-      });
-      container2.add(nameText);
-
-      const descText = this.add.text(GAME_WIDTH / 2 - 130, sy + 5, desc, {
-        fontSize: "7px", color: "#666680", fontFamily: "monospace",
-      });
-      container2.add(descText);
-
-      if (isUnlocked && !isCurrent) {
-        bg2.setInteractive({ useHandCursor: true });
-        bg2.on("pointerover", () => bg2.setFillStyle(0x2a2a4e, 1));
-        bg2.on("pointerout", () => bg2.setFillStyle(0x1a1a2e, 0.95));
-        bg2.on("pointerdown", () => {
-          this.meta.starter = s.id;
-          saveMeta(this.meta);
-          uiItems.forEach(o => o.destroy());
-          this.scene.restart();
-        });
-      }
-
-      sy += 36;
-    }
-
-    // Close button inside scroll
-    const closeBtn = this.add.text(GAME_WIDTH / 2, sy + 5, "[Close]", {
-      fontSize: "13px", color: "#60a5fa", fontFamily: "monospace",
-    }).setOrigin(0.5).setInteractive();
-    container2.add(closeBtn);
-    closeBtn.on("pointerdown", () => uiItems.forEach(o => o.destroy()));
-
-    // Mask + scroll
-    const contentH2 = sy + 30 - scrollTop2;
-    const maxScroll2 = Math.max(0, contentH2 - scrollH2);
-    const maskShape2 = this.make.graphics({ x: 0, y: 0 });
-    maskShape2.fillRect(0, scrollTop2, GAME_WIDTH, scrollH2);
-    uiItems.push(maskShape2 as unknown as Phaser.GameObjects.GameObject);
-    container2.setMask(maskShape2.createGeometryMask());
-
-    if (maxScroll2 > 0) {
-      let dragStart2 = 0;
-      let scrollOff2 = 0;
-      overlay.on("pointerdown", (ptr: Phaser.Input.Pointer) => {
-        dragStart2 = ptr.y;
-      });
-      this.input.on("pointermove", (ptr: Phaser.Input.Pointer) => {
-        if (!ptr.isDown) return;
-        const dy = ptr.y - dragStart2;
-        dragStart2 = ptr.y;
-        scrollOff2 = Math.max(-maxScroll2, Math.min(0, scrollOff2 + dy));
-        container2.y = scrollOff2;
-      });
-    } else {
-      overlay.on("pointerdown", () => uiItems.forEach(o => o.destroy()));
-    }
   }
 }

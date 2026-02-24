@@ -446,6 +446,13 @@ export class DungeonScene extends Phaser.Scene {
       electivire: "0466", luxray: "0405",
       roserade: "0407", vileplume: "0045",
       rhyperior: "0464", dugtrio: "0051",
+      // Phase 181-183: 10th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+      golem: "0076", terrakion: "0639",
+      pheromosa: "0795", escavalier: "0589",
+      kommoo: "0784", gallade: "0475",
+      corviknight: "0823", bastiodon: "0411",
+      aegislash: "0681", jellicent: "0593",
+      slowking: "0199", bronzong: "0437",
     };
 
     // Load player + all enemy species + ally species for this dungeon
@@ -1088,15 +1095,20 @@ export class DungeonScene extends Phaser.Scene {
       this.dungeon.terrain, this.dungeon.width, this.dungeon.height
     );
 
-    // Highlight target tiles
+    // Highlight target tiles (bright orange-red, very visible)
     for (const t of tiles) {
       const px = t.x * TILE_DISPLAY + TILE_DISPLAY / 2;
       const py = t.y * TILE_DISPLAY + TILE_DISPLAY / 2;
-      const highlight = this.add.rectangle(px, py, TILE_DISPLAY - 2, TILE_DISPLAY - 2, 0xfbbf24, 0.35)
+      // Outer glow
+      const glow = this.add.rectangle(px, py, TILE_DISPLAY + 2, TILE_DISPLAY + 2, 0xff6600, 0.25)
+        .setDepth(7);
+      this.skillPreviewUI.push(glow);
+      // Main highlight — much bolder
+      const highlight = this.add.rectangle(px, py, TILE_DISPLAY - 2, TILE_DISPLAY - 2, 0xfbbf24, 0.6)
         .setDepth(8);
       this.skillPreviewUI.push(highlight);
       this.tweens.add({
-        targets: highlight, alpha: { from: 0.35, to: 0.15 },
+        targets: highlight, alpha: { from: 0.6, to: 0.35 },
         duration: 500, yoyo: true, repeat: -1,
       });
     }
@@ -1108,8 +1120,9 @@ export class DungeonScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
     this.skillPreviewUI.push(infoText);
 
-    // Replace skill buttons with Confirm/Cancel
-    const baseX = GAME_WIDTH - 120;
+    // Replace skill buttons with Confirm/Cancel (same side as skill buttons, opposite D-Pad)
+    const isRight = this.dpadSide === "right";
+    const baseX = isRight ? 10 : GAME_WIDTH - 120;
     const baseY = GAME_HEIGHT - 95;
 
     // Hide existing skill buttons
