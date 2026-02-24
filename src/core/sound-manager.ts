@@ -331,6 +331,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [131, 131, 196, 196, 131, 131, 196, 196, 220, 220, 131, 131, 110, 110, 196, 196],
     tempo: 0.22, melodyType: "sawtooth", bassType: "square",
   },
+  // Rocky Cavern — deep, heavy
+  rockyCavern: {
+    melody: [196, 220, 196, 165, 196, 220, 262, 220, 196, 165, 147, 165, 196, 220, 196, 165],
+    bass: [98, 98, 82, 82, 98, 98, 131, 131, 98, 98, 73, 73, 82, 82, 98, 98],
+    tempo: 0.26, melodyType: "sawtooth", bassType: "sine",
+  },
   // Destiny Tower — grand, final
   destinyTower: {
     melody: [262, 330, 392, 523, 392, 330, 262, 196, 262, 392, 523, 659, 523, 392, 330, 262],

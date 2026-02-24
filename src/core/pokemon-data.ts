@@ -779,6 +779,33 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["auraSphere", "quickAttack", "focusPunch"],
     floors: [],
   },
+  // ── Rocky Cavern ──
+  larvitar: {
+    id: "larvitar",
+    name: "Larvitar",
+    spriteKey: "larvitar",
+    types: [PokemonType.Rock, PokemonType.Ground],
+    attackType: PokemonType.Rock,
+    baseStats: { hp: 30, atk: 12, def: 8 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["rockThrow", "bite", "rockSlide"],
+    floors: [],
+  },
+  nosepass: {
+    id: "nosepass",
+    name: "Nosepass",
+    spriteKey: "nosepass",
+    types: [PokemonType.Rock],
+    attackType: PokemonType.Rock,
+    baseStats: { hp: 32, atk: 8, def: 12 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 56,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["rockThrow", "ironDefense", "stoneEdge"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -852,6 +879,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   starly: { 7: "wingAttack", 10: "airSlash" },
   makuhita: { 7: "drainPunch", 10: "focusPunch" },
   riolu: { 7: "auraSphere", 10: "focusPunch" },
+  larvitar: { 7: "rockSlide", 10: "stoneEdge" },
+  nosepass: { 7: "rockSlide", 10: "stoneEdge" },
 };
 
 /** Check if a species learns a new skill at this level */

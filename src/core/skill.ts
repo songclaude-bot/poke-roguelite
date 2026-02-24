@@ -1008,6 +1008,28 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     effect: SkillEffect.Heal,
     description: "Drains HP from the target.",
   },
+
+  // ── Additional Rock Skills ──
+  rockSlide: {
+    id: "rockSlide",
+    name: "Rock Slide",
+    type: PokemonType.Rock,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Around,
+    accuracy: 85,
+    description: "Hurls rocks at all nearby foes.",
+  },
+  stoneEdge: {
+    id: "stoneEdge",
+    name: "Stone Edge",
+    type: PokemonType.Rock,
+    power: 20,
+    pp: 6,
+    range: SkillRange.Front2,
+    accuracy: 80,
+    description: "Launches sharp stones with high power.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
