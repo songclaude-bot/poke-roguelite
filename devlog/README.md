@@ -1143,3 +1143,27 @@
   - 던전 프리뷰, 무브 튜터, 아이템 포지
   - 튜토리얼, 6종 SFX, 날씨 시각효과
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 23: NG+ & 스킬 콤보
+
+### 23-1. New Game Plus (Phase 245)
+- 날짜: 2026-02-24
+- 5단계 프레스티지: NG+1(30클) ~ NG+5(200클)
+- 누적 보너스: HP/ATK/DEF/골드/EXP/아이템/배고픔/시작아이템/PP
+- 허브에 NG+ 인디케이터 (펄싱 애니메이션)
+- NG+ 패널: 활성 보너스, 다음 레벨 미리보기, 진행도
+
+### 23-2. 스킬 콤보 시스템 (Phase 246)
+- 날짜: 2026-02-24
+- 10종 콤보: Fire Chain, Quick Strike, Power Surge, Type Barrage 등
+- 5종 효과: DoubleDamage, AreaBlast, HealBurst, SpeedBoost, CritGuarantee
+- 유연한 슬롯 매칭: 정확 ID, 타입, 효과, 카테고리별
+- 콤보 팝업 + 카메라 흔들림 + SFX
+- Help 씬에 콤보 목록 추가
+
+### v3.1.0 마일스톤
+- **New Game Plus**: 5단계 프레스티지 + 누적 보너스
+- **스킬 콤보**: 10종 콤보 + 5종 효과
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
