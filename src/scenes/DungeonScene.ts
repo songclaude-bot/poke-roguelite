@@ -127,6 +127,7 @@ export class DungeonScene extends Phaser.Scene {
   private turnText!: Phaser.GameObjects.Text;
   private floorText!: Phaser.GameObjects.Text;
   private logText!: Phaser.GameObjects.Text;
+  private logMessages: string[] = [];
   private skillButtons: Phaser.GameObjects.Text[] = [];
 
   // Minimap + Fog of War
@@ -2821,9 +2822,22 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private showLog(msg: string) {
-    this.logText.setText(msg);
-    this.time.delayedCall(2500, () => {
-      if (this.logText.text === msg) this.logText.setText("");
+    // Add to message history (max 4 messages)
+    this.logMessages.push(msg);
+    if (this.logMessages.length > 4) this.logMessages.shift();
+
+    // Build display text with color hints via effectiveness keywords
+    const displayText = this.logMessages.join("\n");
+    this.logText.setText(displayText);
+
+    // Auto-clear oldest messages after delay
+    const snapshot = [...this.logMessages];
+    this.time.delayedCall(4000, () => {
+      // Remove messages that are still in the log from this batch
+      if (this.logMessages.length > 0 && this.logMessages[0] === snapshot[0]) {
+        this.logMessages.shift();
+        this.logText.setText(this.logMessages.join("\n"));
+      }
     });
   }
 
@@ -5431,14 +5445,15 @@ export class DungeonScene extends Phaser.Scene {
       else sfxHit();
 
       this.flashEntity(defender, effectiveness);
+      if (isCrit) this.showCritFlash(defender);
       if (defender.sprite) {
-        this.showDamagePopup(defender.sprite.x, defender.sprite.y, dmg, effectiveness);
+        this.showDamagePopup(defender.sprite.x, defender.sprite.y, dmg, effectiveness, undefined, isCrit, attacker.attackType);
         if (defender !== this.player) this.showEnemyHpBar(defender);
       }
 
       let logMsg = `${attacker.name} attacks ${defender.name}! ${dmg} dmg!`;
       if (isCrit) logMsg += " Critical hit!";
-      if (effText) logMsg += `\n${effText}`;
+      if (effText) logMsg += ` ${effText}`;
       if (abilityMult > 1) logMsg += " (Torrent!)";
       if (wMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
       this.showLog(logMsg);
@@ -5559,8 +5574,9 @@ export class DungeonScene extends Phaser.Scene {
           target.stats.hp = Math.max(0, target.stats.hp - dmg);
 
           this.flashEntity(target, effectiveness);
+          if (skillIsCrit) this.showCritFlash(target);
           if (target.sprite) {
-            this.showDamagePopup(target.sprite.x, target.sprite.y, dmg, effectiveness);
+            this.showDamagePopup(target.sprite.x, target.sprite.y, dmg, effectiveness, undefined, skillIsCrit, skill.type);
             if (target !== this.player) this.showEnemyHpBar(target);
           }
 
@@ -5798,22 +5814,150 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
-  /** Floating damage number popup */
-  private showDamagePopup(x: number, y: number, dmg: number, effectiveness: number, overrideText?: string) {
-    const color = effectiveness >= 2.0 ? "#ff4444" : effectiveness < 1.0 ? "#8888ff" : "#ffffff";
-    const size = effectiveness >= 2.0 ? "14px" : "11px";
-    const popup = this.add.text(x, y - 10, overrideText ?? `${dmg}`, {
-      fontSize: size, color, fontFamily: "monospace", fontStyle: "bold",
+  /** Floating damage number popup — color-coded by effectiveness, size-scaled by damage */
+  private showDamagePopup(
+    x: number, y: number, dmg: number, effectiveness: number,
+    overrideText?: string, isCrit?: boolean, attackType?: PokemonType
+  ) {
+    // Determine color by effectiveness
+    let color: string;
+    if (effectiveness === 0) color = "#999999";       // Immune — gray
+    else if (effectiveness >= 2.0) color = "#ff3333";  // Super effective — red
+    else if (effectiveness < 1.0) color = "#999999";   // Not very effective — gray
+    else color = "#ffffff";                             // Normal — white
+
+    // Critical hit overrides to gold
+    if (isCrit) color = "#ffd700";
+
+    // Build display text
+    let displayText: string;
+    if (overrideText) {
+      displayText = overrideText;
+    } else if (effectiveness === 0) {
+      displayText = "Immune";
+    } else if (isCrit) {
+      displayText = `CRIT ${dmg}`;
+    } else if (effectiveness >= 2.0) {
+      displayText = `${dmg}!`;
+    } else {
+      displayText = `${dmg}`;
+    }
+
+    // Size scaling by damage amount
+    let fontSize: number;
+    if (effectiveness === 0) {
+      fontSize = 10;
+    } else if (effectiveness < 1.0) {
+      fontSize = 10; // Not very effective — small
+    } else if (dmg >= 31) {
+      fontSize = 16;
+    } else if (dmg >= 16) {
+      fontSize = 14;
+    } else if (dmg >= 6) {
+      fontSize = 12;
+    } else {
+      fontSize = 10;
+    }
+
+    // Super effective always at least 14px
+    if (effectiveness >= 2.0 && fontSize < 14) fontSize = 14;
+    // Crit always at least 14px
+    if (isCrit && fontSize < 14) fontSize = 14;
+
+    // Random horizontal offset for visual variety
+    const xOffset = (Math.random() - 0.5) * 16;
+
+    const popup = this.add.text(x + xOffset, y - 10, displayText, {
+      fontSize: `${fontSize}px`, color, fontFamily: "monospace", fontStyle: "bold",
       stroke: "#000000", strokeThickness: 3,
     }).setOrigin(0.5).setDepth(50);
 
+    // Scale bounce: start at 1.5x, settle to 1.0x
+    popup.setScale(1.5);
     this.tweens.add({
       targets: popup,
-      y: y - 40,
+      scaleX: 1.0,
+      scaleY: 1.0,
+      duration: 200,
+      ease: "Back.easeOut",
+    });
+
+    // Float upward and fade
+    this.tweens.add({
+      targets: popup,
+      y: y - 45,
       alpha: { from: 1, to: 0 },
-      duration: 800,
+      duration: 900,
       ease: "Quad.easeOut",
       onComplete: () => popup.destroy(),
+    });
+
+    // Massive damage (31+) bounce effect — extra vertical wobble
+    if (dmg >= 31 && effectiveness > 0) {
+      this.tweens.add({
+        targets: popup,
+        scaleX: { from: 1.3, to: 1.0 },
+        scaleY: { from: 0.8, to: 1.0 },
+        duration: 150,
+        delay: 200,
+        ease: "Bounce.easeOut",
+      });
+    }
+
+    // Hit spark effect at impact point
+    if (effectiveness > 0 && !overrideText) {
+      this.showHitSpark(x, y, attackType);
+    }
+  }
+
+  /** Hit spark effect — brief colored circle at impact point */
+  private showHitSpark(x: number, y: number, attackType?: PokemonType) {
+    // Type-based spark colors
+    const sparkColors: Partial<Record<PokemonType, number>> = {
+      [PokemonType.Fire]: 0xff8c00,     // orange
+      [PokemonType.Water]: 0x3b82f6,    // blue
+      [PokemonType.Electric]: 0xfbbf24, // yellow
+      [PokemonType.Grass]: 0x22c55e,    // green
+      [PokemonType.Ice]: 0x67e8f9,      // cyan
+      [PokemonType.Poison]: 0xa855f7,   // purple
+      [PokemonType.Fighting]: 0xdc2626, // red
+      [PokemonType.Ghost]: 0x7c3aed,    // violet
+      [PokemonType.Psychic]: 0xec4899,  // pink
+      [PokemonType.Dark]: 0x6b21a8,     // dark purple
+    };
+    const sparkColor = (attackType && sparkColors[attackType]) ? sparkColors[attackType]! : 0xffffff;
+
+    const spark = this.add.graphics().setDepth(49);
+    spark.fillStyle(sparkColor, 0.9);
+    spark.fillCircle(x, y, 8);
+    // Outer glow ring
+    spark.fillStyle(sparkColor, 0.4);
+    spark.fillCircle(x, y, 14);
+
+    this.tweens.add({
+      targets: spark,
+      alpha: { from: 1, to: 0 },
+      scaleX: { from: 1.0, to: 1.8 },
+      scaleY: { from: 1.0, to: 1.8 },
+      duration: 150,
+      ease: "Quad.easeOut",
+      onComplete: () => spark.destroy(),
+    });
+  }
+
+  /** Brief flash effect on target for critical hits */
+  private showCritFlash(entity: Entity) {
+    if (!entity.sprite) return;
+    // Bright gold flash
+    entity.sprite.setTint(0xffd700);
+    this.time.delayedCall(100, () => {
+      if (entity.sprite) entity.sprite.setTint(0xffffff);
+      this.time.delayedCall(80, () => {
+        if (entity.sprite) entity.sprite.setTint(0xffd700);
+        this.time.delayedCall(100, () => {
+          if (entity.sprite) entity.sprite.clearTint();
+        });
+      });
     });
   }
 
@@ -5842,18 +5986,30 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
-  /** Heal number popup (green) */
+  /** Heal number popup (green, floats upward with bounce) */
   private showHealPopup(x: number, y: number, amount: number) {
-    const popup = this.add.text(x, y - 10, `+${amount}`, {
-      fontSize: "11px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+    const xOffset = (Math.random() - 0.5) * 12;
+    const popup = this.add.text(x + xOffset, y - 10, `+${amount}`, {
+      fontSize: "12px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
       stroke: "#000000", strokeThickness: 3,
     }).setOrigin(0.5).setDepth(50);
 
+    // Scale bounce on appearance
+    popup.setScale(1.5);
     this.tweens.add({
       targets: popup,
-      y: y - 40,
+      scaleX: 1.0,
+      scaleY: 1.0,
+      duration: 200,
+      ease: "Back.easeOut",
+    });
+
+    // Float upward and fade
+    this.tweens.add({
+      targets: popup,
+      y: y - 45,
       alpha: { from: 1, to: 0 },
-      duration: 800,
+      duration: 900,
       ease: "Quad.easeOut",
       onComplete: () => popup.destroy(),
     });
