@@ -333,6 +333,8 @@ const DUNGEON_BGM_MAP: Record<string, string> = {
   harmonyHall: "dungeon-normal",
   // Destiny Tower
   destinyTower: "destiny",
+  // Endless Abyss — cycles through dark theme
+  endlessDungeon: "dungeon-dark",
 };
 
 function getDungeonBgmFile(dungeonId: string): string {

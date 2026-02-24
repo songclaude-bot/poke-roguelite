@@ -5830,6 +5830,19 @@ export const DUNGEONS: Record<string, DungeonDef> = {
     description: "B1F~B20F. All types. The final challenge!",
     boss: { speciesId: "gible", name: "Apex Garchomp", statMultiplier: 7.0, extraSkillIds: ["dracoMeteor", "earthPower", "fireBlast"] },
   },
+  endlessDungeon: {
+    id: "endlessDungeon",
+    name: "Endless Abyss",
+    tilesetPath: "tilesets/BeachCave/tileset_0.png",
+    tilesetKey: "beachcave-tiles",
+    floors: 9999,  // effectively infinite
+    enemySpeciesIds: [],  // will be dynamically populated
+    floorEnemies: {},  // will be dynamically populated
+    difficulty: 1.0,  // base difficulty, scales with floor
+    itemsPerFloor: 4,
+    unlockClears: 10,
+    description: "Infinite floors. How deep can you go?",
+  },
 };
 
 /** Get dungeon by ID */

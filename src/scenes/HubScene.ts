@@ -89,6 +89,17 @@ export class HubScene extends Phaser.Scene {
       y += 52;
     }
 
+    // Endless Dungeon button (unlocked after 10 clears)
+    if (this.meta.totalClears >= 10) {
+      this.createButton(GAME_WIDTH / 2, y, btnW, 42,
+        "Endless Abyss \u221E",
+        "Infinite floors. How deep can you go?",
+        "#ef4444",
+        () => this.enterDungeon("endlessDungeon")
+      );
+      y += 52;
+    }
+
     // ── Bottom fixed buttons (high depth to stay on top) ──
     const currentStarter = this.meta.starter ?? "mudkip";
     const starterName = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
@@ -147,6 +158,8 @@ export class HubScene extends Phaser.Scene {
     const tierGroups: { tier: typeof TIER_DEFS[0]; dungeons: DungeonDef[] }[] = TIER_DEFS.map(t => ({ tier: t, dungeons: [] }));
 
     for (const dg of allDungeons) {
+      // Special case: Endless Dungeon is shown as a separate button above the tier list
+      if (dg.id === "endlessDungeon") continue;
       // Special case: Destiny Tower always goes to the "Special" tier
       if (dg.id === "destinyTower") {
         tierGroups[tierGroups.length - 1].dungeons.push(dg);

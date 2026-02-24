@@ -196,6 +196,13 @@ export class DungeonScene extends Phaser.Scene {
     this.dungeonDef = getDungeon(data?.dungeonId ?? "beachCave");
     const isNewRun = (data?.floor ?? 1) === 1 && !data?.hp;
     this.currentFloor = data?.floor ?? 1;
+
+    // Endless dungeon: dynamically scale difficulty and items based on floor
+    if (this.dungeonDef.id === "endlessDungeon") {
+      this.dungeonDef = { ...this.dungeonDef }; // shallow copy to avoid mutating original
+      this.dungeonDef.difficulty = 1.0 + (this.currentFloor * 0.1);
+      this.dungeonDef.itemsPerFloor = Math.min(7, 3 + Math.floor(this.currentFloor / 15));
+    }
     this.persistentHp = data?.hp ?? (50 + hpBonus);
     this.persistentMaxHp = data?.maxHp ?? (50 + hpBonus);
     this.persistentSkills = data?.skills ?? null;
@@ -642,7 +649,9 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Spawn enemies (dungeon + floor specific) ──
     const rooms = this.dungeon.rooms;
-    const floorSpeciesIds = getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
+    const floorSpeciesIds = this.dungeonDef.id === "endlessDungeon"
+      ? this.getEndlessEnemies(this.currentFloor)
+      : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
     const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
     if (floorSpecies.length === 0) floorSpecies.push(SPECIES.zubat);
 
@@ -687,7 +696,8 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     // ── Monster House (15% chance, not on floor 1 or boss floors) ──
-    const isLastFloor = this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors;
+    const isEndlessBossFloor = this.dungeonDef.id === "endlessDungeon" && this.currentFloor % 10 === 0;
+    const isLastFloor = (this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors) || isEndlessBossFloor;
     if (!isLastFloor && this.currentFloor > 1 && Math.random() < 0.15 && rooms.length > 2) {
       const mhCandidates = rooms.filter((r, idx) =>
         idx > 0 && // Not player's room
@@ -746,6 +756,61 @@ export class DungeonScene extends Phaser.Scene {
         }
         // Red tint aura for boss
         if (boss.sprite) boss.sprite.setTint(0xff6666);
+        this.time.delayedCall(800, () => { if (boss.sprite) boss.sprite.clearTint(); });
+
+        this.bossEntity = boss;
+        this.enemies.push(boss);
+        this.allEntities.push(boss);
+      }
+    }
+
+    // ── Endless dungeon: spawn mini-boss every 10 floors ──
+    if (this.dungeonDef.id === "endlessDungeon" && this.currentFloor % 10 === 0) {
+      const allSpecies = Object.keys(SPECIES);
+      const bossSpeciesId = allSpecies[Math.floor(Math.random() * allSpecies.length)];
+      const sp = SPECIES[bossSpeciesId];
+      if (sp) {
+        const bossRoom = rooms.slice(1).reduce((best, r) =>
+          (r.w * r.h > best.w * best.h) ? r : best, rooms[1]);
+        const bx = bossRoom.x + Math.floor(bossRoom.w / 2);
+        const by = bossRoom.y + Math.floor(bossRoom.h / 2);
+
+        const bossMultiplier = 2.0 + this.currentFloor * 0.2;
+        const baseStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
+        const bossStats = {
+          hp: Math.floor(baseStats.hp * bossMultiplier),
+          maxHp: Math.floor(baseStats.hp * bossMultiplier),
+          atk: Math.floor(baseStats.atk * bossMultiplier),
+          def: Math.floor(baseStats.def * bossMultiplier),
+          level: baseStats.level + 3,
+        };
+
+        const boss: Entity = {
+          tileX: bx, tileY: by,
+          facing: Direction.Down,
+          stats: bossStats,
+          alive: true,
+          spriteKey: sp.spriteKey,
+          name: `Abyss ${sp.name}`,
+          types: sp.types,
+          attackType: sp.attackType,
+          skills: createSpeciesSkills(sp),
+          statusEffects: [],
+          speciesId: sp.spriteKey,
+          isBoss: true,
+          ability: SPECIES_ABILITIES[sp.spriteKey],
+        };
+        const bossTex = `${sp.spriteKey}-idle`;
+        if (this.textures.exists(bossTex)) {
+          boss.sprite = this.add.sprite(
+            this.tileToPixelX(bx), this.tileToPixelY(by), bossTex
+          );
+          boss.sprite.setScale(TILE_SCALE * 1.5).setDepth(11);
+          const bossAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+          if (this.anims.exists(bossAnim)) boss.sprite.play(bossAnim);
+        }
+        // Purple tint aura for endless boss
+        if (boss.sprite) boss.sprite.setTint(0xaa66ff);
         this.time.delayedCall(800, () => { if (boss.sprite) boss.sprite.clearTint(); });
 
         this.bossEntity = boss;
@@ -2371,7 +2436,9 @@ export class DungeonScene extends Phaser.Scene {
 
       // Spawn 4-6 extra enemies in this room
       const count = 4 + Math.floor(Math.random() * 3);
-      const floorSpeciesIds = getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
+      const floorSpeciesIds = this.dungeonDef.id === "endlessDungeon"
+        ? this.getEndlessEnemies(this.currentFloor)
+        : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
       const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
       if (floorSpecies.length === 0) return;
 
@@ -2507,8 +2574,21 @@ export class DungeonScene extends Phaser.Scene {
     this.shopOpen = false;
   }
 
+  /** Get random enemy species for endless dungeon based on current floor */
+  private getEndlessEnemies(floor: number): string[] {
+    const allSpecies = Object.keys(SPECIES);
+    // Pick 4-8 random species, more variety at deeper floors
+    const count = Math.min(8, 4 + Math.floor(floor / 10));
+    const enemies: string[] = [];
+    for (let i = 0; i < count; i++) {
+      enemies.push(allSpecies[Math.floor(Math.random() * allSpecies.length)]);
+    }
+    return enemies;
+  }
+
   private advanceFloor() {
-    if (this.currentFloor >= this.dungeonDef.floors) {
+    // Endless dungeon never shows clear screen — always advance
+    if (this.dungeonDef.id !== "endlessDungeon" && this.currentFloor >= this.dungeonDef.floors) {
       this.showDungeonClear();
       return;
     }
