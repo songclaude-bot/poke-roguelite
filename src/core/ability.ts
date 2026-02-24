@@ -140,4 +140,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   horsea: AbilityId.SwiftSwim,
   lotad: AbilityId.SwiftSwim,
   carvanha: AbilityId.Guts,
+  elekid: AbilityId.Static,
+  mareep: AbilityId.Static,
 };

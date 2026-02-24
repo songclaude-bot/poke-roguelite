@@ -878,6 +878,32 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 100,
     description: "Strikes with a jet of water at priority.",
   },
+
+  // ── Additional Electric Skills ──
+  thunderbolt: {
+    id: "thunderbolt",
+    name: "Thunderbolt",
+    type: PokemonType.Electric,
+    power: 18,
+    pp: 10,
+    range: SkillRange.FrontLine,
+    accuracy: 90,
+    effect: SkillEffect.Paralyze,
+    effectChance: 20,
+    description: "Fires a strong bolt of electricity.",
+  },
+  thunderPunch: {
+    id: "thunderPunch",
+    name: "Thunder Punch",
+    type: PokemonType.Electric,
+    power: 15,
+    pp: 14,
+    range: SkillRange.Front1,
+    accuracy: 90,
+    effect: SkillEffect.Paralyze,
+    effectChance: 20,
+    description: "Punches with electrically charged fist.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

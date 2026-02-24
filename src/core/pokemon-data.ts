@@ -277,6 +277,32 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["bite", "aquaJet", "brine"],
     floors: [],
   },
+  elekid: {
+    id: "elekid",
+    name: "Elekid",
+    spriteKey: "elekid",
+    types: [PokemonType.Electric],
+    attackType: PokemonType.Electric,
+    baseStats: { hp: 24, atk: 11, def: 7 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 56,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["thunderPunch", "spark", "thunderShock"],
+    floors: [],
+  },
+  mareep: {
+    id: "mareep",
+    name: "Mareep",
+    spriteKey: "mareep",
+    types: [PokemonType.Electric],
+    attackType: PokemonType.Electric,
+    baseStats: { hp: 26, atk: 9, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["thunderShock", "thunderWave", "tackle"],
+    floors: [],
+  },
   meditite: {
     id: "meditite",
     name: "Meditite",
@@ -681,6 +707,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   horsea: { 7: "brine", 10: "waterPulse" },
   lotad: { 7: "waterPulse", 10: "absorb" },
   carvanha: { 7: "brine", 10: "darkPulse" },
+  elekid: { 7: "thunderPunch", 10: "thunderbolt" },
+  mareep: { 7: "spark", 10: "thunderbolt" },
 };
 
 /** Check if a species learns a new skill at this level */
