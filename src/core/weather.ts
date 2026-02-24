@@ -193,6 +193,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     ironVault: [WeatherType.Sandstorm, WeatherType.Hail],
     phantomRift: [WeatherType.Hail],
     mindPalace: [WeatherType.Rain, WeatherType.Hail],
+    // Phase 143-145: Ice/Dark/Fairy/Dragon/Flying/Normal 6th
+    frozenCitadel: [WeatherType.Hail],
+    eclipseVault: [WeatherType.Sandstorm, WeatherType.Hail],
+    moonlitGarden: [WeatherType.Rain],
+    wyrmsNest: [WeatherType.Sandstorm, WeatherType.Hail],
+    skyPinnacle: [WeatherType.Rain, WeatherType.Sandstorm],
+    primevalPlains: [WeatherType.Rain, WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

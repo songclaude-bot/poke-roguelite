@@ -816,6 +816,42 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [262, 262, 330, 330, 349, 349, 262, 262, 220, 220, 262, 262, 330, 330, 392, 392],
     tempo: 0.34, melodyType: "sine", bassType: "sine",
   },
+  // Frozen Citadel — icy, crystalline, cold
+  frozenCitadel: {
+    melody: [659, 622, 587, 523, 494, 523, 587, 659, 698, 659, 587, 523, 494, 440, 392, 440],
+    bass: [330, 330, 294, 294, 247, 247, 294, 294, 349, 349, 294, 294, 247, 247, 220, 220],
+    tempo: 0.32, melodyType: "sine", bassType: "triangle",
+  },
+  // Eclipse Vault — dark, ominous, slow
+  eclipseVault: {
+    melody: [175, 185, 196, 220, 196, 185, 175, 165, 156, 165, 175, 196, 220, 247, 220, 196],
+    bass: [88, 88, 98, 98, 110, 110, 88, 88, 78, 78, 88, 88, 110, 110, 123, 123],
+    tempo: 0.36, melodyType: "sawtooth", bassType: "triangle",
+  },
+  // Moonlit Garden — gentle, fairy-like, waltz
+  moonlitGarden: {
+    melody: [440, 523, 587, 659, 587, 523, 440, 392, 440, 494, 587, 659, 784, 659, 587, 523],
+    bass: [220, 220, 294, 294, 330, 330, 220, 220, 196, 196, 247, 247, 330, 330, 294, 294],
+    tempo: 0.30, melodyType: "sine", bassType: "sine",
+  },
+  // Wyrm's Nest — powerful, draconic, rumbling
+  wyrmsNest: {
+    melody: [196, 247, 294, 330, 294, 247, 196, 175, 196, 262, 330, 392, 330, 262, 220, 196],
+    bass: [98, 98, 123, 123, 165, 165, 98, 98, 88, 88, 131, 131, 196, 196, 110, 110],
+    tempo: 0.28, melodyType: "sawtooth", bassType: "square",
+  },
+  // Sky Pinnacle — airy, uplifting, soaring
+  skyPinnacle: {
+    melody: [523, 587, 659, 784, 659, 587, 523, 494, 440, 523, 659, 784, 880, 784, 659, 523],
+    bass: [262, 262, 330, 330, 392, 392, 262, 262, 220, 220, 262, 262, 392, 392, 330, 330],
+    tempo: 0.26, melodyType: "triangle", bassType: "sine",
+  },
+  // Primeval Plains — steady, natural, earthy
+  primevalPlains: {
+    melody: [330, 349, 392, 440, 392, 349, 330, 294, 330, 392, 440, 494, 440, 392, 349, 330],
+    bass: [165, 165, 196, 196, 220, 220, 165, 165, 147, 147, 196, 196, 247, 247, 196, 196],
+    tempo: 0.28, melodyType: "triangle", bassType: "triangle",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

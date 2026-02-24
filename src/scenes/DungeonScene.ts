@@ -350,6 +350,13 @@ export class DungeonScene extends Phaser.Scene {
       klefki: "0707", mawile: "0303",
       rotom: "0479", dreepy: "0885",
       munna: "0517", chingling: "0433",
+      // Phase 143-145: Ice/Dark/Fairy/Dragon/Flying/Normal 6th
+      smoochum: "0238", delibird: "0225",
+      nuzleaf: "0274", spiritomb: "0442",
+      marill: "0183", cleffa: "0173",
+      druddigon: "0621", applin: "0840",
+      hoppip: "0187", tropius: "0357",
+      aipom: "0190", smeargle: "0235",
     };
 
     // Load player + all enemy species + ally species for this dungeon

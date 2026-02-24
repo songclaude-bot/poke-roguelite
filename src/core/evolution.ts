@@ -219,6 +219,14 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "dreepy", to: "drakloak", level: 50, newName: "Drakloak", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "dragonPulse" },
   { from: "munna", to: "musharna", level: 30, newName: "Musharna", hpBonus: 16, atkBonus: 8, defBonus: 10, newSkillId: "futuresight" },
   { from: "chingling", to: "chimecho", level: 20, newName: "Chimecho", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "psychic" },
+  // Phase 143-145: Ice/Dark/Fairy/Dragon/Flying/Normal 6th
+  { from: "smoochum", to: "jynx", level: 30, newName: "Jynx", hpBonus: 16, atkBonus: 10, defBonus: 6, newSkillId: "iceBeam" },
+  { from: "nuzleaf", to: "shiftry", level: 36, newName: "Shiftry", hpBonus: 14, atkBonus: 12, defBonus: 8, newSkillId: "leafStorm" },
+  { from: "marill", to: "azumarill", level: 18, newName: "Azumarill", hpBonus: 18, atkBonus: 8, defBonus: 10, newSkillId: "waterPulse" },
+  { from: "cleffa", to: "clefairy", level: 16, newName: "Clefairy", hpBonus: 12, atkBonus: 6, defBonus: 8, newSkillId: "dazzlingGleam" },
+  { from: "applin", to: "flapple", level: 28, newName: "Flapple", hpBonus: 14, atkBonus: 12, defBonus: 6, newSkillId: "dragonPulse" },
+  { from: "hoppip", to: "skiploom", level: 18, newName: "Skiploom", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "hurricane" },
+  { from: "aipom", to: "ambipom", level: 32, newName: "Ambipom", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "hyperVoice" },
 ];
 
 /** Check if a species can evolve at a given level */

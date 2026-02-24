@@ -331,4 +331,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   dreepy: AbilityId.RunAway, // Clear Body equivalent
   munna: AbilityId.ShieldDust, // Synchronize equivalent
   chingling: AbilityId.Levitate,
+  // Phase 143-145: Ice/Dark/Fairy/Dragon/Flying/Normal 6th
+  smoochum: AbilityId.ShieldDust, // Oblivious equivalent
+  delibird: AbilityId.Pickup, // Vital Spirit equivalent
+  nuzleaf: AbilityId.Pickup, // Chlorophyll equivalent
+  spiritomb: AbilityId.Sturdy, // Pressure equivalent
+  marill: AbilityId.SwiftSwim, // Huge Power equivalent
+  cleffa: AbilityId.ShieldDust, // Magic Guard equivalent
+  druddigon: AbilityId.Guts, // Rough Skin equivalent
+  applin: AbilityId.Sturdy, // Ripen equivalent
+  hoppip: AbilityId.RunAway, // Chlorophyll equivalent
+  tropius: AbilityId.Torrent, // Harvest equivalent
+  aipom: AbilityId.Pickup, // Run Away equivalent
+  smeargle: AbilityId.ShieldDust, // Own Tempo equivalent
 };

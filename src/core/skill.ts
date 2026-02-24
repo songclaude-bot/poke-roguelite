@@ -1925,6 +1925,28 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 100,
     description: "Disappears then strikes from the shadows.",
   },
+
+  // ── Phase 143-145: Ice/Dark/Fairy/Dragon/Flying/Normal 6th Skills ──
+  glacialLance: {
+    id: "glacialLance",
+    name: "Glacial Lance",
+    type: PokemonType.Ice,
+    power: 16,
+    pp: 8,
+    range: SkillRange.FrontLine,
+    accuracy: 95,
+    description: "Launches a frozen lance in a line.",
+  },
+  boomburst: {
+    id: "boomburst",
+    name: "Boomburst",
+    type: PokemonType.Normal,
+    power: 16,
+    pp: 6,
+    range: SkillRange.Room,
+    accuracy: 90,
+    description: "Deafening sound that fills the room.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
