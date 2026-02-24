@@ -276,6 +276,10 @@ export class DungeonScene extends Phaser.Scene {
   private dpadUI: Phaser.GameObjects.GameObject[] = [];
   private dpadSide: "right" | "left" = "right"; // default: right (국룰 UX)
 
+  // Quick-slot: last used item
+  private lastUsedItemId: string | null = null;
+  private quickSlotBtn: Phaser.GameObjects.Text | null = null;
+
   // Challenge mode state
   private challengeMode: string | null = null;
 
@@ -1756,21 +1760,11 @@ export class DungeonScene extends Phaser.Scene {
       .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
       .on("pointerdown", () => this.pickupItem());
 
-    this.add.text(menuCX + 22, menuCY - 5, "⏳", iconStyle)
+    // Quick-slot: use last used item (or show "—" if none)
+    this.quickSlotBtn = this.add.text(menuCX + 22, menuCY - 5, "—", iconStyle)
       .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
-      .on("pointerdown", () => {
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.fullMapOpen) return;
-        this.turnManager.executeTurn(
-          () => Promise.resolve(),
-          [...this.getAllyActions(), ...this.getEnemyActions()]
-        ).then(() => {
-          this.recoverPP(this.player);
-          this.tickBelly();
-          this.tickWeather();
-          this.tickEntityStatus(this.player);
-          this.updateHUD();
-        });
-      });
+      .on("pointerdown", () => this.useQuickSlot());
+    this.updateQuickSlotLabel();
 
     // ── Team button (center-bottom, below Pickup/Wait) ──
     this.add.text(menuCX, menuCY + 22, "Team", {
@@ -3270,6 +3264,7 @@ export class DungeonScene extends Phaser.Scene {
     fi.sprite.destroy();
     this.floorItems.splice(idx, 1);
     this.showLog(`Picked up ${fi.item.name}!`);
+    this.updateQuickSlotLabel();
 
     // Score chain: item pickup
     addChainAction(this.scoreChain, "itemPickup");
@@ -3354,6 +3349,44 @@ export class DungeonScene extends Phaser.Scene {
     this.bagUI = [];
   }
 
+  /** Quick-slot: use the last-used item type again */
+  private useQuickSlot() {
+    if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.fullMapOpen) return;
+    if (!this.lastUsedItemId) {
+      this.showLog("No recent item. Use an item from the Bag first.");
+      return;
+    }
+    const idx = this.inventory.findIndex(s => s.item.id === this.lastUsedItemId);
+    if (idx === -1) {
+      this.showLog(`No ${this.lastUsedItemId} left!`);
+      return;
+    }
+    this.useItem(idx);
+    this.closeBag(); // safety: close bag if somehow open
+  }
+
+  /** Update the quick-slot button label to show last used item */
+  private updateQuickSlotLabel() {
+    if (!this.quickSlotBtn) return;
+    if (!this.lastUsedItemId) {
+      this.quickSlotBtn.setText("—");
+      this.quickSlotBtn.setColor("#555570");
+      return;
+    }
+    // Find item in inventory to show icon
+    const stack = this.inventory.find(s => s.item.id === this.lastUsedItemId);
+    if (!stack) {
+      // Item used up - show dimmed
+      this.quickSlotBtn.setText("✕");
+      this.quickSlotBtn.setColor("#555570");
+      return;
+    }
+    const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : "★";
+    const countStr = stack.count > 1 ? `${stack.count}` : "";
+    this.quickSlotBtn.setText(`${icon}${countStr}`);
+    this.quickSlotBtn.setColor("#4ade80");
+  }
+
   private useItem(index: number) {
     if (this.challengeMode === "noItems") {
       this.showLog("Items are forbidden!");
@@ -3364,6 +3397,7 @@ export class DungeonScene extends Phaser.Scene {
     if (!stack) return;
 
     const item = stack.item;
+    this.lastUsedItemId = item.id;
     sfxHeal();
 
     switch (item.id) {
@@ -3631,6 +3665,7 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     this.updateHUD();
+    this.updateQuickSlotLabel();
   }
 
   /** Find a random walkable tile (ground, no entity) */

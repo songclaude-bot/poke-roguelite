@@ -28,6 +28,7 @@ const config: Phaser.Types.Core.GameConfig = {
   },
   render: {
     preserveDrawingBuffer: true,
+    antialias: false,
   },
   scene: [BootScene, HubScene, DungeonPreviewScene, DungeonScene, UpgradeScene, AchievementScene, PokedexScene, MoveTutorScene, HeldItemScene, CraftingScene, HelpScene, AbilityUpgradeScene, LeaderboardScene, SettingsScene],
 };
