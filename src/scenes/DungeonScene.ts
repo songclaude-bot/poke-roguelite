@@ -261,6 +261,7 @@ export class DungeonScene extends Phaser.Scene {
       staryu: "0120", clamperl: "0366",
       shinx: "0403", electrike: "0309",
       gulpin: "0316", ekans: "0023",
+      cubone: "0104", diglett: "0050",
     };
 
     // Load player + all enemy species + ally species for this dungeon

@@ -385,6 +385,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [131, 131, 147, 147, 110, 110, 131, 131, 165, 165, 131, 131, 110, 110, 98, 98],
     tempo: 0.34, melodyType: "sawtooth", bassType: "triangle",
   },
+  // Quake Tunnel — rumbling, deep
+  quakeTunnel: {
+    melody: [196, 220, 262, 294, 262, 220, 196, 175, 196, 262, 294, 330, 294, 262, 220, 196],
+    bass: [98, 98, 131, 131, 147, 147, 98, 98, 98, 98, 147, 147, 165, 165, 131, 131],
+    tempo: 0.30, melodyType: "sawtooth", bassType: "square",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

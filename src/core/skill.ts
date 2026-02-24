@@ -1145,6 +1145,27 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Charges with electricity at full force.",
   },
+  // ── Phase 49 Ground Skills ──
+  boneRush: {
+    id: "boneRush",
+    name: "Bone Rush",
+    type: PokemonType.Ground,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Strikes with a bone thrown forward.",
+  },
+  bulldoze: {
+    id: "bulldoze",
+    name: "Bulldoze",
+    type: PokemonType.Ground,
+    power: 12,
+    pp: 15,
+    range: SkillRange.Around,
+    accuracy: 95,
+    description: "Stomps the ground, hitting all nearby.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

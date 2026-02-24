@@ -168,4 +168,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   electrike: AbilityId.Static,
   gulpin: AbilityId.Guts,
   ekans: AbilityId.ShieldDust,
+  cubone: AbilityId.RockHead,
+  diglett: AbilityId.NoGuard,
 };
