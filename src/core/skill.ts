@@ -1331,6 +1331,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Dives underwater and strikes the target.",
   },
+
+  // ── Phase 69 Fire Skills ──
+  heatWave: {
+    id: "heatWave",
+    name: "Heat Wave",
+    type: PokemonType.Fire,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Around,
+    accuracy: 85,
+    description: "Blasts searing heat at all surrounding foes.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

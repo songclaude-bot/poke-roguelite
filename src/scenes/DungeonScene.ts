@@ -276,6 +276,7 @@ export class DungeonScene extends Phaser.Scene {
       lillipup: "0506", minccino: "0572",
       foongus: "0590", petilil: "0548",
       feebas: "0349", wailmer: "0320",
+      litwick: "0607", growlithe: "0058",
     };
 
     // Load player + all enemy species + ally species for this dungeon

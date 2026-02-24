@@ -1327,6 +1327,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["dive", "brine", "waterPulse"],
     floors: [],
   },
+
+  // ── Phase 69 Fire 3rd ──
+  litwick: {
+    id: "litwick", name: "Litwick", spriteKey: "litwick",
+    types: [PokemonType.Fire, PokemonType.Ghost], attackType: PokemonType.Fire,
+    baseStats: { hp: 24, atk: 12, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["flamethrower", "heatWave", "shadowBall"],
+    floors: [],
+  },
+  growlithe: {
+    id: "growlithe", name: "Growlithe", spriteKey: "growlithe",
+    types: [PokemonType.Fire], attackType: PokemonType.Fire,
+    baseStats: { hp: 28, atk: 14, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 40, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 3,
+    skillIds: ["flameWheel", "heatWave", "bite"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1445,6 +1467,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   petilil: { 7: "energyBall", 10: "grassKnot" },
   feebas: { 7: "dive", 10: "waterPulse" },
   wailmer: { 7: "brine", 10: "dive" },
+  litwick: { 7: "heatWave", 10: "shadowBall" },
+  growlithe: { 7: "heatWave", 10: "flameWheel" },
 };
 
 /** Check if a species learns a new skill at this level */

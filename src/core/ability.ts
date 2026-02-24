@@ -197,4 +197,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   petilil: AbilityId.Torrent, // Overgrow equivalent
   feebas: AbilityId.SwiftSwim,
   wailmer: AbilityId.SwiftSwim,
+  litwick: AbilityId.FlameBody,
+  growlithe: AbilityId.FlameBody,
 };
