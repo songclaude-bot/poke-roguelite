@@ -4,6 +4,13 @@ import { PokemonType } from "./type-chart";
 import { Skill } from "./skill";
 import { SkillEffect } from "./skill";
 import { AbilityId } from "./ability";
+import {
+  getGutsMultiplier,
+  getPurePowerMultiplier,
+  getNoGuardAtkBonus,
+  getRockHeadDefBonus,
+  getShieldDustDefBonus,
+} from "./ability-upgrade";
 
 export interface EntityStats {
   hp: number;
@@ -35,26 +42,38 @@ export interface Entity {
   isBoss?: boolean; // true if floor boss
   speciesId?: string; // species key for serialization
   ability?: AbilityId; // passive ability
+  abilityLevel?: number; // ability upgrade level (1-5, default 1)
   sturdyUsed?: boolean; // track if Sturdy was consumed this floor
 }
 
-/** Get effective ATK (with buffs + abilities) */
+/** Get effective ATK (with buffs + abilities, scaled by ability level) */
 export function getEffectiveAtk(entity: Entity): number {
   let atk = entity.stats.atk;
-  // Ability: Pure Power (+30% always)
-  if (entity.ability === AbilityId.PurePower) atk = Math.floor(atk * 1.3);
-  // Ability: Guts (+50% when has status effect)
-  if (entity.ability === AbilityId.Guts && entity.statusEffects.length > 0) atk = Math.floor(atk * 1.5);
+  const aLv = entity.abilityLevel ?? 1;
+  // Ability: Pure Power (scaled by level)
+  if (entity.ability === AbilityId.PurePower) atk = Math.floor(atk * getPurePowerMultiplier(aLv));
+  // Ability: Guts (scaled by level)
+  if (entity.ability === AbilityId.Guts && entity.statusEffects.length > 0) atk = Math.floor(atk * getGutsMultiplier(aLv));
+  // Ability: No Guard bonus ATK at higher levels
+  if (entity.ability === AbilityId.NoGuard) atk = Math.floor(atk * getNoGuardAtkBonus(aLv));
   // Buff: AtkUp (+50%)
   const hasAtkUp = entity.statusEffects.some(s => s.type === SkillEffect.AtkUp);
   if (hasAtkUp) atk = Math.floor(atk * 1.5);
   return atk;
 }
 
-/** Get effective DEF (with buffs) */
+/** Get effective DEF (with buffs + abilities, scaled by ability level) */
 export function getEffectiveDef(entity: Entity): number {
+  let def = entity.stats.def;
+  const aLv = entity.abilityLevel ?? 1;
+  // Ability: Rock Head bonus DEF at higher levels
+  if (entity.ability === AbilityId.RockHead) def = Math.floor(def * getRockHeadDefBonus(aLv));
+  // Ability: Shield Dust bonus DEF at higher levels
+  if (entity.ability === AbilityId.ShieldDust) def = Math.floor(def * getShieldDustDefBonus(aLv));
+  // Buff: DefUp (+50%)
   const hasDefUp = entity.statusEffects.some(s => s.type === SkillEffect.DefUp);
-  return hasDefUp ? Math.floor(entity.stats.def * 1.5) : entity.stats.def;
+  if (hasDefUp) def = Math.floor(def * 1.5);
+  return def;
 }
 
 /** Human-readable labels for status effect wear-off messages */

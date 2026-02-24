@@ -31,6 +31,11 @@ import {
 } from "../core/save-system";
 import { TrapDef, TrapType, rollTrap, trapsPerFloor, FloorTrap, TRAPS, generateTraps } from "../core/trap";
 import { AbilityId, SPECIES_ABILITIES, ABILITIES } from "../core/ability";
+import {
+  getAbilityLevel, getTorrentValues, getSturdyHp,
+  getStaticChance, getFlameBodyChance, getPickupChance,
+  getRunAwayDodgeBonus, getLevitateDodgeBonus,
+} from "../core/ability-upgrade";
 import { WeatherType, WEATHERS, weatherDamageMultiplier, isWeatherImmune, rollFloorWeather } from "../core/weather";
 import { ShopItem, generateShopItems, shouldSpawnShop } from "../core/shop";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
@@ -770,6 +775,7 @@ export class DungeonScene extends Phaser.Scene {
       skills: playerSkills,
       statusEffects: [],
       ability: SPECIES_ABILITIES[this.starterId] ?? SPECIES_ABILITIES["mudkip"],
+      abilityLevel: getAbilityLevel(loadMeta().abilityLevels, SPECIES_ABILITIES[this.starterId] ?? SPECIES_ABILITIES["mudkip"]),
       speciesId: this.starterId,
     };
     const playerTextureKey = `${playerSp.spriteKey}-idle`;
@@ -4061,8 +4067,11 @@ export class DungeonScene extends Phaser.Scene {
       attacker.facing = dir;
       attacker.sprite!.play(`${attacker.spriteKey}-idle-${dir}`);
 
-      // Held item: dodge chance (defender is player)
-      const dodgeChance = this.heldItemEffect.dodgeChance ?? 0;
+      // Held item + ability dodge chance (defender is player)
+      let dodgeChance = this.heldItemEffect.dodgeChance ?? 0;
+      // Ability: Run Away / Levitate dodge bonus at higher levels
+      if (defender.ability === AbilityId.RunAway) dodgeChance += getRunAwayDodgeBonus(defender.abilityLevel ?? 1) * 100;
+      if (defender.ability === AbilityId.Levitate) dodgeChance += getLevitateDodgeBonus(defender.abilityLevel ?? 1) * 100;
       if (defender === this.player && dodgeChance > 0 && Math.random() * 100 < dodgeChance) {
         sfxDodge();
         this.showLog(`${defender.name} dodged ${attacker.name}'s attack!`);
@@ -4080,12 +4089,14 @@ export class DungeonScene extends Phaser.Scene {
       const atk = getEffectiveAtk(attacker);
       const def = getEffectiveDef(defender);
       const baseDmg = Math.max(1, atk - Math.floor(def / 2));
-      // Ability: Torrent — +50% Water damage when HP < 33%
+      // Ability: Torrent — scaled by ability level
       let abilityMult = 1.0;
       if (attacker.ability === AbilityId.Torrent &&
-          attacker.attackType === PokemonType.Water &&
-          attacker.stats.hp < attacker.stats.maxHp / 3) {
-        abilityMult = 1.5;
+          attacker.attackType === PokemonType.Water) {
+        const torrent = getTorrentValues(attacker.abilityLevel ?? 1);
+        if (attacker.stats.hp < attacker.stats.maxHp * torrent.threshold) {
+          abilityMult = torrent.multiplier;
+        }
       }
       const wMult = weatherDamageMultiplier(this.currentWeather, attacker.attackType);
       // Held item: crit chance (attacker is player)
@@ -4114,16 +4125,16 @@ export class DungeonScene extends Phaser.Scene {
       if (wMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
       this.showLog(logMsg);
 
-      // Ability: Static — 30% chance to paralyze attacker on contact
-      if (defender.ability === AbilityId.Static && Math.random() < 0.3) {
+      // Ability: Static — paralyze chance scaled by ability level
+      if (defender.ability === AbilityId.Static && Math.random() < getStaticChance(defender.abilityLevel ?? 1)) {
         if (!attacker.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
           attacker.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 2 });
           this.showLog(`${defender.name}'s Static paralyzed ${attacker.name}!`);
         }
       }
 
-      // Ability: Flame Body — 30% chance to burn attacker on contact
-      if (defender.ability === AbilityId.FlameBody && Math.random() < 0.3) {
+      // Ability: Flame Body — burn chance scaled by ability level
+      if (defender.ability === AbilityId.FlameBody && Math.random() < getFlameBodyChance(defender.abilityLevel ?? 1)) {
         if (!attacker.statusEffects.some(s => s.type === SkillEffect.Burn)) {
           attacker.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 3 });
           this.showLog(`${defender.name}'s Flame Body burned ${attacker.name}!`);
@@ -4188,8 +4199,10 @@ export class DungeonScene extends Phaser.Scene {
         }
 
         if (skill.power > 0) {
-          // Held item: dodge chance (target is player, attacker is enemy)
-          const skillDodge = this.heldItemEffect.dodgeChance ?? 0;
+          // Held item + ability dodge chance (target is player, attacker is enemy)
+          let skillDodge = this.heldItemEffect.dodgeChance ?? 0;
+          if (target.ability === AbilityId.RunAway) skillDodge += getRunAwayDodgeBonus(target.abilityLevel ?? 1) * 100;
+          if (target.ability === AbilityId.Levitate) skillDodge += getLevitateDodgeBonus(target.abilityLevel ?? 1) * 100;
           if (target === this.player && !user.isAlly && user !== this.player && skillDodge > 0 && Math.random() * 100 < skillDodge) {
             sfxDodge();
             this.showLog(`${target.name} dodged ${user.name}'s ${skill.name}!`);
@@ -4516,9 +4529,9 @@ export class DungeonScene extends Phaser.Scene {
   private checkDeath(entity: Entity) {
     if (entity.stats.hp > 0 || !entity.alive) return;
 
-    // Ability: Sturdy — survive one lethal hit per floor
+    // Ability: Sturdy — survive one lethal hit per floor, HP scaled by level
     if (entity.ability === AbilityId.Sturdy && !entity.sturdyUsed) {
-      entity.stats.hp = 1;
+      entity.stats.hp = getSturdyHp(entity.abilityLevel ?? 1);
       entity.sturdyUsed = true;
       this.showLog(`${entity.name}'s Sturdy held on!`);
       if (entity.sprite) {
@@ -4654,8 +4667,8 @@ export class DungeonScene extends Phaser.Scene {
         });
       }
 
-      // ── Ability: Pickup — 10% chance to find item (disabled in No Items challenge) ──
-      if (this.challengeMode !== "noItems" && this.player.ability === AbilityId.Pickup && Math.random() < 0.1) {
+      // ── Ability: Pickup — chance scaled by ability level (disabled in No Items challenge) ──
+      if (this.challengeMode !== "noItems" && this.player.ability === AbilityId.Pickup && Math.random() < getPickupChance(this.player.abilityLevel ?? 1)) {
         if (this.inventory.length < MAX_INVENTORY) {
           const found = rollFloorItem();
           const existing = this.inventory.find(s => s.item.id === found.id && found.stackable);
