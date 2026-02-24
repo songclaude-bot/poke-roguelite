@@ -1192,3 +1192,26 @@
 - **동료 전술**: 4종 명령 + Team 패널
 - **이벤트 룸**: 8종 랜덤 이벤트 + 선택지 시스템
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 25: 비주얼 + 인챈트
+
+### 25-1. 던전 층 테마 (Phase 251)
+- 날짜: 2026-02-24
+- 12종 비주얼 테마: Cave, Forest, Ocean, Volcano, Temple 등
+- 벽/바닥/복도 색상 오버레이, 체커보드 패턴
+- 타일맵 앰비언트 틴트, 테마별 안개 색상
+- 5층마다 5% 어둡게 (깊이감)
+
+### 25-2. 아이템 인챈트 (Phase 252)
+- 날짜: 2026-02-24
+- 10종 인챈트 (3티어): Sharpness, Resilience, Vampiric, Phoenix 등
+- HeldItemScene에 인챈트 섹션 + 티어 색상
+- 전투 효과: Thorns 반사, Haste 추가턴, Phoenix 부활
+- Phoenix: 극적인 금색 플래시 + 불꽃 틴트 + 상승 텍스트
+
+### v3.3.0 마일스톤
+- **층 테마**: 12종 비주얼 테마 + 깊이 어두움
+- **인챈트**: 10종 장비 강화 + Phoenix 부활
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
