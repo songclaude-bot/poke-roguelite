@@ -508,6 +508,28 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "The earth erupts around the user.",
   },
+  dig: {
+    id: "dig",
+    name: "Dig",
+    type: PokemonType.Ground,
+    power: 16,
+    pp: 12,
+    range: SkillRange.Front1,
+    accuracy: 95,
+    description: "Digs underground then strikes.",
+  },
+  sandTomb: {
+    id: "sandTomb",
+    name: "Sand Tomb",
+    type: PokemonType.Ground,
+    power: 10,
+    pp: 18,
+    range: SkillRange.Around,
+    accuracy: 85,
+    effect: SkillEffect.Burn,
+    effectChance: 30,
+    description: "Traps the foe in a sand vortex.",
+  },
   // ── Additional Fire Skills ──
   fireBlast: {
     id: "fireBlast",

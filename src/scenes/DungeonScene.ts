@@ -245,6 +245,7 @@ export class DungeonScene extends Phaser.Scene {
       dratini: "0147", bagon: "0371", gible: "0443",
       poochyena: "0261",
       beldum: "0374", skarmory: "0227",
+      sandshrew: "0027", trapinch: "0328", phanpy: "0231",
     };
 
     // Load player + all enemy species + ally species for this dungeon

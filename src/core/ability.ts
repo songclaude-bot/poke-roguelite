@@ -134,4 +134,7 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   poochyena: AbilityId.RunAway,
   beldum: AbilityId.RockHead,
   skarmory: AbilityId.ShieldDust,
+  sandshrew: AbilityId.RockHead,
+  trapinch: AbilityId.NoGuard,
+  phanpy: AbilityId.Guts,
 };
