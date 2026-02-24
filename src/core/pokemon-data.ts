@@ -2166,6 +2166,67 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["muddyWater", "earthquake", "waterPulse"],
     floors: [],
   },
+  // Phase 124-126: Rock/Bug/Fighting 5th
+  nacli: {
+    id: "nacli", name: "Nacli", spriteKey: "nacli",
+    types: [PokemonType.Rock], attackType: PokemonType.Rock,
+    baseStats: { hp: 55, atk: 55, def: 75 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 8, idleFrames: 5,
+    skillIds: ["rockBlast", "stoneEdge", "rockSlide"],
+    floors: [],
+  },
+  tyrunt: {
+    id: "tyrunt", name: "Tyrunt", spriteKey: "tyrunt",
+    types: [PokemonType.Rock, PokemonType.Dragon], attackType: PokemonType.Rock,
+    baseStats: { hp: 58, atk: 89, def: 77 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 8,
+    skillIds: ["rockBlast", "crunch", "dragonClaw"],
+    floors: [],
+  },
+  blipbug: {
+    id: "blipbug", name: "Blipbug", spriteKey: "blipbug",
+    types: [PokemonType.Bug], attackType: PokemonType.Bug,
+    baseStats: { hp: 25, atk: 20, def: 45 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 6, idleFrames: 2,
+    skillIds: ["bugBuzz", "psychic", "bugBite"],
+    floors: [],
+  },
+  cutiefly: {
+    id: "cutiefly", name: "Cutiefly", spriteKey: "cutiefly",
+    types: [PokemonType.Bug, PokemonType.Fairy], attackType: PokemonType.Bug,
+    baseStats: { hp: 40, atk: 45, def: 40 },
+    walkFrameWidth: 24, walkFrameHeight: 48,
+    idleFrameWidth: 24, idleFrameHeight: 48,
+    walkFrames: 6, idleFrames: 12,
+    skillIds: ["bugBuzz", "dazzlingGleam", "fairyWind"],
+    floors: [],
+  },
+  clobbopus: {
+    id: "clobbopus", name: "Clobbopus", spriteKey: "clobbopus",
+    types: [PokemonType.Fighting], attackType: PokemonType.Fighting,
+    baseStats: { hp: 50, atk: 68, def: 60 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 5, idleFrames: 2,
+    skillIds: ["closeCombat", "rockSmash", "karateChop"],
+    floors: [],
+  },
+  passimian: {
+    id: "passimian", name: "Passimian", spriteKey: "passimian",
+    types: [PokemonType.Fighting], attackType: PokemonType.Fighting,
+    baseStats: { hp: 100, atk: 120, def: 90 },
+    walkFrameWidth: 40, walkFrameHeight: 48,
+    idleFrameWidth: 40, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 2,
+    skillIds: ["closeCombat", "rockSmash", "superpower"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -2364,6 +2425,13 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   toxel: { 7: "nuzzle", 10: "poisonJab" },
   drilbur: { 7: "dig", 10: "earthquake" },
   barboach: { 7: "muddyWater", 10: "earthquake" },
+  // Phase 124-126: Rock/Bug/Fighting 5th
+  nacli: { 7: "rockBlast", 10: "stoneEdge" },
+  tyrunt: { 7: "rockBlast", 10: "crunch" },
+  blipbug: { 7: "bugBuzz", 10: "psychic" },
+  cutiefly: { 7: "bugBuzz", 10: "dazzlingGleam" },
+  clobbopus: { 7: "closeCombat", 10: "lowKick" },
+  passimian: { 7: "closeCombat", 10: "lowKick" },
 };
 
 /** Check if a species learns a new skill at this level */

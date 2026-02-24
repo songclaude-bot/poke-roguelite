@@ -672,6 +672,25 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [98, 98, 131, 131, 165, 165, 131, 131, 98, 98, 88, 88, 131, 131, 165, 165],
     tempo: 0.28, melodyType: "square", bassType: "sawtooth",
   },
+  // Phase 124-126: Rock/Bug/Fighting 5th
+  // Crystal Depths — deep, echoing, crystalline
+  crystalDepths: {
+    melody: [330, 392, 440, 523, 494, 440, 392, 349, 330, 294, 330, 392, 440, 523, 587, 523],
+    bass: [165, 165, 220, 220, 247, 247, 196, 196, 165, 165, 147, 147, 220, 220, 294, 294],
+    tempo: 0.30, melodyType: "sine", bassType: "triangle",
+  },
+  // Silkwood Grove — airy, buzzing
+  silkwoodGrove: {
+    melody: [494, 523, 587, 659, 587, 523, 494, 440, 392, 440, 494, 523, 587, 659, 698, 659],
+    bass: [247, 247, 294, 294, 330, 330, 262, 262, 196, 196, 220, 220, 294, 294, 349, 349],
+    tempo: 0.28, melodyType: "triangle", bassType: "sine",
+  },
+  // Warlord's Arena — intense, martial
+  warlordsArena: {
+    melody: [262, 330, 392, 440, 523, 440, 392, 330, 262, 294, 330, 392, 440, 523, 587, 523],
+    bass: [131, 131, 196, 196, 262, 262, 220, 220, 131, 131, 147, 147, 220, 220, 294, 294],
+    tempo: 0.22, melodyType: "sawtooth", bassType: "square",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

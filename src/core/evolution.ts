@@ -177,6 +177,12 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "toxel", to: "toxtricity", level: 14, newName: "Toxtricity", hpBonus: 14, atkBonus: 12, defBonus: 4, newSkillId: "nuzzle" },
   { from: "skrelp", to: "dragalge", level: 14, newName: "Dragalge", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "sludgeBomb" },
   { from: "drilbur", to: "excadrill", level: 14, newName: "Excadrill", hpBonus: 14, atkBonus: 12, defBonus: 8, newSkillId: "earthquake" },
+  // Phase 124-126: Rock/Bug/Fighting 5th
+  { from: "nacli", to: "naclstack", level: 24, newName: "Naclstack", hpBonus: 14, atkBonus: 8, defBonus: 10, newSkillId: "stoneEdge" },
+  { from: "tyrunt", to: "tyrantrum", level: 39, newName: "Tyrantrum", hpBonus: 16, atkBonus: 12, defBonus: 8, newSkillId: "rockSlide" },
+  { from: "blipbug", to: "dottler", level: 10, newName: "Dottler", hpBonus: 10, atkBonus: 6, defBonus: 8, newSkillId: "psychic" },
+  { from: "cutiefly", to: "ribombee", level: 25, newName: "Ribombee", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "dazzlingGleam" },
+  { from: "clobbopus", to: "grapploct", level: 35, newName: "Grapploct", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "superpower" },
 ];
 
 /** Check if a species can evolve at a given level */

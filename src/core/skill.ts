@@ -1785,6 +1785,37 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 85,
     description: "Floods the room with muddy water.",
   },
+  // Phase 124-126: Rock/Bug/Fighting 5th
+  rockBlast: {
+    id: "rockBlast",
+    name: "Rock Blast",
+    type: PokemonType.Rock,
+    power: 10,
+    pp: 14,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Hurls rocks at distant foes.",
+  },
+  bugBuzz: {
+    id: "bugBuzz",
+    name: "Bug Buzz",
+    type: PokemonType.Bug,
+    power: 12,
+    pp: 10,
+    range: SkillRange.Room,
+    accuracy: 90,
+    description: "Vibrates soundwaves throughout the room.",
+  },
+  closeCombat: {
+    id: "closeCombat",
+    name: "Close Combat",
+    type: PokemonType.Fighting,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Front1,
+    accuracy: 100,
+    description: "An all-out attack at close range.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

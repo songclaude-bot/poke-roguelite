@@ -277,4 +277,11 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   toxel: AbilityId.Static, // Rattled equivalent
   drilbur: AbilityId.Guts, // Sand Rush equivalent
   barboach: AbilityId.SwiftSwim, // Oblivious equivalent
+  // Phase 124-126: Rock/Bug/Fighting 5th
+  nacli: AbilityId.Sturdy,
+  tyrunt: AbilityId.Guts, // StrongJaw equivalent
+  blipbug: AbilityId.ShieldDust, // CompoundEyes equivalent
+  cutiefly: AbilityId.ShieldDust,
+  clobbopus: AbilityId.Guts, // Limber equivalent
+  passimian: AbilityId.PurePower, // Defiant equivalent
 };

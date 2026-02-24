@@ -163,6 +163,10 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     thunderDome: [WeatherType.Rain, WeatherType.Sandstorm],
     miasmaSwamp: [WeatherType.Rain, WeatherType.Sandstorm],
     tectonicRift: [WeatherType.Sandstorm],
+    // Phase 124-126: Rock/Bug/Fighting 5th
+    crystalDepths: [WeatherType.Sandstorm, WeatherType.None],
+    silkwoodGrove: [WeatherType.Rain, WeatherType.None],
+    warlordsArena: [WeatherType.Sandstorm, WeatherType.None],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

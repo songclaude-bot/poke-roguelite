@@ -321,6 +321,9 @@ export class DungeonScene extends Phaser.Scene {
       yamper: "0835", pincurchin: "0871",
       skrelp: "0690", toxel: "0848",
       drilbur: "0529", barboach: "0339",
+      // Phase 124-126: Rock/Bug/Fighting 5th
+      nacli: "0932", tyrunt: "0696", blipbug: "0824",
+      cutiefly: "0742", clobbopus: "0852", passimian: "0766",
     };
 
     // Load player + all enemy species + ally species for this dungeon
