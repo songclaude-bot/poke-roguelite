@@ -175,6 +175,10 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     glacialAbyss: [WeatherType.Hail],
     shadowLabyrinth: [WeatherType.Sandstorm, WeatherType.Hail],
     faerieGarden: [WeatherType.Rain],
+    // Phase 133-135: Dragon/Flying/Normal 5th
+    dragonsDen: [WeatherType.Sandstorm, WeatherType.Hail],
+    stormySkies: [WeatherType.Rain, WeatherType.Sandstorm],
+    verdantMeadow: [WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

@@ -1849,6 +1849,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Drops large icicles on the target.",
   },
+
+  // ── Phase 133-135: Dragon/Flying/Normal 5th Skills ──
+  scaleShot: {
+    id: "scaleShot",
+    name: "Scale Shot",
+    type: PokemonType.Dragon,
+    power: 10,
+    pp: 14,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Shoots scales at distant foes.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

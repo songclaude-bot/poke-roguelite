@@ -729,6 +729,25 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [294, 294, 349, 349, 392, 392, 294, 294, 247, 247, 294, 294, 349, 349, 440, 440],
     tempo: 0.34, melodyType: "triangle", bassType: "sine",
   },
+  // Phase 133-135: Dragon/Flying/Normal 5th
+  // Dragon's Den — deep, draconic, powerful
+  dragonsDen: {
+    melody: [196, 233, 262, 294, 330, 294, 262, 233, 196, 220, 262, 330, 392, 330, 262, 220],
+    bass: [98, 98, 131, 131, 165, 165, 131, 131, 110, 110, 131, 131, 196, 196, 131, 131],
+    tempo: 0.26, melodyType: "sawtooth", bassType: "square",
+  },
+  // Stormy Skies — breezy, turbulent, soaring
+  stormySkies: {
+    melody: [440, 494, 523, 587, 659, 587, 523, 494, 440, 392, 440, 494, 523, 587, 659, 698],
+    bass: [220, 220, 262, 262, 330, 330, 262, 262, 220, 220, 196, 196, 262, 262, 349, 349],
+    tempo: 0.28, melodyType: "square", bassType: "triangle",
+  },
+  // Verdant Meadow — light, pastoral, cheerful
+  verdantMeadow: {
+    melody: [392, 440, 494, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 523, 587, 523],
+    bass: [196, 196, 247, 247, 262, 262, 196, 196, 165, 165, 175, 175, 247, 247, 294, 294],
+    tempo: 0.32, melodyType: "triangle", bassType: "sine",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

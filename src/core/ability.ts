@@ -298,4 +298,11 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   pawniard: AbilityId.PurePower, // Defiant equivalent
   fidough: AbilityId.ShieldDust, // Own Tempo equivalent
   dedenne: AbilityId.Static, // Cheek Pouch equivalent
+  // Phase 133-135: Dragon/Flying/Normal 5th
+  cyclizar: AbilityId.ShieldDust, // Shed Skin equivalent
+  tatsugiri: AbilityId.SwiftSwim, // Commander equivalent
+  wingull: AbilityId.SwiftSwim, // Hydration equivalent
+  swablu: AbilityId.ShieldDust, // Natural Cure equivalent
+  lechonk: AbilityId.Pickup, // Aroma Veil equivalent
+  tandemaus: AbilityId.Pickup, // Run Away equivalent
 };

@@ -196,6 +196,11 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "zorua", to: "zoroark", level: 30, newName: "Zoroark", hpBonus: 14, atkBonus: 12, defBonus: 6, newSkillId: "nightSlash" },
   { from: "pawniard", to: "bisharp", level: 52, newName: "Bisharp", hpBonus: 16, atkBonus: 12, defBonus: 10, newSkillId: "ironHead" },
   { from: "fidough", to: "dachsbun", level: 26, newName: "Dachsbun", hpBonus: 14, atkBonus: 8, defBonus: 10, newSkillId: "playRough" },
+  // Phase 133-135: Dragon/Flying/Normal 5th
+  { from: "wingull", to: "pelipper", level: 25, newName: "Pelipper", hpBonus: 14, atkBonus: 8, defBonus: 10, newSkillId: "hurricane" },
+  { from: "swablu", to: "altaria", level: 35, newName: "Altaria", hpBonus: 16, atkBonus: 10, defBonus: 8, newSkillId: "moonblast" },
+  { from: "lechonk", to: "oinkologne", level: 18, newName: "Oinkologne", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "hyperVoice" },
+  { from: "tandemaus", to: "maushold", level: 25, newName: "Maushold", hpBonus: 14, atkBonus: 10, defBonus: 6, newSkillId: "hyperVoice" },
 ];
 
 /** Check if a species can evolve at a given level */

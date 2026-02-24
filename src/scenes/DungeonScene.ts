@@ -332,6 +332,10 @@ export class DungeonScene extends Phaser.Scene {
       cetoddle: "0974", frigibax: "0996",
       zorua: "0570", pawniard: "0624",
       fidough: "0926", dedenne: "0702",
+      // Phase 133-135: Dragon/Flying/Normal 5th
+      cyclizar: "0967", tatsugiri: "0978",
+      wingull: "0278", swablu: "0333",
+      lechonk: "0915", tandemaus: "0921",
     };
 
     // Load player + all enemy species + ally species for this dungeon

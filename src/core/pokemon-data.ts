@@ -2349,6 +2349,67 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["drainingKiss", "thunderbolt", "nuzzle"],
     floors: [],
   },
+  // Phase 133-135: Dragon/Flying/Normal 5th
+  cyclizar: {
+    id: "cyclizar", name: "Cyclizar", spriteKey: "cyclizar",
+    types: [PokemonType.Dragon, PokemonType.Normal], attackType: PokemonType.Dragon,
+    baseStats: { hp: 70, atk: 95, def: 65 },
+    walkFrameWidth: 48, walkFrameHeight: 56,
+    idleFrameWidth: 56, idleFrameHeight: 48,
+    walkFrames: 6, idleFrames: 10,
+    skillIds: ["scaleShot", "dragonPulse", "bodySlam"],
+    floors: [],
+  },
+  tatsugiri: {
+    id: "tatsugiri", name: "Tatsugiri", spriteKey: "tatsugiri",
+    types: [PokemonType.Dragon, PokemonType.Water], attackType: PokemonType.Dragon,
+    baseStats: { hp: 68, atk: 50, def: 60 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 6, idleFrames: 3,
+    skillIds: ["scaleShot", "dragonPulse", "waterPulse"],
+    floors: [],
+  },
+  wingull: {
+    id: "wingull", name: "Wingull", spriteKey: "wingull",
+    types: [PokemonType.Water, PokemonType.Flying], attackType: PokemonType.Flying,
+    baseStats: { hp: 40, atk: 30, def: 30 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 18,
+    skillIds: ["hurricane", "waterPulse", "wingAttack"],
+    floors: [],
+  },
+  swablu: {
+    id: "swablu", name: "Swablu", spriteKey: "swablu",
+    types: [PokemonType.Normal, PokemonType.Flying], attackType: PokemonType.Flying,
+    baseStats: { hp: 45, atk: 40, def: 60 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 6, idleFrames: 9,
+    skillIds: ["hurricane", "moonblast", "wingAttack"],
+    floors: [],
+  },
+  lechonk: {
+    id: "lechonk", name: "Lechonk", spriteKey: "lechonk",
+    types: [PokemonType.Normal], attackType: PokemonType.Normal,
+    baseStats: { hp: 54, atk: 45, def: 40 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["hyperVoice", "bodySlam", "tackle"],
+    floors: [],
+  },
+  tandemaus: {
+    id: "tandemaus", name: "Tandemaus", spriteKey: "tandemaus",
+    types: [PokemonType.Normal], attackType: PokemonType.Normal,
+    baseStats: { hp: 50, atk: 50, def: 45 },
+    walkFrameWidth: 40, walkFrameHeight: 48,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 7, idleFrames: 8,
+    skillIds: ["hyperVoice", "bodySlam", "swift"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -2568,6 +2629,13 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   pawniard: { 7: "darkPulse", 10: "ironHead" },
   fidough: { 7: "drainingKiss", 10: "dazzlingGleam" },
   dedenne: { 7: "drainingKiss", 10: "thunderbolt" },
+  // Phase 133-135: Dragon/Flying/Normal 5th
+  cyclizar: { 7: "scaleShot", 10: "dragonPulse" },
+  tatsugiri: { 7: "scaleShot", 10: "dragonPulse" },
+  wingull: { 7: "hurricane", 10: "waterPulse" },
+  swablu: { 7: "hurricane", 10: "moonblast" },
+  lechonk: { 7: "hyperVoice", 10: "bodySlam" },
+  tandemaus: { 7: "hyperVoice", 10: "bodySlam" },
 };
 
 /** Check if a species learns a new skill at this level */
