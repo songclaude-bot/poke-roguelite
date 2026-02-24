@@ -249,6 +249,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     thunderGodSpire: [WeatherType.Rain, WeatherType.Sandstorm],
     venomousAbyss: [WeatherType.Rain, WeatherType.Sandstorm],
     tectonicThrone: [WeatherType.Sandstorm],
+    // Phase 171-173: 9th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+    ancientMonolith: [WeatherType.Sandstorm],
+    predatorHive: [WeatherType.Rain],
+    wargodsTemple: [WeatherType.Sandstorm, WeatherType.Rain],
+    magnetarCore: [WeatherType.Sandstorm, WeatherType.Hail],
+    spectralThrone: [WeatherType.Hail],
+    cognitionSpire: [WeatherType.Rain, WeatherType.Hail],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

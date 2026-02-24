@@ -406,6 +406,13 @@ export class DungeonScene extends Phaser.Scene {
       jolteon: "0135", ampharos: "0181",
       nidoking: "0034", crobat: "0169",
       krookodile: "0553", nidoqueen: "0031",
+      // Phase 171-173: 9th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+      tyranitar: "0248", aerodactyl: "0142",
+      yanmega: "0469", scolipede: "0545",
+      conkeldurr: "0534", machamp: "0068",
+      magnezone: "0462", empoleon: "0395",
+      dusknoir: "0477", cofagrigus: "0563",
+      reuniclus: "0579", gothitelle: "0576",
     };
 
     // Load player + all enemy species + ally species for this dungeon

@@ -2294,6 +2294,52 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 85,
     description: "Shatters the earth with cataclysmic force.",
   },
+
+  // ── Phase 171-173: 9th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic Skills ──
+  rockPolish: {
+    id: "rockPolish",
+    name: "Rock Polish",
+    type: PokemonType.Rock,
+    power: 0,
+    pp: 10,
+    range: SkillRange.Self,
+    accuracy: 100,
+    effect: SkillEffect.AtkUp,
+    effectChance: 100,
+    description: "Polishes body to sharply raise attack speed.",
+  },
+  megaPunch: {
+    id: "megaPunch",
+    name: "Mega Punch",
+    type: PokemonType.Fighting,
+    power: 20,
+    pp: 5,
+    range: SkillRange.Front1,
+    accuracy: 85,
+    description: "Delivers a devastating punch with tremendous force.",
+  },
+  doomDesire: {
+    id: "doomDesire",
+    name: "Doom Desire",
+    type: PokemonType.Steel,
+    power: 22,
+    pp: 4,
+    range: SkillRange.Room,
+    accuracy: 85,
+    description: "Concentrates light into a devastating beam that fills the room.",
+  },
+  shadowRave: {
+    id: "shadowRave",
+    name: "Shadow Rave",
+    type: PokemonType.Ghost,
+    power: 20,
+    pp: 5,
+    range: SkillRange.Around,
+    accuracy: 90,
+    effect: SkillEffect.Burn,
+    effectChance: 30,
+    description: "Unleashes a frenzied wave of spectral energy all around.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

@@ -438,4 +438,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   crobat: AbilityId.Levitate, // Inner Focus equivalent
   krookodile: AbilityId.Guts, // Intimidate equivalent
   nidoqueen: AbilityId.Sturdy, // Poison Point equivalent
+  // Phase 171-173: 9th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+  tyranitar: AbilityId.Guts, // Sand Stream equivalent
+  aerodactyl: AbilityId.RockHead, // Rock Head
+  yanmega: AbilityId.PurePower, // Speed Boost equivalent
+  scolipede: AbilityId.PurePower, // Speed Boost equivalent
+  conkeldurr: AbilityId.Guts, // Guts
+  machamp: AbilityId.NoGuard, // No Guard
+  magnezone: AbilityId.Sturdy, // Sturdy
+  empoleon: AbilityId.Sturdy, // Defiant equivalent
+  dusknoir: AbilityId.Levitate, // Pressure equivalent
+  cofagrigus: AbilityId.FlameBody, // Mummy equivalent (burns on contact)
+  reuniclus: AbilityId.ShieldDust, // Magic Guard equivalent
+  gothitelle: AbilityId.ShieldDust, // Shadow Tag equivalent
 };

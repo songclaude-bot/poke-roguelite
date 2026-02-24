@@ -1107,6 +1107,42 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [131, 131, 165, 165, 196, 196, 131, 131, 110, 110, 165, 165, 220, 220, 165, 110],
     tempo: 0.24, melodyType: "sawtooth", bassType: "square",
   },
+  // Ancient Monolith — deep, primordial
+  ancientMonolith: {
+    melody: [196, 220, 262, 220, 196, 175, 196, 262, 294, 262, 220, 196, 175, 196, 220, 262],
+    bass: [98, 98, 131, 131, 98, 98, 88, 88, 147, 147, 131, 131, 98, 98, 110, 131],
+    tempo: 0.28, melodyType: "sawtooth", bassType: "square",
+  },
+  // Predator Hive — buzzing, frantic
+  predatorHive: {
+    melody: [440, 494, 523, 587, 523, 494, 440, 392, 440, 523, 587, 659, 587, 523, 440, 392],
+    bass: [220, 220, 262, 262, 294, 294, 220, 220, 196, 196, 262, 262, 330, 330, 262, 220],
+    tempo: 0.18, melodyType: "square", bassType: "sawtooth",
+  },
+  // Wargod's Temple — martial, powerful
+  wargodsTemple: {
+    melody: [262, 330, 392, 440, 392, 330, 262, 294, 330, 392, 440, 523, 440, 392, 330, 262],
+    bass: [131, 131, 196, 196, 220, 220, 131, 131, 165, 165, 220, 220, 262, 262, 196, 131],
+    tempo: 0.20, melodyType: "sawtooth", bassType: "square",
+  },
+  // Magnetar Core — metallic, pulsing
+  magnetarCore: {
+    melody: [523, 587, 659, 523, 494, 523, 659, 784, 659, 587, 523, 494, 440, 494, 523, 587],
+    bass: [262, 262, 330, 330, 262, 262, 330, 330, 392, 392, 262, 262, 220, 220, 262, 262],
+    tempo: 0.22, melodyType: "square", bassType: "sawtooth",
+  },
+  // Spectral Throne — eerie, regal
+  spectralThrone: {
+    melody: [220, 262, 294, 262, 220, 196, 175, 196, 220, 262, 330, 294, 262, 220, 196, 220],
+    bass: [110, 110, 131, 131, 147, 147, 98, 98, 110, 110, 165, 165, 131, 131, 98, 110],
+    tempo: 0.30, melodyType: "sine", bassType: "triangle",
+  },
+  // Cognition Spire — ethereal, cerebral
+  cognitionSpire: {
+    melody: [392, 440, 523, 587, 523, 440, 392, 349, 392, 494, 587, 659, 587, 494, 440, 392],
+    bass: [196, 196, 262, 262, 294, 294, 196, 196, 175, 175, 247, 247, 330, 330, 262, 196],
+    tempo: 0.26, melodyType: "triangle", bassType: "sine",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],
