@@ -46,6 +46,9 @@ import {
   DungeonModifier, rollModifiers, modifiersFromIds, getModifierEffects, ModifierEffects,
 } from "../core/dungeon-modifiers";
 import {
+  DifficultyLevel, DifficultyModifiers, getDifficultyModifiers, loadDifficulty, isNonNormalDifficulty,
+} from "../core/difficulty-settings";
+import {
   initAudio, startBgm, stopBgm,
   sfxHit, sfxSuperEffective, sfxNotEffective, sfxMove, sfxPickup,
   sfxLevelUp, sfxRecruit, sfxStairs, sfxDeath, sfxBossDefeat,
@@ -232,6 +235,10 @@ export class DungeonScene extends Phaser.Scene {
   private activeModifiers: DungeonModifier[] = [];
   private modifierEffects: ModifierEffects = getModifierEffects([]);
 
+  // Difficulty settings
+  private difficultyLevel: DifficultyLevel = DifficultyLevel.Normal;
+  private difficultyMods: DifficultyModifiers = getDifficultyModifiers(DifficultyLevel.Normal);
+
   // Pokedex tracking: species encountered this run
   private seenSpecies = new Set<string>();
 
@@ -256,6 +263,10 @@ export class DungeonScene extends Phaser.Scene {
       const side = localStorage.getItem("poke-roguelite-dpadSide");
       if (side === "left" || side === "right") this.dpadSide = side;
     } catch { /* ignore */ }
+
+    // Load difficulty settings
+    this.difficultyLevel = loadDifficulty();
+    this.difficultyMods = getDifficultyModifiers(this.difficultyLevel);
 
     // Apply upgrade bonuses on fresh run start (floor 1 from hub)
     const meta = loadMeta();
@@ -861,6 +872,15 @@ export class DungeonScene extends Phaser.Scene {
             enemyStats.maxHp = Math.floor(enemyStats.maxHp * this.modifierEffects.enemyHpMult);
           }
 
+          // Apply difficulty setting modifiers to enemy stats
+          if (this.difficultyMods.enemyHpMult !== 1) {
+            enemyStats.hp = Math.floor(enemyStats.hp * this.difficultyMods.enemyHpMult);
+            enemyStats.maxHp = Math.floor(enemyStats.maxHp * this.difficultyMods.enemyHpMult);
+          }
+          if (this.difficultyMods.enemyAtkMult !== 1) {
+            enemyStats.atk = Math.floor(enemyStats.atk * this.difficultyMods.enemyAtkMult);
+          }
+
           const enemy: Entity = {
             tileX: ex, tileY: ey,
             facing: Direction.Down,
@@ -904,9 +924,9 @@ export class DungeonScene extends Phaser.Scene {
 
         const baseStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
         const bossStats = {
-          hp: Math.floor(baseStats.hp * bossDef.statMultiplier),
-          maxHp: Math.floor(baseStats.hp * bossDef.statMultiplier),
-          atk: Math.floor(baseStats.atk * bossDef.statMultiplier),
+          hp: Math.floor(baseStats.hp * bossDef.statMultiplier * this.difficultyMods.enemyHpMult),
+          maxHp: Math.floor(baseStats.hp * bossDef.statMultiplier * this.difficultyMods.enemyHpMult),
+          atk: Math.floor(baseStats.atk * bossDef.statMultiplier * this.difficultyMods.enemyAtkMult),
           def: Math.floor(baseStats.def * bossDef.statMultiplier),
           level: baseStats.level + 3,
         };
@@ -960,9 +980,9 @@ export class DungeonScene extends Phaser.Scene {
         const bossMultiplier = 2.0 + this.currentFloor * 0.2;
         const baseStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
         const bossStats = {
-          hp: Math.floor(baseStats.hp * bossMultiplier),
-          maxHp: Math.floor(baseStats.hp * bossMultiplier),
-          atk: Math.floor(baseStats.atk * bossMultiplier),
+          hp: Math.floor(baseStats.hp * bossMultiplier * this.difficultyMods.enemyHpMult),
+          maxHp: Math.floor(baseStats.hp * bossMultiplier * this.difficultyMods.enemyHpMult),
+          atk: Math.floor(baseStats.atk * bossMultiplier * this.difficultyMods.enemyAtkMult),
           def: Math.floor(baseStats.def * bossMultiplier),
           level: baseStats.level + 3,
         };
@@ -1017,9 +1037,9 @@ export class DungeonScene extends Phaser.Scene {
         const bossMultiplier = 3.0 + this.currentFloor * 1.5;
         const baseStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
         const bossStats = {
-          hp: Math.floor(baseStats.hp * bossMultiplier),
-          maxHp: Math.floor(baseStats.hp * bossMultiplier),
-          atk: Math.floor(baseStats.atk * bossMultiplier),
+          hp: Math.floor(baseStats.hp * bossMultiplier * this.difficultyMods.enemyHpMult),
+          maxHp: Math.floor(baseStats.hp * bossMultiplier * this.difficultyMods.enemyHpMult),
+          atk: Math.floor(baseStats.atk * bossMultiplier * this.difficultyMods.enemyAtkMult),
           def: Math.floor(baseStats.def * bossMultiplier),
           level: baseStats.level + 5 + this.currentFloor,
         };
@@ -1066,7 +1086,8 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Spawn floor items ──
     this.inventory = this.persistentInventory ?? [];
-    for (let i = 0; i < this.dungeonDef.itemsPerFloor; i++) {
+    const itemCount = Math.max(1, Math.floor(this.dungeonDef.itemsPerFloor * this.difficultyMods.itemDropMult));
+    for (let i = 0; i < itemCount; i++) {
       const room = rooms[Math.floor(Math.random() * rooms.length)];
       const ix = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
       const iy = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
@@ -1087,7 +1108,7 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     // ── Spawn floor traps (hidden) ──
-    const trapCount = trapsPerFloor(this.currentFloor, this.dungeonDef.difficulty);
+    const trapCount = Math.floor(trapsPerFloor(this.currentFloor, this.dungeonDef.difficulty) * this.difficultyMods.trapFreqMult);
     // Collect occupied positions (items, enemies, etc.)
     const occupiedPositions = new Set<string>();
     for (const fi of this.floorItems) occupiedPositions.add(`${fi.x},${fi.y}`);
@@ -2477,7 +2498,7 @@ export class DungeonScene extends Phaser.Scene {
         this.gameOver = true;
         clearDungeonSave();
         const heldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
-        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult);
+        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult * this.difficultyMods.goldMult);
         this.cameras.main.fadeOut(500);
         this.time.delayedCall(600, () => {
           this.scene.start("HubScene", {
@@ -3138,7 +3159,7 @@ export class DungeonScene extends Phaser.Scene {
   private tickBelly() {
     if (this.belly > 0) {
       // Difficulty-based drain: higher difficulty = faster hunger
-      const drainRate = 0.5 + this.dungeonDef.difficulty * 0.1;
+      const drainRate = (0.5 + this.dungeonDef.difficulty * 0.1) * this.difficultyMods.bellyDrainMult;
       const prevBelly = this.belly;
       this.belly = Math.max(0, this.belly - drainRate);
 
@@ -3398,6 +3419,15 @@ export class DungeonScene extends Phaser.Scene {
 
         const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
         const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty * diffMult, sp, this.ngPlusLevel);
+
+        // Apply difficulty setting modifiers to monster house enemies
+        if (this.difficultyMods.enemyHpMult !== 1) {
+          enemyStats.hp = Math.floor(enemyStats.hp * this.difficultyMods.enemyHpMult);
+          enemyStats.maxHp = Math.floor(enemyStats.maxHp * this.difficultyMods.enemyHpMult);
+        }
+        if (this.difficultyMods.enemyAtkMult !== 1) {
+          enemyStats.atk = Math.floor(enemyStats.atk * this.difficultyMods.enemyAtkMult);
+        }
 
         const enemy: Entity = {
           tileX: ex, tileY: ey,
@@ -3722,7 +3752,7 @@ export class DungeonScene extends Phaser.Scene {
     const modGoldMult = this.modifierEffects.goldMult; // Dungeon modifier gold multiplier
     const clearHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
     const hasBoss = this.dungeonDef.boss || this.isBossRush;
-    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult);
+    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * this.difficultyMods.goldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -3793,6 +3823,7 @@ export class DungeonScene extends Phaser.Scene {
       cleared: true,
       date: new Date().toISOString(),
       challengeMode: this.challengeMode ?? undefined,
+      difficulty: isNonNormalDifficulty(this.difficultyLevel) ? this.difficultyLevel : undefined,
     });
 
     // Stats summary
@@ -3843,7 +3874,7 @@ export class DungeonScene extends Phaser.Scene {
     clearDungeonSave();
 
     const goHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
-    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult);
+    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -3904,6 +3935,7 @@ export class DungeonScene extends Phaser.Scene {
       cleared: false,
       date: new Date().toISOString(),
       challengeMode: this.challengeMode ?? undefined,
+      difficulty: isNonNormalDifficulty(this.difficultyLevel) ? this.difficultyLevel : undefined,
     });
 
     // Stats summary
@@ -4156,7 +4188,9 @@ export class DungeonScene extends Phaser.Scene {
       const critChance = this.heldItemEffect.critChance ?? 0;
       const isCrit = attacker === this.player && critChance > 0 && Math.random() * 100 < critChance;
       const critMult = isCrit ? 1.5 : 1.0;
-      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * wMult * critMult));
+      // Apply difficulty playerDamageMult when defender is the player
+      const diffDmgMult = defender === this.player ? this.difficultyMods.playerDamageMult : 1.0;
+      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * wMult * critMult * diffDmgMult));
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
       // Sound effects based on effectiveness
@@ -4275,7 +4309,9 @@ export class DungeonScene extends Phaser.Scene {
           const skillCritChance = this.heldItemEffect.critChance ?? 0;
           const skillIsCrit = user === this.player && skillCritChance > 0 && Math.random() * 100 < skillCritChance;
           const skillCritMult = skillIsCrit ? 1.5 : 1.0;
-          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * wMult * skillCritMult));
+          // Apply difficulty playerDamageMult when target is the player
+          const skillDiffDmgMult = target === this.player ? this.difficultyMods.playerDamageMult : 1.0;
+          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * wMult * skillCritMult * skillDiffDmgMult));
           target.stats.hp = Math.max(0, target.stats.hp - dmg);
 
           this.flashEntity(target, effectiveness);
@@ -4625,7 +4661,7 @@ export class DungeonScene extends Phaser.Scene {
       // Grant EXP (boss gives 5x, apply modifier expMult)
       const baseExp = expFromEnemy(entity.stats.level, this.currentFloor);
       const heldExpMult = 1 + (this.heldItemEffect.expBonus ?? 0) / 100;
-      const expGain = Math.floor((isBossKill ? baseExp * 5 : baseExp) * this.modifierEffects.expMult * heldExpMult);
+      const expGain = Math.floor((isBossKill ? baseExp * 5 : baseExp) * this.modifierEffects.expMult * heldExpMult * this.difficultyMods.expMult);
       this.totalExp += expGain;
 
       if (isBossKill) {

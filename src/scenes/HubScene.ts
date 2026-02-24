@@ -250,6 +250,12 @@ export class HubScene extends Phaser.Scene {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
+    // Settings button (gear icon)
+    const settingsBtn = this.add.text(GAME_WIDTH - 50, GAME_HEIGHT - 8, "[Gear]", {
+      fontSize: "10px", color: "#94a3b8", fontFamily: "monospace",
+    }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true });
+    settingsBtn.on("pointerdown", () => this.scene.start("SettingsScene"));
+
     // Help button
     const helpBtn = this.add.text(GAME_WIDTH - 20, GAME_HEIGHT - 8, "[?]", {
       fontSize: "10px", color: "#667eea", fontFamily: "monospace",

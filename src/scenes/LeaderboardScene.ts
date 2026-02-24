@@ -396,6 +396,10 @@ export class LeaderboardScene extends Phaser.Scene {
       const modeNames: Record<string, string> = { speedrun: "Speed Run", noItems: "No Items", solo: "Solo" };
       line2 += `  [${modeNames[run.challengeMode] ?? run.challengeMode}]`;
     }
+    if (run.difficulty) {
+      const diffNames: Record<string, string> = { easy: "Easy", hard: "Hard", nightmare: "Nightmare" };
+      line2 += `  [${diffNames[run.difficulty] ?? run.difficulty}]`;
+    }
 
     // Dungeon name (if showing across dungeons)
     if (showDungeon) {

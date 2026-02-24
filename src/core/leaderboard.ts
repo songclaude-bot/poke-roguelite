@@ -20,6 +20,7 @@ export interface RunScore {
   cleared: boolean;
   date: string; // ISO date string
   challengeMode?: string;
+  difficulty?: string; // difficulty level tag (omitted for Normal)
 }
 
 export interface RunScoreInput {
@@ -32,6 +33,7 @@ export interface RunScoreInput {
   cleared: boolean;
   totalFloors: number; // dungeon's total floor count, needed for turn efficiency
   challengeMode?: string;
+  difficulty?: string; // difficulty level tag (omitted for Normal)
 }
 
 /**
