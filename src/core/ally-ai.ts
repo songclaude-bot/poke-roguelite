@@ -1,6 +1,8 @@
 import { Direction, DIR_DX, DIR_DY } from "./direction";
 import { TerrainType } from "./dungeon-generator";
 import { Entity, canMoveTo, canMoveDiagonal, chebyshevDist, AllyTactic } from "./entity";
+import { Skill, SkillEffect, SkillRange } from "./skill";
+import { getEffectiveness } from "./type-chart";
 
 // ── Constants ──
 const BASE_FOLLOW_DIST = 2;  // ideal follow distance for position 0
@@ -498,4 +500,196 @@ function bfsToPlayer(
     allEntities, ally,
     [player] // ignore player as blocker
   );
+}
+
+// ══════════════════════════════════════════════════════════
+// ── Ally Skill Selection ──
+// ══════════════════════════════════════════════════════════
+
+/** Threshold below which an entity is considered low HP */
+const LOW_HP_THRESHOLD = 0.4;
+/** Player HP threshold for ally healing support (FollowMe only) */
+const PLAYER_HEAL_THRESHOLD = 0.5;
+/** Range within which allies consider healing nearby allies */
+const HEAL_NEARBY_RANGE = 3;
+
+/**
+ * Check if an entity needs healing (below threshold % HP).
+ */
+function needsHealing(entity: Entity, threshold: number): boolean {
+  return entity.alive && entity.stats.hp < entity.stats.maxHp * threshold;
+}
+
+/**
+ * Find a healing skill with PP remaining from the ally's skill list.
+ */
+function findHealSkill(ally: Entity): Skill | null {
+  return ally.skills.find(
+    s => s.currentPp > 0 && s.effect === SkillEffect.Heal && s.range === SkillRange.Self
+  ) ?? null;
+}
+
+/**
+ * Find a buff skill (AtkUp or DefUp) that the ally doesn't already have active.
+ */
+function findBuffSkill(ally: Entity): Skill | null {
+  const hasAtkUp = ally.statusEffects.some(s => s.type === SkillEffect.AtkUp);
+  const hasDefUp = ally.statusEffects.some(s => s.type === SkillEffect.DefUp);
+  return ally.skills.find(s => {
+    if (s.currentPp <= 0 || s.range !== SkillRange.Self) return false;
+    if (s.effect === SkillEffect.AtkUp && !hasAtkUp) return true;
+    if (s.effect === SkillEffect.DefUp && !hasDefUp) return true;
+    return false;
+  }) ?? null;
+}
+
+/**
+ * Find the best damaging skill against a target, considering type effectiveness.
+ * Returns the skill with highest effective power (power * effectiveness).
+ */
+function findBestAttackSkill(ally: Entity, target: Entity): Skill | null {
+  let bestSkill: Skill | null = null;
+  let bestScore = 0;
+
+  for (const skill of ally.skills) {
+    if (skill.currentPp <= 0 || skill.power <= 0) continue;
+    const eff = getEffectiveness(skill.type, target.types);
+    // Skip immune moves
+    if (eff === 0) continue;
+    const score = skill.power * eff;
+    if (score > bestScore) {
+      bestScore = score;
+      bestSkill = skill;
+    }
+  }
+  return bestSkill;
+}
+
+/**
+ * Find any super-effective skill against the target.
+ */
+function findSuperEffectiveSkill(ally: Entity, target: Entity): Skill | null {
+  return ally.skills.find(s => {
+    if (s.currentPp <= 0 || s.power <= 0) return false;
+    return getEffectiveness(s.type, target.types) >= 2.0;
+  }) ?? null;
+}
+
+/**
+ * Select the best skill for an ally to use based on tactic and situation.
+ * Returns the skill to use, or null to fall back to basic attack.
+ *
+ * Priority logic varies by tactic:
+ * - FollowMe: balanced — heal self/player, buff, then best attack
+ * - GoAfterFoes: offensive — prefer super-effective and high-power attacks
+ * - StayHere: defensive — prefer heal/buff, then attack
+ * - Scatter: random from available skills
+ */
+export function selectAllySkill(
+  ally: Entity,
+  target: Entity | null,
+  allies: Entity[],
+  player: Entity,
+): Skill | null {
+  const tactic = ally.allyTactic ?? AllyTactic.FollowMe;
+  const healSkill = findHealSkill(ally);
+  const buffSkill = findBuffSkill(ally);
+
+  // ── Scatter: random skill choice ──
+  if (tactic === AllyTactic.Scatter) {
+    const usable = ally.skills.filter(s => s.currentPp > 0);
+    if (usable.length === 0) return null;
+    // Filter out heal if not needed
+    const filtered = usable.filter(s => {
+      if (s.effect === SkillEffect.Heal && !needsHealing(ally, LOW_HP_THRESHOLD)) return false;
+      return true;
+    });
+    if (filtered.length === 0) return null;
+    return filtered[Math.floor(Math.random() * filtered.length)];
+  }
+
+  // ── Healing priority (all tactics except Scatter, already handled) ──
+  // Self-heal if below threshold
+  if (healSkill && needsHealing(ally, LOW_HP_THRESHOLD)) {
+    return healSkill;
+  }
+
+  // FollowMe: heal if player is below 50% HP and ally is adjacent
+  if (tactic === AllyTactic.FollowMe && healSkill) {
+    if (needsHealing(player, PLAYER_HEAL_THRESHOLD) &&
+        chebyshevDist(ally.tileX, ally.tileY, player.tileX, player.tileY) <= 1) {
+      // Self-heal skill can't target player directly, but ally can heal self
+      // to preserve team HP pool. Only heal self if also somewhat hurt (>20% missing HP).
+      if (needsHealing(ally, 0.8)) {
+        return healSkill;
+      }
+    }
+    // Also heal if a nearby ally is critically low
+    for (const other of allies) {
+      if (other === ally || !other.alive) continue;
+      if (chebyshevDist(ally.tileX, ally.tileY, other.tileX, other.tileY) <= HEAL_NEARBY_RANGE) {
+        // If nearby ally is very low, self-heal to preserve team
+        if (needsHealing(other, 0.3) && needsHealing(ally, 0.7)) {
+          return healSkill;
+        }
+      }
+    }
+  }
+
+  // StayHere: prioritize heal/buff heavily
+  if (tactic === AllyTactic.StayHere) {
+    if (healSkill && needsHealing(ally, 0.6)) return healSkill;
+    if (buffSkill) return buffSkill;
+  }
+
+  // ── Buff logic (FollowMe and GoAfterFoes) ──
+  // Only buff if no active buff and in a moment of relative safety
+  if (tactic === AllyTactic.FollowMe && buffSkill) {
+    // Buff when not in immediate danger (no adjacent enemy or target is far)
+    if (!target || (target && chebyshevDist(ally.tileX, ally.tileY, target.tileX, target.tileY) > 1)) {
+      return buffSkill;
+    }
+  }
+
+  // GoAfterFoes: only buff AtkUp (not DefUp) and only if not adjacent to enemy
+  if (tactic === AllyTactic.GoAfterFoes && buffSkill && buffSkill.effect === SkillEffect.AtkUp) {
+    if (!target || chebyshevDist(ally.tileX, ally.tileY, target.tileX, target.tileY) > 1) {
+      return buffSkill;
+    }
+  }
+
+  // ── Attack skill selection (requires a target) ──
+  if (!target) return null;
+
+  // GoAfterFoes: strongly prefer offensive skills
+  if (tactic === AllyTactic.GoAfterFoes) {
+    // Always prefer super-effective
+    const superEff = findSuperEffectiveSkill(ally, target);
+    if (superEff) return superEff;
+    // Then best damaging skill
+    const best = findBestAttackSkill(ally, target);
+    if (best) return best;
+    return null;
+  }
+
+  // FollowMe: balanced — prefer super-effective, then best attack with some randomness
+  if (tactic === AllyTactic.FollowMe) {
+    const superEff = findSuperEffectiveSkill(ally, target);
+    if (superEff) return superEff;
+    // Use skill ~60% of the time for variety (otherwise basic attack)
+    if (Math.random() < 0.6) {
+      const best = findBestAttackSkill(ally, target);
+      if (best) return best;
+    }
+    return null;
+  }
+
+  // StayHere: already handled heal/buff above, just pick best attack
+  if (tactic === AllyTactic.StayHere) {
+    const best = findBestAttackSkill(ally, target);
+    if (best) return best;
+    return null;
+  }
+
+  return null;
 }

@@ -16,7 +16,7 @@ import {
   AllyTactic,
 } from "../core/entity";
 import { getEnemyMoveDirection, isAdjacentToPlayer, directionToPlayer } from "../core/enemy-ai";
-import { getAllyMoveDirection, tryRecruit, directionTo, getFollowDist } from "../core/ally-ai";
+import { getAllyMoveDirection, tryRecruit, directionTo, getFollowDist, selectAllySkill } from "../core/ally-ai";
 import { PokemonType, getEffectiveness, effectivenessText } from "../core/type-chart";
 import { Skill, SkillRange, SkillEffect, SKILL_DB, createSkill } from "../core/skill";
 import { getSkillTargetTiles } from "../core/skill-targeting";
@@ -7268,15 +7268,24 @@ export class DungeonScene extends Phaser.Scene {
             partyPosition >= 0 ? partyPosition : 0
           );
 
-          if (attackTarget) {
+          // ── Smart skill selection ──
+          // Check for self-targeting skills (heal/buff) even without an attack target
+          const selectedSkill = selectAllySkill(ally, attackTarget, this.allies, this.player);
+
+          if (selectedSkill && selectedSkill.range === SkillRange.Self) {
+            // Self-targeting skill (heal/buff) — can use even without attack target
+            selectedSkill.currentPp--;
+            this.showAllySkillPopup(ally, selectedSkill);
+            await this.performSkill(ally, selectedSkill, ally.facing);
+            this.updateHUD();
+          } else if (attackTarget) {
             const dir = directionTo(ally, attackTarget);
             ally.facing = dir;
-            // Use skill sometimes
-            const usableSkills = ally.skills.filter(s => s.currentPp > 0 && s.power > 0);
-            if (usableSkills.length > 0 && Math.random() < 0.35) {
-              const skill = usableSkills[Math.floor(Math.random() * usableSkills.length)];
-              skill.currentPp--;
-              await this.performSkill(ally, skill, dir);
+            if (selectedSkill) {
+              // Use the intelligently selected skill
+              selectedSkill.currentPp--;
+              this.showAllySkillPopup(ally, selectedSkill);
+              await this.performSkill(ally, selectedSkill, dir);
             } else {
               await this.performBasicAttack(ally, attackTarget);
             }
@@ -7289,6 +7298,30 @@ export class DungeonScene extends Phaser.Scene {
           }
         };
       });
+  }
+
+  /** Show a brief skill name popup above an ally when they use a skill */
+  private showAllySkillPopup(ally: Entity, skill: Skill) {
+    if (!ally.sprite) return;
+    const x = ally.sprite.x;
+    const y = ally.sprite.y - 20;
+    const popup = this.add.text(x, y, skill.name, {
+      fontSize: "9px",
+      color: "#a5f3fc",
+      fontFamily: "monospace",
+      fontStyle: "bold",
+      stroke: "#000000",
+      strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(300);
+
+    this.tweens.add({
+      targets: popup,
+      y: y - 18,
+      alpha: { from: 1, to: 0 },
+      duration: 700,
+      ease: "Quad.easeOut",
+      onComplete: () => popup.destroy(),
+    });
   }
 
   /** Serialize allies for floor transition / save */
