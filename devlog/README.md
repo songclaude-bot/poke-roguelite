@@ -454,12 +454,36 @@
 
 ---
 
-## 현재 게임 규모 (v0.75.0)
+## Phase 75: Stalactite Grotto
+
+### 75. Rock 3차 던전
+- 날짜: 2026-02-24
+- 핵심: Dwebble/Binacle, smackDown 스킬, Stalactite Grotto 13층, Stone Barbaracle 보스
+
+---
+
+## Phase 76: Chitin Burrow
+
+### 76. Bug 3차 던전
+- 날짜: 2026-02-24
+- 핵심: Nincada/Venipede, megahorn 스킬, Chitin Burrow 13층, Swift Ninjask 보스
+
+---
+
+## Phase 77: Valor Arena
+
+### 77. Fighting 3차 던전
+- 날짜: 2026-02-24
+- 핵심: Mienfoo/Timburr, superpower 스킬, Valor Arena 14층, Grand Mienshao 보스
+
+---
+
+## 현재 게임 규모 (v0.80.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **57개 던전**: Beach Cave → Seismic Fault + Destiny Tower
-- **129종+ 포켓몬** (진화 포함 147종+)
-- **135종+ 기술**
+- **60개 던전**: Beach Cave → Valor Arena + Destiny Tower
+- **141종+ 포켓몬** (진화 포함 159종+)
+- **138종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **73종 스타터** (클리어 수로 해금)
-- **108종+ 진화 경로**
+- **79종 스타터** (클리어 수로 해금)
+- **114종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
