@@ -1195,6 +1195,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["nightSlash", "foulPlay", "pursuit"],
     floors: [],
   },
+
+  // ── Phase 61 Flying 2nd ──
+  pidove: {
+    id: "pidove", name: "Pidove", spriteKey: "pidove",
+    types: [PokemonType.Normal, PokemonType.Flying], attackType: PokemonType.Flying,
+    baseStats: { hp: 26, atk: 12, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 5, idleFrames: 4,
+    skillIds: ["airSlash", "hurricane", "wingAttack"],
+    floors: [],
+  },
+  rufflet: {
+    id: "rufflet", name: "Rufflet", spriteKey: "rufflet",
+    types: [PokemonType.Normal, PokemonType.Flying], attackType: PokemonType.Flying,
+    baseStats: { hp: 30, atk: 14, def: 6 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 24, idleFrameHeight: 48,
+    walkFrames: 5, idleFrames: 4,
+    skillIds: ["bravebird", "aerialAce", "hurricane"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1301,6 +1323,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   spoink: { 7: "psyshock", 10: "psychic" },
   stunky: { 7: "foulPlay", 10: "darkPulse" },
   purrloin: { 7: "nightSlash", 10: "foulPlay" },
+  pidove: { 7: "airSlash", 10: "hurricane" },
+  rufflet: { 7: "bravebird", 10: "hurricane" },
 };
 
 /** Check if a species learns a new skill at this level */

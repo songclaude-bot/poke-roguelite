@@ -185,4 +185,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   spoink: AbilityId.ShieldDust,
   stunky: AbilityId.ShieldDust,
   purrloin: AbilityId.NoGuard,
+  pidove: AbilityId.ShieldDust,
+  rufflet: AbilityId.Guts,
 };

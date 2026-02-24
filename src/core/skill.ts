@@ -1259,6 +1259,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Turns the foe's power against it.",
   },
+
+  // ── Phase 61 Flying Skills ──
+  hurricane: {
+    id: "hurricane",
+    name: "Hurricane",
+    type: PokemonType.Flying,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Room,
+    accuracy: 70,
+    description: "Summons a devastating hurricane in the room.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
