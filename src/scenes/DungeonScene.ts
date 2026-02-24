@@ -313,6 +313,10 @@ export class DungeonScene extends Phaser.Scene {
       turtonator: "0776", drampa: "0780",
       rookidee: "0821", archen: "0566",
       wooloo: "0831", skwovet: "0819",
+      // Phase 118-120: Water/Fire/Grass 5th
+      bruxish: "0779", chewtle: "0833",
+      litleo: "0667", torchic: "0255",
+      gossifleur: "0829", bounsweet: "0761",
     };
 
     // Load player + all enemy species + ally species for this dungeon

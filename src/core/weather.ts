@@ -157,6 +157,9 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     draconicSpire: [WeatherType.Sandstorm, WeatherType.Hail],
     skyHighNest: [WeatherType.Rain, WeatherType.Sandstorm],
     pastoralPlains: [WeatherType.Rain],
+    abyssalDepths: [WeatherType.Rain],
+    volcanicCore: [WeatherType.Sandstorm],
+    ancientWoods: [WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

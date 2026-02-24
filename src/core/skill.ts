@@ -1731,6 +1731,38 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 95,
     description: "Doubles in power when burned or paralyzed.",
   },
+  // Phase 118-120: Water/Fire/Grass 5th
+  liquidation: {
+    id: "liquidation",
+    name: "Liquidation",
+    type: PokemonType.Water,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Front1,
+    accuracy: 90,
+    description: "Strikes with a powerful water jet.",
+  },
+  blazeKick: {
+    id: "blazeKick",
+    name: "Blaze Kick",
+    type: PokemonType.Fire,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Front1,
+    accuracy: 85,
+    effect: SkillEffect.Burn,
+    description: "A blazing kick with high burn chance.",
+  },
+  tropicalKick: {
+    id: "tropicalKick",
+    name: "Tropical Kick",
+    type: PokemonType.Grass,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front1,
+    accuracy: 95,
+    description: "A kick infused with tropical energy.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

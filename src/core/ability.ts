@@ -265,4 +265,10 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   archen: AbilityId.Guts, // Defeatist equivalent
   wooloo: AbilityId.Pickup, // Fluffy equivalent
   skwovet: AbilityId.Pickup, // Cheek Pouch equivalent
+  bruxish: AbilityId.PurePower, // Strong Jaw equivalent
+  chewtle: AbilityId.Sturdy, // Strong Jaw equivalent
+  litleo: AbilityId.Guts, // Unnerve equivalent
+  torchic: AbilityId.Torrent, // Speed Boost → Torrent equivalent
+  gossifleur: AbilityId.ShieldDust, // Cotton Down equivalent
+  bounsweet: AbilityId.ShieldDust, // Leaf Guard equivalent
 };

@@ -637,6 +637,22 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [165, 165, 220, 220, 220, 220, 165, 165, 131, 131, 165, 165, 220, 220, 262, 262],
     tempo: 0.34, melodyType: "triangle", bassType: "sine",
   },
+  // Phase 118-120: Water/Fire/Grass 5th
+  abyssalDepths: {
+    melody: [165, 196, 220, 262, 247, 220, 196, 165, 147, 165, 196, 220, 262, 294, 262, 220],
+    bass: [82, 82, 110, 110, 131, 131, 98, 98, 74, 74, 82, 82, 131, 131, 147, 147],
+    tempo: 0.36, melodyType: "sine", bassType: "triangle",
+  },
+  volcanicCore: {
+    melody: [294, 330, 392, 440, 494, 440, 392, 330, 294, 330, 392, 494, 523, 494, 392, 330],
+    bass: [147, 147, 196, 196, 247, 247, 196, 196, 147, 147, 196, 196, 262, 262, 196, 196],
+    tempo: 0.24, melodyType: "sawtooth", bassType: "square",
+  },
+  ancientWoods: {
+    melody: [262, 294, 330, 349, 392, 349, 330, 294, 262, 247, 220, 247, 262, 294, 349, 330],
+    bass: [131, 131, 165, 165, 196, 196, 165, 165, 131, 131, 110, 110, 131, 131, 175, 175],
+    tempo: 0.32, melodyType: "triangle", bassType: "sine",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

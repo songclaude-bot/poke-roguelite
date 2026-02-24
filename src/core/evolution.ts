@@ -166,6 +166,12 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "archen", to: "archeops", level: 16, newName: "Archeops", hpBonus: 14, atkBonus: 12, defBonus: 4, newSkillId: "rockSlide" },
   { from: "wooloo", to: "dubwool", level: 14, newName: "Dubwool", hpBonus: 14, atkBonus: 6, defBonus: 10, newSkillId: "facade" },
   { from: "skwovet", to: "greedent", level: 14, newName: "Greedent", hpBonus: 16, atkBonus: 8, defBonus: 8, newSkillId: "facade" },
+  // Phase 118-120: Water/Fire/Grass 5th
+  { from: "chewtle", to: "drednaw", level: 14, newName: "Drednaw", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "liquidation" },
+  { from: "litleo", to: "pyroar", level: 14, newName: "Pyroar", hpBonus: 14, atkBonus: 10, defBonus: 4, newSkillId: "flamethrower" },
+  { from: "torchic", to: "combusken", level: 14, newName: "Combusken", hpBonus: 12, atkBonus: 10, defBonus: 6, newSkillId: "blazeKick" },
+  { from: "gossifleur", to: "eldegoss", level: 14, newName: "Eldegoss", hpBonus: 14, atkBonus: 6, defBonus: 10, newSkillId: "energyBall" },
+  { from: "bounsweet", to: "steenee", level: 14, newName: "Steenee", hpBonus: 12, atkBonus: 10, defBonus: 6, newSkillId: "tropicalKick" },
 ];
 
 /** Check if a species can evolve at a given level */
