@@ -21,7 +21,16 @@ export class HubScene extends Phaser.Scene {
     super({ key: "HubScene" });
   }
 
-  init(data?: { gold?: number; cleared?: boolean; bestFloor?: number }) {
+  init(data?: {
+    gold?: number;
+    cleared?: boolean;
+    bestFloor?: number;
+    enemiesDefeated?: number;
+    turns?: number;
+    dungeonId?: string;
+    starter?: string;
+    challengeMode?: string;
+  }) {
     this.meta = loadMeta();
 
     if (data?.gold !== undefined) {
@@ -31,6 +40,23 @@ export class HubScene extends Phaser.Scene {
       if (data.cleared) this.meta.totalClears++;
       if (data.bestFloor && data.bestFloor > this.meta.bestFloor) {
         this.meta.bestFloor = data.bestFloor;
+      }
+      // Track achievement stats
+      this.meta.totalEnemiesDefeated += data.enemiesDefeated ?? 0;
+      this.meta.totalTurns += data.turns ?? 0;
+      // Endless best floor
+      if (data.dungeonId === "endlessDungeon" && data.bestFloor) {
+        if (data.bestFloor > this.meta.endlessBestFloor) {
+          this.meta.endlessBestFloor = data.bestFloor;
+        }
+      }
+      // Challenge clears
+      if (data.cleared && data.challengeMode) {
+        this.meta.challengeClears++;
+      }
+      // Starter usage tracking
+      if (data.starter && !this.meta.startersUsed.includes(data.starter)) {
+        this.meta.startersUsed.push(data.starter);
       }
       saveMeta(this.meta);
     }
@@ -138,9 +164,7 @@ export class HubScene extends Phaser.Scene {
     );
     this.createFixedButton(GAME_WIDTH / 2, fixedY + 72, btnW, 32,
       "Records", `Clears: ${this.meta.totalClears}  Best: B${this.meta.bestFloor}F`, "#60a5fa",
-      () => this.showNotice(
-        `Total Runs: ${this.meta.totalRuns}\nClears: ${this.meta.totalClears}\nBest Floor: B${this.meta.bestFloor}F\nTotal Gold: ${this.meta.totalGold}`
-      )
+      () => this.scene.start("AchievementScene")
     );
 
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v2.0.0", {

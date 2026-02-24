@@ -49,6 +49,12 @@ export interface MetaSaveData {
   upgrades: Record<string, number>; // upgradeId → level
   // Starter pokemon (unlocked by clears)
   starter?: string; // speciesId (default: "mudkip")
+  // Achievement tracking stats
+  totalEnemiesDefeated: number;
+  totalTurns: number;
+  endlessBestFloor: number;
+  challengeClears: number;
+  startersUsed: string[];  // array of starter IDs used
 }
 
 const SAVE_VERSION = 1;
@@ -95,6 +101,11 @@ function defaultMeta(): MetaSaveData {
     totalRuns: 0,
     storage: [],
     upgrades: {},
+    totalEnemiesDefeated: 0,
+    totalTurns: 0,
+    endlessBestFloor: 0,
+    challengeClears: 0,
+    startersUsed: [],
   };
 }
 
@@ -104,6 +115,12 @@ export function loadMeta(): MetaSaveData {
     if (!raw) return defaultMeta();
     const data = JSON.parse(raw) as MetaSaveData;
     if (data.version !== SAVE_VERSION) return defaultMeta();
+    // Backward compatibility: fill in new fields if missing from old saves
+    if (data.totalEnemiesDefeated === undefined) data.totalEnemiesDefeated = 0;
+    if (data.totalTurns === undefined) data.totalTurns = 0;
+    if (data.endlessBestFloor === undefined) data.endlessBestFloor = 0;
+    if (data.challengeClears === undefined) data.challengeClears = 0;
+    if (data.startersUsed === undefined) data.startersUsed = [];
     return data;
   } catch {
     return defaultMeta();

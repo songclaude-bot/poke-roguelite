@@ -1657,7 +1657,16 @@ export class DungeonScene extends Phaser.Scene {
       clearDungeonSave();
       this.cameras.main.fadeOut(500);
       this.time.delayedCall(600, () => {
-        this.scene.start("HubScene", { gold: 0, cleared: false, bestFloor: this.currentFloor });
+        this.scene.start("HubScene", {
+          gold: 0,
+          cleared: false,
+          bestFloor: this.currentFloor,
+          enemiesDefeated: this.enemiesDefeated,
+          turns: this.turnManager.turn,
+          dungeonId: this.dungeonDef.id,
+          starter: this.starterId,
+          challengeMode: this.challengeMode ?? undefined,
+        });
       });
     });
   }
@@ -2022,7 +2031,16 @@ export class DungeonScene extends Phaser.Scene {
         const escGold = goldFromRun(this.currentFloor, this.enemiesDefeated, false);
         this.cameras.main.fadeOut(500);
         this.time.delayedCall(600, () => {
-          this.scene.start("HubScene", { gold: escGold, cleared: false, bestFloor: this.currentFloor });
+          this.scene.start("HubScene", {
+            gold: escGold,
+            cleared: false,
+            bestFloor: this.currentFloor,
+            enemiesDefeated: this.enemiesDefeated,
+            turns: this.turnManager.turn,
+            dungeonId: this.dungeonDef.id,
+            starter: this.starterId,
+            challengeMode: this.challengeMode ?? undefined,
+          });
         });
         break;
       }
@@ -2139,7 +2157,16 @@ export class DungeonScene extends Phaser.Scene {
       case "escapeOrb": {
         this.showLog("Used Escape Orb! Escaping the dungeon...");
         this.time.delayedCall(800, () => {
-          this.scene.start("HubScene");
+          this.scene.start("HubScene", {
+            gold: 0,
+            cleared: false,
+            bestFloor: this.currentFloor,
+            enemiesDefeated: this.enemiesDefeated,
+            turns: this.turnManager.turn,
+            dungeonId: this.dungeonDef.id,
+            starter: this.starterId,
+            challengeMode: this.challengeMode ?? undefined,
+          });
         });
         break;
       }
@@ -2748,7 +2775,16 @@ export class DungeonScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
     restartText.on("pointerdown", () => {
-      this.scene.start("HubScene", { gold, cleared: true, bestFloor: this.dungeonDef.floors });
+      this.scene.start("HubScene", {
+        gold,
+        cleared: true,
+        bestFloor: this.dungeonDef.floors,
+        enemiesDefeated: this.enemiesDefeated,
+        turns: this.turnManager.turn,
+        dungeonId: this.dungeonDef.id,
+        starter: this.starterId,
+        challengeMode: this.challengeMode ?? undefined,
+      });
     });
 
     this.tweens.add({
@@ -2795,7 +2831,16 @@ export class DungeonScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
     restartText.on("pointerdown", () => {
-      this.scene.start("HubScene", { gold, cleared: false, bestFloor: this.currentFloor });
+      this.scene.start("HubScene", {
+        gold,
+        cleared: false,
+        bestFloor: this.currentFloor,
+        enemiesDefeated: this.enemiesDefeated,
+        turns: this.turnManager.turn,
+        dungeonId: this.dungeonDef.id,
+        starter: this.starterId,
+        challengeMode: this.challengeMode ?? undefined,
+      });
     });
   }
 
