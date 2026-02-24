@@ -112,7 +112,7 @@ export class HubScene extends Phaser.Scene {
       )
     );
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.4.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.5.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
@@ -532,6 +532,43 @@ export class HubScene extends Phaser.Scene {
       { id: "tropius", name: "Tropius", unlock: 17 },
       { id: "aipom", name: "Aipom", unlock: 16 },
       { id: "smeargle", name: "Smeargle", unlock: 17 },
+      // 7th dungeon starters
+      { id: "poliwag", name: "Poliwag", unlock: 19 },
+      { id: "corphish", name: "Corphish", unlock: 18 },
+      { id: "magby", name: "Magby", unlock: 19 },
+      { id: "darumaka", name: "Darumaka", unlock: 18 },
+      { id: "sewaddle", name: "Sewaddle", unlock: 17 },
+      { id: "pumpkaboo", name: "Pumpkaboo", unlock: 18 },
+      { id: "plusle", name: "Plusle", unlock: 19 },
+      { id: "minun", name: "Minun", unlock: 18 },
+      { id: "nidoranF", name: "NidoranF", unlock: 19 },
+      { id: "seviper", name: "Seviper", unlock: 18 },
+      { id: "gligar", name: "Gligar", unlock: 19 },
+      { id: "rhyhorn", name: "Rhyhorn", unlock: 18 },
+      { id: "sudowoodo", name: "Sudowoodo", unlock: 19 },
+      { id: "boldore", name: "Boldore", unlock: 18 },
+      { id: "pineco", name: "Pineco", unlock: 17 },
+      { id: "heracross", name: "Heracross", unlock: 18 },
+      { id: "hitmonlee", name: "Hitmonlee", unlock: 19 },
+      { id: "hitmonchan", name: "Hitmonchan", unlock: 18 },
+      { id: "steelix", name: "Steelix", unlock: 19 },
+      { id: "scizor", name: "Scizor", unlock: 18 },
+      { id: "banette", name: "Banette", unlock: 19 },
+      { id: "shedinja", name: "Shedinja", unlock: 18 },
+      { id: "slowpoke", name: "Slowpoke", unlock: 17 },
+      { id: "girafarig", name: "Girafarig", unlock: 18 },
+      { id: "glaceon", name: "Glaceon", unlock: 19 },
+      { id: "beartic", name: "Beartic", unlock: 18 },
+      { id: "umbreon", name: "Umbreon", unlock: 19 },
+      { id: "cacturne", name: "Cacturne", unlock: 18 },
+      { id: "granbull", name: "Granbull", unlock: 19 },
+      { id: "togekiss", name: "Togekiss", unlock: 18 },
+      { id: "shelgon", name: "Shelgon", unlock: 19 },
+      { id: "gabite", name: "Gabite", unlock: 18 },
+      { id: "noctowl", name: "Noctowl", unlock: 17 },
+      { id: "xatu", name: "Xatu", unlock: 18 },
+      { id: "kangaskhan", name: "Kangaskhan", unlock: 19 },
+      { id: "tauros", name: "Tauros", unlock: 18 },
     ];
 
     const current = this.meta.starter ?? "mudkip";

@@ -660,4 +660,32 @@
 - **205종 스타터** (전체)
 - **300종+ 포켓몬** (진화 포함)
 - **200종+ 기술**
+
+---
+
+## Phase 7: 7th Dungeons (22층, 난이도 5.0, 보스 10.0x)
+
+### 7-1. Water/Fire/Grass/Electric/Poison/Ground (Phase 148-150)
+- 날짜: 2026-02-24
+- Abyssopelagic (Water), Caldera Core (Fire), Primordial Canopy (Grass)
+- Plasma Corridor (Electric), Corrosive Pit (Poison), Mantle Cavern (Ground)
+
+### 7-2. Rock/Bug/Fighting/Steel/Ghost/Psychic (Phase 151-153)
+- 날짜: 2026-02-24
+- Obsidian Forge (Rock), Chitin Labyrinth (Bug), Colosseum (Fighting)
+- Steel Abyss (Steel), Necropolis Depths (Ghost), Cosmic Library (Psychic)
+
+### 7-3. Ice/Dark/Fairy/Dragon/Flying/Normal (Phase 154-156)
+- 날짜: 2026-02-24
+- Glacier Fortress (Ice), Umbral Citadel (Dark), Sylvan Sanctuary (Fairy)
+- Dragon's Spine (Dragon), Stratosphere (Flying), Sovereign Hall (Normal)
+
+### v1.5.0 마일스톤
+- **전 18타입 × 7개 던전 = 126개 던전** + Destiny Tower = 총 127개 던전!
+- **MAX_ALLIES 4로 증가** (5인 파티)
+- **신규 아이템 사용 로직**: reviveSeed, allPowerOrb, escapeOrb
+- **신규 포켓몬 36종** (Phases 148-156)
+- **241종 스타터** (전체)
+- **360종+ 포켓몬** (진화 포함)
+- **220종+ 기술**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
