@@ -467,6 +467,13 @@ export class DungeonScene extends Phaser.Scene {
       raikou: "0243", zekrom: "0644",
       nihilego: "0793", naganadel: "0804",
       groudon: "0383", landorus: "0645",
+      // Phase 191-193: 11th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+      regirock: "0377", stakataka: "0805",
+      genesect: "0649", buzzwole: "0794",
+      cobalion: "0638", marshadow: "0802",
+      registeel: "0379", solgaleo: "0791",
+      giratina: "0487", lunala: "0792",
+      mewtwo: "0150", deoxys: "0386",
     };
 
     // Load player + all enemy species + ally species for this dungeon

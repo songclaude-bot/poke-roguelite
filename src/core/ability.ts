@@ -516,4 +516,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   naganadel: AbilityId.PurePower, // Beast Boost equivalent
   groudon: AbilityId.Sturdy, // Drought equivalent
   landorus: AbilityId.Guts, // Sand Force equivalent
+  // Phase 191-193: 11th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+  regirock: AbilityId.Sturdy, // Clear Body equivalent
+  stakataka: AbilityId.Sturdy, // Beast Boost equivalent
+  genesect: AbilityId.PurePower, // Download equivalent
+  buzzwole: AbilityId.Guts, // Beast Boost equivalent
+  cobalion: AbilityId.Sturdy, // Justified equivalent
+  marshadow: AbilityId.PurePower, // Technician equivalent
+  registeel: AbilityId.Sturdy, // Clear Body equivalent
+  solgaleo: AbilityId.PurePower, // Full Metal Body equivalent
+  giratina: AbilityId.Levitate, // Pressure equivalent
+  lunala: AbilityId.ShieldDust, // Shadow Shield equivalent
+  mewtwo: AbilityId.PurePower, // Pressure equivalent
+  deoxys: AbilityId.PurePower, // Pressure equivalent
 };

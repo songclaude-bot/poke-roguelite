@@ -291,6 +291,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     thunderSovereignty: [WeatherType.Rain, WeatherType.Sandstorm],
     ultraVenomNexus: [WeatherType.Rain, WeatherType.Sandstorm],
     pangaeaThrone: [WeatherType.Sandstorm],
+    // Phase 191-193: 11th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+    petrifiedColossus: [WeatherType.Sandstorm],
+    cyberHive: [WeatherType.Rain],
+    justiceHall: [WeatherType.Sandstorm, WeatherType.Rain],
+    ironSanctuary: [WeatherType.Sandstorm, WeatherType.Hail],
+    distortionRift: [WeatherType.Hail],
+    genesisChamber: [WeatherType.Rain, WeatherType.Hail],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

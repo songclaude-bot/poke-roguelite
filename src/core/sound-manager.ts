@@ -303,6 +303,13 @@ const DUNGEON_BGM_MAP: Record<string, string> = {
   idyllicMeadow: "dungeon-normal", elysianFields: "dungeon-normal", paradiseReach: "dungeon-normal",
   elysianDominion: "dungeon-normal", paradiseApex: "dungeon-normal", primordialPlains: "dungeon-normal",
   primordialColossus: "dungeon-normal",
+  // Phase 191-193: 11th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+  petrifiedColossus: "dungeon-rock",
+  cyberHive: "dungeon-bug",
+  justiceHall: "dungeon-fighting",
+  ironSanctuary: "dungeon-steel",
+  distortionRift: "dungeon-ghost",
+  genesisChamber: "dungeon-psychic",
   // Destiny Tower
   destinyTower: "destiny",
 };
@@ -1454,6 +1461,42 @@ const _LEGACY_BGM_UNUSED = {
     melody: [147, 175, 220, 262, 294, 262, 220, 175, 165, 196, 247, 294, 330, 294, 247, 196],
     bass: [73, 73, 110, 110, 147, 147, 110, 110, 82, 82, 124, 124, 165, 165, 110, 73],
     tempo: 0.19, melodyType: "sawtooth", bassType: "square",
+  },
+  // Petrified Colossus — heavy, rumbling, ancient stone
+  petrifiedColossus: {
+    melody: [131, 165, 196, 220, 262, 220, 196, 165, 147, 175, 220, 262, 294, 262, 220, 175],
+    bass: [65, 65, 98, 98, 131, 131, 98, 98, 73, 73, 110, 110, 147, 147, 110, 65],
+    tempo: 0.21, melodyType: "sawtooth", bassType: "square",
+  },
+  // Cyber Hive — mechanical, buzzing, intense
+  cyberHive: {
+    melody: [262, 294, 349, 392, 440, 392, 349, 294, 277, 330, 392, 440, 494, 440, 392, 330],
+    bass: [131, 131, 175, 175, 220, 220, 175, 175, 139, 139, 165, 165, 247, 247, 165, 131],
+    tempo: 0.16, melodyType: "square", bassType: "sawtooth",
+  },
+  // Justice Hall — heroic, noble, resolute
+  justiceHall: {
+    melody: [220, 262, 330, 392, 440, 392, 330, 262, 247, 294, 349, 392, 440, 494, 440, 349],
+    bass: [110, 110, 165, 165, 220, 220, 165, 165, 124, 124, 175, 175, 220, 220, 175, 110],
+    tempo: 0.18, melodyType: "sawtooth", bassType: "triangle",
+  },
+  // Iron Sanctuary — metallic, resonant, solar
+  ironSanctuary: {
+    melody: [175, 220, 262, 330, 392, 330, 262, 220, 196, 247, 294, 349, 440, 349, 294, 247],
+    bass: [88, 88, 131, 131, 196, 196, 131, 131, 98, 98, 147, 147, 220, 220, 147, 88],
+    tempo: 0.19, melodyType: "square", bassType: "square",
+  },
+  // Distortion Rift — eerie, warping, otherworldly
+  distortionRift: {
+    melody: [147, 175, 208, 247, 277, 247, 208, 175, 156, 185, 220, 262, 311, 262, 220, 185],
+    bass: [73, 73, 104, 104, 139, 139, 104, 104, 78, 78, 110, 110, 156, 156, 110, 73],
+    tempo: 0.23, melodyType: "sine", bassType: "triangle",
+  },
+  // Genesis Chamber — cosmic, cerebral, overwhelming
+  genesisChamber: {
+    melody: [330, 392, 440, 523, 587, 523, 440, 392, 349, 440, 494, 587, 659, 587, 494, 440],
+    bass: [165, 165, 220, 220, 294, 294, 220, 220, 175, 175, 247, 247, 330, 330, 247, 165],
+    tempo: 0.20, melodyType: "sine", bassType: "square",
   },
   // Hub — peaceful town
   hub: {
