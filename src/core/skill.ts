@@ -1369,6 +1369,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     effectChance: 30,
     description: "Hurls filthy garbage at the target.",
   },
+
+  // ── Phase 73 Ground Skills ──
+  highHorsepower: {
+    id: "highHorsepower",
+    name: "High Horsepower",
+    type: PokemonType.Ground,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Front2,
+    accuracy: 85,
+    description: "Charges with tremendous force.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

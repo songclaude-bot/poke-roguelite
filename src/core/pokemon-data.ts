@@ -1393,6 +1393,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["venoshock", "gunkShot", "bite"],
     floors: [],
   },
+
+  // ── Phase 73 Ground 3rd ──
+  mudbray: {
+    id: "mudbray", name: "Mudbray", spriteKey: "mudbray",
+    types: [PokemonType.Ground], attackType: PokemonType.Ground,
+    baseStats: { hp: 28, atk: 14, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 14,
+    skillIds: ["highHorsepower", "earthPower", "bulldoze"],
+    floors: [],
+  },
+  hippopotas: {
+    id: "hippopotas", name: "Hippopotas", spriteKey: "hippopotas",
+    types: [PokemonType.Ground], attackType: PokemonType.Ground,
+    baseStats: { hp: 30, atk: 10, def: 12 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["earthPower", "highHorsepower", "sandTomb"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1517,6 +1539,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   tynamo: { 7: "voltSwitch", 10: "thunderbolt" },
   trubbish: { 7: "gunkShot", 10: "sludgeBomb" },
   skorupi: { 7: "gunkShot", 10: "venoshock" },
+  mudbray: { 7: "highHorsepower", 10: "earthPower" },
+  hippopotas: { 7: "earthPower", 10: "highHorsepower" },
 };
 
 /** Check if a species learns a new skill at this level */
