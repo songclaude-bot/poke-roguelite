@@ -1235,6 +1235,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 85,
     description: "Swings a heavy ice fist down on the foe.",
   },
+
+  // ── Phase 59 Psychic Skills ──
+  psyshock: {
+    id: "psyshock",
+    name: "Psyshock",
+    type: PokemonType.Psychic,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Materializes psychic power into a shockwave.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

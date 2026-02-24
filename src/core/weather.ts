@@ -115,6 +115,7 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     wyrmAbyss: [WeatherType.Sandstorm, WeatherType.Hail],
     enchantedGlade: [WeatherType.Rain],
     glacialCavern: [WeatherType.Hail],
+    astralSpire: [WeatherType.Rain, WeatherType.Hail],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

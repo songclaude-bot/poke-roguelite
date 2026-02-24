@@ -1161,6 +1161,18 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["avalanche", "iceShard", "iceHammer"],
     floors: [],
   },
+
+  // ── Phase 59 Psychic 2nd ──
+  spoink: {
+    id: "spoink", name: "Spoink", spriteKey: "spoink",
+    types: [PokemonType.Psychic], attackType: PokemonType.Psychic,
+    baseStats: { hp: 28, atk: 10, def: 10 },
+    walkFrameWidth: 32, walkFrameHeight: 64,
+    idleFrameWidth: 24, idleFrameHeight: 56,
+    walkFrames: 8, idleFrames: 6,
+    skillIds: ["psybeam", "psyshock", "zenHeadbutt"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1264,6 +1276,7 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   togepi: { 7: "drainingKiss", 10: "moonblast" },
   snover: { 7: "iceHammer", 10: "iceBeam" },
   bergmite: { 7: "avalanche", 10: "iceHammer" },
+  spoink: { 7: "psyshock", 10: "psychic" },
 };
 
 /** Check if a species learns a new skill at this level */

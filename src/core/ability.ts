@@ -182,4 +182,5 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   togepi: AbilityId.ShieldDust,
   snover: AbilityId.Sturdy,
   bergmite: AbilityId.Sturdy,
+  spoink: AbilityId.ShieldDust,
 };
