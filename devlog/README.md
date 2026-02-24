@@ -622,4 +622,42 @@
 - **169종 스타터** (전체)
 - **240종+ 포켓몬** (진화 포함)
 - **180종+ 기술**
+
+---
+
+## Phase 6: 6th Dungeons (20층, 난이도 4.5, 보스 9.0x)
+
+### 6-1. Water/Fire/Grass/Electric/Poison/Ground 6th 던전 (Phase 137-139)
+- 날짜: 2026-02-24
+- Tidal Trench (Water): Buizel(0418)/Finizen(0963), 20층
+- Inferno Peak (Fire): Fletchinder(0662)/Heatmor(0631), 20층
+- Eterna Forest (Grass): Smoliv(0928)/Deerling(0585), 20층
+- Volt Chamber (Electric): Pachirisu(0417)/Emolga(0587), discharge 스킬, 20층
+- Venom Depths (Poison): Glimmet(0969)/Koffing(0109), 20층
+- Faultline Chasm (Ground): Wooper(0194)/Baltoy(0343), 20층
+
+### 6-2. Rock/Bug/Fighting/Steel/Ghost/Psychic 6th 던전 (Phase 140-142)
+- 날짜: 2026-02-24
+- Fossil Crypt (Rock): Anorith(0347)/Lunatone(0337), ancientPower 스킬, 20층
+- Cocoon Hollow (Bug): Surskit(0283)/Volbeat(0313), silverWind 스킬, 20층
+- Titan's Dojo (Fighting): Scraggy(0559)/Mankey(0056), aurasphere 스킬, 20층
+- Iron Vault (Steel): Klefki(0707)/Mawile(0303), 20층
+- Phantom Rift (Ghost): Rotom(0479)/Dreepy(0885), shadowForce 스킬, 20층
+- Mind Palace (Psychic): Munna(0517)/Chingling(0433), 20층
+
+### 6-3. Ice/Dark/Fairy/Dragon/Flying/Normal 6th 던전 (Phase 143-145)
+- 날짜: 2026-02-24
+- Frozen Citadel (Ice): Smoochum(0238)/Delibird(0225), glacialLance 스킬, 20층
+- Eclipse Vault (Dark): Nuzleaf(0274)/Spiritomb(0442), 20층
+- Moonlit Garden (Fairy): Marill(0183)/Cleffa(0173), 20층
+- Wyrm's Nest (Dragon): Druddigon(0621)/Applin(0840), 20층
+- Sky Pinnacle (Flying): Hoppip(0187)/Tropius(0357), 20층
+- Primeval Plains (Normal): Aipom(0190)/Smeargle(0235), boomburst 스킬, 20층
+
+### v1.4.0 마일스톤
+- **전 18타입 × 6개 던전 = 108개 던전** + Destiny Tower = 총 109개 던전!
+- **신규 포켓몬 36종** (Phases 137-145)
+- **205종 스타터** (전체)
+- **300종+ 포켓몬** (진화 포함)
+- **200종+ 기술**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/

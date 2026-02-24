@@ -112,7 +112,7 @@ export class HubScene extends Phaser.Scene {
       )
     );
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.3.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.4.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
@@ -495,6 +495,43 @@ export class HubScene extends Phaser.Scene {
       { id: "swablu", name: "Swablu", unlock: 16 },
       { id: "lechonk", name: "Lechonk", unlock: 15 },
       { id: "tandemaus", name: "Tandemaus", unlock: 16 },
+      // 6th dungeon starters
+      { id: "buizel", name: "Buizel", unlock: 18 },
+      { id: "finizen", name: "Finizen", unlock: 17 },
+      { id: "fletchinder", name: "Fletchinder", unlock: 18 },
+      { id: "heatmor", name: "Heatmor", unlock: 17 },
+      { id: "smoliv", name: "Smoliv", unlock: 16 },
+      { id: "deerling", name: "Deerling", unlock: 17 },
+      { id: "pachirisu", name: "Pachirisu", unlock: 18 },
+      { id: "emolga", name: "Emolga", unlock: 17 },
+      { id: "glimmet", name: "Glimmet", unlock: 18 },
+      { id: "koffing", name: "Koffing", unlock: 17 },
+      { id: "wooper", name: "Wooper", unlock: 16 },
+      { id: "baltoy", name: "Baltoy", unlock: 17 },
+      { id: "anorith", name: "Anorith", unlock: 18 },
+      { id: "lunatone", name: "Lunatone", unlock: 17 },
+      { id: "surskit", name: "Surskit", unlock: 16 },
+      { id: "volbeat", name: "Volbeat", unlock: 17 },
+      { id: "scraggy", name: "Scraggy", unlock: 18 },
+      { id: "mankey", name: "Mankey", unlock: 17 },
+      { id: "klefki", name: "Klefki", unlock: 18 },
+      { id: "mawile", name: "Mawile", unlock: 17 },
+      { id: "rotom", name: "Rotom", unlock: 18 },
+      { id: "dreepy", name: "Dreepy", unlock: 17 },
+      { id: "munna", name: "Munna", unlock: 16 },
+      { id: "chingling", name: "Chingling", unlock: 17 },
+      { id: "smoochum", name: "Smoochum", unlock: 18 },
+      { id: "delibird", name: "Delibird", unlock: 17 },
+      { id: "nuzleaf", name: "Nuzleaf", unlock: 16 },
+      { id: "spiritomb", name: "Spiritomb", unlock: 17 },
+      { id: "marill", name: "Marill", unlock: 18 },
+      { id: "cleffa", name: "Cleffa", unlock: 17 },
+      { id: "druddigon", name: "Druddigon", unlock: 18 },
+      { id: "applin", name: "Applin", unlock: 17 },
+      { id: "hoppip", name: "Hoppip", unlock: 16 },
+      { id: "tropius", name: "Tropius", unlock: 17 },
+      { id: "aipom", name: "Aipom", unlock: 16 },
+      { id: "smeargle", name: "Smeargle", unlock: 17 },
     ];
 
     const current = this.meta.starter ?? "mudkip";
