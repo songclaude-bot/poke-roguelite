@@ -62,6 +62,7 @@ import {
   sfxCombo, sfxCritical, sfxDodge, sfxItemPickup, sfxBuff, sfxWeatherChange,
   getBgmVolume, getSfxVolume, setBgmVolume, setSfxVolume,
 } from "../core/sound-manager";
+import { DungeonEvent, EventChoice, rollDungeonEvent } from "../core/dungeon-events";
 
 interface AllyData {
   speciesId: string;
@@ -198,6 +199,14 @@ export class DungeonScene extends Phaser.Scene {
   private monsterHouseType: MonsterHouseType = MonsterHouseType.Standard;
   private monsterHouseCleared = false;
   private monsterHouseEnemies: Entity[] = []; // track enemies spawned in monster house
+
+  // Event Room
+  private eventRoom: { x: number; y: number; w: number; h: number } | null = null;
+  private eventTriggered = false;
+  private eventOpen = false;
+  private eventUI: Phaser.GameObjects.GameObject[] = [];
+  private currentEvent: DungeonEvent | null = null;
+  private eventMarker: Phaser.GameObjects.Text | null = null;
 
   // NG+ prestige system
   private ngPlusLevel = 0;
@@ -396,6 +405,12 @@ export class DungeonScene extends Phaser.Scene {
     this.monsterHouseType = MonsterHouseType.Standard;
     this.monsterHouseCleared = false;
     this.monsterHouseEnemies = [];
+    this.eventRoom = null;
+    this.eventTriggered = false;
+    this.eventOpen = false;
+    this.eventUI = [];
+    this.currentEvent = null;
+    this.eventMarker = null;
     this.autoExploring = false;
     this.autoExploreTimer = null;
     this.autoExploreText = null;
@@ -1276,6 +1291,52 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Event Room (20% chance on floor 3+, not boss floor) ──
+    if (this.currentFloor >= 3 && !isBossFloor && Math.random() < 0.20 && rooms.length > 2) {
+      const eventCandidates = rooms.filter(r =>
+        // Not the player's room
+        !(playerStart.x >= r.x && playerStart.x < r.x + r.w &&
+          playerStart.y >= r.y && playerStart.y < r.y + r.h) &&
+        // Not the stairs room
+        !(stairsPos.x >= r.x && stairsPos.x < r.x + r.w &&
+          stairsPos.y >= r.y && stairsPos.y < r.y + r.h) &&
+        // Not the shop room
+        r !== this.shopRoom &&
+        // Not the monster house room
+        r !== this.monsterHouseRoom
+      );
+      if (eventCandidates.length > 0) {
+        const evRoom = eventCandidates[Math.floor(Math.random() * eventCandidates.length)];
+        const rolledEvent = rollDungeonEvent(this.currentFloor);
+        if (rolledEvent) {
+          this.eventRoom = evRoom;
+          this.currentEvent = rolledEvent;
+
+          // Place "!" marker at center of event room
+          const markerX = Math.floor(evRoom.x + evRoom.w / 2);
+          const markerY = Math.floor(evRoom.y + evRoom.h / 2);
+          this.eventMarker = this.add.text(
+            markerX * TILE_DISPLAY + TILE_DISPLAY / 2,
+            markerY * TILE_DISPLAY + TILE_DISPLAY / 2 - 8,
+            "!", { fontSize: "18px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+              stroke: "#000000", strokeThickness: 3 }
+          ).setOrigin(0.5).setDepth(8);
+
+          // Pulse animation on the marker
+          this.tweens.add({
+            targets: this.eventMarker,
+            scaleX: { from: 1, to: 1.3 },
+            scaleY: { from: 1, to: 1.3 },
+            alpha: { from: 1, to: 0.6 },
+            duration: 800,
+            yoyo: true,
+            repeat: -1,
+            ease: "Sine.easeInOut",
+          });
+        }
+      }
+    }
+
     // ── Fog of War ──
     this.visited = Array.from({ length: height }, () => new Array(width).fill(false));
     this.revealArea(playerStart.x, playerStart.y, 4);
@@ -1622,7 +1683,7 @@ export class DungeonScene extends Phaser.Scene {
 
       btn.on("pointerdown", () => {
         if (this.autoExploring) { this.stopAutoExplore("Stopped."); return; }
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen) return;
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen) return;
         txt.setColor("#fbbf24");
         this.time.delayedCall(150, () => txt.setColor("#8899bb"));
         this.handlePlayerAction(d.dir);
@@ -1640,7 +1701,7 @@ export class DungeonScene extends Phaser.Scene {
 
     waitBtn.on("pointerdown", () => {
       if (this.autoExploring) { this.stopAutoExplore("Stopped."); return; }
-      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen) return;
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen) return;
       waitTxt.setAlpha(0.5);
       this.time.delayedCall(150, () => waitTxt.setAlpha(1));
       this.turnManager.executeTurn(
@@ -1904,6 +1965,24 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Event room outline (cyan border with "!" indicator) ──
+    if (this.eventRoom && !this.eventTriggered) {
+      const er = this.eventRoom;
+      let eventVisible = false;
+      for (let ey = er.y; ey < er.y + er.h && !eventVisible; ey++) {
+        for (let ex = er.x; ex < er.x + er.w && !eventVisible; ex++) {
+          if (this.visited[ey]?.[ex]) eventVisible = true;
+        }
+      }
+      if (eventVisible) {
+        this.minimapGfx.lineStyle(expanded ? 2 : 1, 0x22d3ee, 0.8);
+        this.minimapGfx.strokeRect(
+          mx + er.x * t - 1, my + er.y * t - 1,
+          er.w * t + 2, er.h * t + 2
+        );
+      }
+    }
+
     // ── Stairs (gold, only if visited) ──
     const { stairsPos } = this.dungeon;
     if (this.visited[stairsPos.y]?.[stairsPos.x]) {
@@ -2100,7 +2179,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeMenu();
       return;
     }
-    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen) return;
+    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen) return;
 
     sfxMenuOpen();
     this.menuOpen = true;
@@ -2160,7 +2239,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeTeamPanel();
       return;
     }
-    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.gameOver) return;
+    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.gameOver) return;
 
     const liveAllies = this.allies.filter(a => a.alive);
     if (liveAllies.length === 0) {
@@ -2595,7 +2674,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private openBag() {
-    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen) return;
+    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen) return;
     sfxMenuOpen();
     this.bagOpen = true;
 
@@ -3917,6 +3996,434 @@ export class DungeonScene extends Phaser.Scene {
     this.shopOpen = false;
   }
 
+  // ── Event Room System ──
+
+  private checkEventRoom() {
+    if (!this.eventRoom || this.eventTriggered || this.eventOpen) return;
+    const r = this.eventRoom;
+    const px = this.player.tileX;
+    const py = this.player.tileY;
+    if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h) {
+      this.eventTriggered = true;
+      // Remove the "!" marker
+      if (this.eventMarker) {
+        this.eventMarker.destroy();
+        this.eventMarker = null;
+      }
+      // Open the event overlay
+      this.openEventUI();
+    }
+  }
+
+  private openEventUI() {
+    if (this.eventOpen || !this.currentEvent) return;
+    sfxMenuOpen();
+    this.eventOpen = true;
+    this.stopAutoExplore();
+
+    const event = this.currentEvent;
+
+    // Dim overlay
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75)
+      .setScrollFactor(0).setDepth(200).setInteractive();
+    this.eventUI.push(overlay);
+
+    // Event name (title)
+    const titleText = this.add.text(GAME_WIDTH / 2, 60, event.name, {
+      fontSize: "16px", color: "#22d3ee", fontFamily: "monospace", fontStyle: "bold",
+      stroke: "#000000", strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    this.eventUI.push(titleText);
+
+    // Decorative line
+    const line = this.add.graphics().setScrollFactor(0).setDepth(201);
+    line.lineStyle(1, 0x22d3ee, 0.5);
+    line.lineBetween(GAME_WIDTH / 2 - 120, 82, GAME_WIDTH / 2 + 120, 82);
+    this.eventUI.push(line);
+
+    // Description text (word-wrapped)
+    const descText = this.add.text(GAME_WIDTH / 2, 105, event.description, {
+      fontSize: "10px", color: "#c0c8e0", fontFamily: "monospace",
+      wordWrap: { width: 280 }, align: "center", lineSpacing: 4,
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
+    this.eventUI.push(descText);
+
+    // Choice buttons
+    const choiceStartY = 220;
+    for (let i = 0; i < event.choices.length; i++) {
+      const choice = event.choices[i];
+      const cy = choiceStartY + i * 80;
+
+      // Choice button background
+      const btnBg = this.add.rectangle(GAME_WIDTH / 2, cy, 280, 60, 0x1a1a2e, 0.95)
+        .setScrollFactor(0).setDepth(201).setInteractive()
+        .setStrokeStyle(1, 0x22d3ee, 0.6);
+      this.eventUI.push(btnBg);
+
+      // Choice label
+      const labelText = this.add.text(GAME_WIDTH / 2, cy - 12, choice.label, {
+        fontSize: "12px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+      this.eventUI.push(labelText);
+
+      // Choice description
+      const choiceDesc = this.add.text(GAME_WIDTH / 2, cy + 8, choice.description, {
+        fontSize: "9px", color: "#888ea8", fontFamily: "monospace",
+        wordWrap: { width: 250 }, align: "center",
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(202);
+      this.eventUI.push(choiceDesc);
+
+      // Hover effects
+      btnBg.on("pointerover", () => {
+        btnBg.setStrokeStyle(2, 0xfbbf24, 1);
+        labelText.setColor("#ffffff");
+      });
+      btnBg.on("pointerout", () => {
+        btnBg.setStrokeStyle(1, 0x22d3ee, 0.6);
+        labelText.setColor("#fbbf24");
+      });
+
+      // Click handler
+      btnBg.on("pointerdown", () => {
+        this.applyEventEffect(choice);
+      });
+    }
+  }
+
+  private closeEventUI() {
+    for (const obj of this.eventUI) obj.destroy();
+    this.eventUI = [];
+    this.eventOpen = false;
+  }
+
+  private showEventResult(message: string, color = "#4ade80") {
+    this.closeEventUI();
+
+    // Brief result overlay
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6)
+      .setScrollFactor(0).setDepth(200).setInteractive();
+
+    const resultText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, message, {
+      fontSize: "12px", color, fontFamily: "monospace", fontStyle: "bold",
+      wordWrap: { width: 280 }, align: "center",
+      stroke: "#000000", strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    // Auto-dismiss after 1.5 seconds
+    this.time.delayedCall(1500, () => {
+      overlay.destroy();
+      resultText.destroy();
+      this.updateHUD();
+      this.updateMinimap();
+    });
+  }
+
+  private applyEventEffect(choice: EventChoice) {
+    const effectId = choice.effectId;
+    const value = choice.effectValue ?? 0;
+
+    switch (effectId) {
+      case "nothing": {
+        this.closeEventUI();
+        this.showLog("You decided to move on.");
+        break;
+      }
+
+      case "wishingWell_toss": {
+        // Requires 50G
+        if (this.gold < value) {
+          this.showLog(`Not enough gold! Need ${value}G.`);
+          return; // Don't close UI, let player pick another choice
+        }
+        this.gold -= value;
+        const roll = Math.random();
+        if (roll < 0.33) {
+          this.player.stats.atk += 3;
+          this.showEventResult("The well grants power!\nATK +3!", "#ff6b6b");
+        } else if (roll < 0.66) {
+          this.player.stats.def += 3;
+          this.showEventResult("The well grants resilience!\nDEF +3!", "#60a5fa");
+        } else {
+          this.player.stats.maxHp += 20;
+          this.player.stats.hp = Math.min(this.player.stats.hp + 20, this.player.stats.maxHp);
+          this.showEventResult("The well grants vitality!\nMax HP +20!", "#4ade80");
+        }
+        sfxBuff();
+        this.showLog("Your wish was granted!");
+        break;
+      }
+
+      case "stash_open": {
+        this.closeEventUI();
+        if (Math.random() < 0.5) {
+          // Good outcome: 2-3 items
+          const itemCount = 2 + Math.floor(Math.random() * 2);
+          let addedCount = 0;
+          for (let i = 0; i < itemCount; i++) {
+            if (this.inventory.length >= MAX_INVENTORY) break;
+            const item = rollFloorItem();
+            const existing = this.inventory.find(s => s.item.id === item.id && item.stackable);
+            if (existing) existing.count++;
+            else this.inventory.push({ item, count: 1 });
+            addedCount++;
+          }
+          sfxItemPickup();
+          this.showEventResult(`Found ${addedCount} items in the stash!`, "#4ade80");
+          this.showLog(`Found ${addedCount} items!`);
+        } else {
+          // Bad outcome: spawn 2-3 enemies
+          this.showLog("It was a trap! Enemies appear!");
+          this.spawnEventEnemies(2 + Math.floor(Math.random() * 2));
+          this.showEventResult("Enemies burst out of the stash!", "#ef4444");
+        }
+        break;
+      }
+
+      case "statue_pray": {
+        this.player.stats.hp = this.player.stats.maxHp;
+        sfxHeal();
+        this.showEventResult("The statue's warmth heals you fully!\nHP fully restored!", "#4ade80");
+        this.showLog("HP fully restored!");
+        break;
+      }
+
+      case "statue_smash": {
+        // Take damage
+        this.player.stats.hp = Math.max(1, this.player.stats.hp - value);
+        // Give 3 random items
+        let addedCount = 0;
+        for (let i = 0; i < 3; i++) {
+          if (this.inventory.length >= MAX_INVENTORY) break;
+          const item = rollFloorItem();
+          const existing = this.inventory.find(s => s.item.id === item.id && item.stackable);
+          if (existing) existing.count++;
+          else this.inventory.push({ item, count: 1 });
+          addedCount++;
+        }
+        sfxHit();
+        this.showEventResult(`Smashed! Took ${value} damage.\nFound ${addedCount} items!`, "#fbbf24");
+        this.showLog(`Took ${value} damage but found ${addedCount} items!`);
+        break;
+      }
+
+      case "traveler_feed": {
+        // Check if player has an Apple
+        const appleIdx = this.inventory.findIndex(s => s.item.id === "apple" || s.item.id === "bigApple");
+        if (appleIdx === -1) {
+          this.showLog("You don't have any Apples!");
+          return; // Don't close UI
+        }
+        // Consume the apple
+        const stack = this.inventory[appleIdx];
+        stack.count--;
+        if (stack.count <= 0) this.inventory.splice(appleIdx, 1);
+
+        // Recruit a random ally
+        this.spawnEventAlly();
+        sfxRecruit();
+        this.showEventResult("The traveler is grateful!\nThey join your team!", "#ff6b9d");
+        this.showLog("A grateful traveler joins you!");
+        break;
+      }
+
+      case "chest_open": {
+        // Give a powerful item (orb or rare seed)
+        const powerfulItems = ["allPowerOrb", "reviveSeed", "luminousOrb", "maxElixir", "sitrusBerry"];
+        const itemId = powerfulItems[Math.floor(Math.random() * powerfulItems.length)];
+        const item = ITEM_DB[itemId];
+        if (this.inventory.length < MAX_INVENTORY && item) {
+          const existing = this.inventory.find(s => s.item.id === item.id && item.stackable);
+          if (existing) existing.count++;
+          else this.inventory.push({ item, count: 1 });
+        }
+        // Apply Burn status
+        this.player.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
+        sfxItemPickup();
+        this.showEventResult(`Got ${item?.name ?? "an item"}!\nBut you were cursed with Burn!`, "#bb44ff");
+        this.showLog(`Got ${item?.name ?? "an item"}, but burned!`);
+        break;
+      }
+
+      case "train_do": {
+        // Grant EXP but lose 30% belly
+        const bellyLoss = Math.floor(this.maxBelly * 0.3);
+        this.belly = Math.max(0, this.belly - bellyLoss);
+        // Process level ups
+        const prevLevel = this.player.stats.level;
+        const levelResult = processLevelUp(this.player.stats, value, this.totalExp);
+        this.totalExp = levelResult.totalExp;
+        for (const r of levelResult.results) {
+          sfxLevelUp();
+          this.showLog(`Level up! Lv.${r.newLevel}! HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
+        }
+        sfxBuff();
+        this.showEventResult(`Intense training!\n+${value} EXP, Belly -${bellyLoss}`, "#fbbf24");
+        this.showLog(`Gained ${value} EXP! Belly -${bellyLoss}.`);
+        break;
+      }
+
+      case "fortune_pay": {
+        if (this.gold < value) {
+          this.showLog(`Not enough gold! Need ${value}G.`);
+          return; // Don't close UI
+        }
+        this.gold -= value;
+        // Reveal entire floor
+        const { width, height } = this.dungeon;
+        for (let fy = 0; fy < height; fy++) {
+          for (let fx = 0; fx < width; fx++) {
+            this.visited[fy][fx] = true;
+          }
+        }
+        // Reveal all traps too
+        for (const trap of this.floorTraps) {
+          trap.revealed = true;
+        }
+        this.updateMinimap();
+        sfxBuff();
+        this.showEventResult("The orb reveals all secrets!\nFloor map fully revealed!", "#22d3ee");
+        this.showLog("Floor layout fully revealed!");
+        break;
+      }
+
+      case "rest_do": {
+        this.player.stats.hp = this.player.stats.maxHp;
+        this.belly = Math.min(this.maxBelly, this.belly + value);
+        this.resetBellyWarnings();
+        sfxHeal();
+        this.showEventResult(`You rest peacefully...\nHP fully restored! Belly +${value}`, "#4ade80");
+        this.showLog(`Rested! HP restored, Belly +${value}.`);
+        break;
+      }
+
+      default: {
+        this.closeEventUI();
+        this.showLog("Nothing happened.");
+        break;
+      }
+    }
+  }
+
+  /** Spawn enemies in the event room (for Abandoned Stash trap) */
+  private spawnEventEnemies(count: number) {
+    if (!this.eventRoom) return;
+    const r = this.eventRoom;
+    const floorSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
+      ? this.getEndlessEnemies(this.currentFloor)
+      : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
+    const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
+    if (floorSpecies.length === 0) return;
+
+    for (let i = 0; i < count; i++) {
+      const ex = r.x + 1 + Math.floor(Math.random() * Math.max(1, r.w - 2));
+      const ey = r.y + 1 + Math.floor(Math.random() * Math.max(1, r.h - 2));
+      if (this.dungeon.terrain[ey]?.[ex] !== TerrainType.GROUND) continue;
+      if (this.allEntities.some(e => e.alive && e.tileX === ex && e.tileY === ey)) continue;
+
+      const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
+      const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
+
+      if (this.difficultyMods.enemyHpMult !== 1) {
+        enemyStats.hp = Math.floor(enemyStats.hp * this.difficultyMods.enemyHpMult);
+        enemyStats.maxHp = Math.floor(enemyStats.maxHp * this.difficultyMods.enemyHpMult);
+      }
+      if (this.difficultyMods.enemyAtkMult !== 1) {
+        enemyStats.atk = Math.floor(enemyStats.atk * this.difficultyMods.enemyAtkMult);
+      }
+
+      const enemy: Entity = {
+        tileX: ex, tileY: ey,
+        facing: Direction.Down,
+        stats: { ...enemyStats },
+        alive: true,
+        spriteKey: sp.spriteKey,
+        name: sp.name,
+        types: sp.types,
+        attackType: sp.attackType,
+        skills: createSpeciesSkills(sp),
+        statusEffects: [],
+        speciesId: sp.spriteKey,
+        ability: SPECIES_ABILITIES[sp.spriteKey],
+      };
+      const eTex = `${sp.spriteKey}-idle`;
+      if (this.textures.exists(eTex)) {
+        enemy.sprite = this.add.sprite(
+          this.tileToPixelX(ex), this.tileToPixelY(ey), eTex
+        );
+        enemy.sprite.setScale(TILE_SCALE).setDepth(9);
+        const eAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+        if (this.anims.exists(eAnim)) enemy.sprite.play(eAnim);
+      }
+      this.enemies.push(enemy);
+      this.allEntities.push(enemy);
+      this.seenSpecies.add(sp.spriteKey);
+    }
+  }
+
+  /** Spawn a temporary ally from the Lost Traveler event */
+  private spawnEventAlly() {
+    if (!this.eventRoom || this.allies.length >= MAX_ALLIES) return;
+    const r = this.eventRoom;
+
+    // Pick a random species from the current floor's enemy pool
+    const floorSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
+      ? this.getEndlessEnemies(this.currentFloor)
+      : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
+    const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
+    if (floorSpecies.length === 0) return;
+
+    const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
+    const allyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty * 0.9, sp, this.ngPlusLevel);
+
+    // Place ally near event room center
+    const ax = Math.floor(r.x + r.w / 2);
+    const ay = Math.floor(r.y + r.h / 2);
+
+    const ally: Entity = {
+      tileX: ax, tileY: ay,
+      facing: Direction.Down,
+      stats: { ...allyStats },
+      alive: true,
+      spriteKey: sp.spriteKey,
+      name: sp.name,
+      types: sp.types,
+      attackType: sp.attackType,
+      skills: createSpeciesSkills(sp),
+      statusEffects: [],
+      isAlly: true,
+      speciesId: sp.spriteKey,
+      ability: SPECIES_ABILITIES[sp.spriteKey],
+      allyTactic: AllyTactic.FollowMe,
+    };
+
+    const recruitTex = `${sp.spriteKey}-idle`;
+    if (this.textures.exists(recruitTex)) {
+      ally.sprite = this.add.sprite(
+        this.tileToPixelX(ax), this.tileToPixelY(ay), recruitTex
+      ).setScale(TILE_SCALE).setDepth(10);
+      const recruitAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+      if (this.anims.exists(recruitAnim)) ally.sprite.play(recruitAnim);
+    }
+
+    // Pink tint flash for recruitment
+    if (ally.sprite) ally.sprite.setTint(0xff88cc);
+    this.time.delayedCall(400, () => { if (ally.sprite) ally.sprite.clearTint(); });
+
+    const heart = this.add.text(
+      this.tileToPixelX(ax), this.tileToPixelY(ay) - 20,
+      "♥", { fontSize: "18px", color: "#ff6b9d", fontFamily: "monospace" }
+    ).setOrigin(0.5).setDepth(50);
+    this.tweens.add({
+      targets: heart, y: heart.y - 30, alpha: { from: 1, to: 0 },
+      duration: 1000, ease: "Quad.easeOut",
+      onComplete: () => heart.destroy(),
+    });
+
+    this.allies.push(ally);
+    this.allEntities.push(ally);
+    this.seenSpecies.add(sp.spriteKey);
+  }
+
   /** Get random enemy species for endless dungeon based on current floor */
   private getEndlessEnemies(floor: number): string[] {
     const allSpecies = Object.keys(SPECIES);
@@ -4268,6 +4775,7 @@ export class DungeonScene extends Phaser.Scene {
       this.checkStairs();
       this.checkShop();
       this.checkMonsterHouse();
+      this.checkEventRoom();
     }
 
     // Belly drain per turn (movement or attack)
@@ -5441,7 +5949,7 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (this.turnManager.isBusy || !this.player.alive || this.gameOver ||
-        this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen) return;
+        this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen) return;
 
     // Check stop conditions before even starting
     const preCheck = this.checkAutoExploreStop();
@@ -5530,6 +6038,7 @@ export class DungeonScene extends Phaser.Scene {
     // Don't call checkStairs — that would auto-advance the floor. Let the stop condition handle it.
     this.checkShop();
     this.checkMonsterHouse();
+    this.checkEventRoom();
 
     // Belly drain, weather, status
     this.tickBelly();
