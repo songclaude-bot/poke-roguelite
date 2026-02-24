@@ -60,6 +60,8 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "sneasel", to: "weavile", level: 16, newName: "Weavile", hpBonus: 12, atkBonus: 8, defBonus: 4, newSkillId: "darkPulse" },
   { from: "taillow", to: "swellow", level: 16, newName: "Swellow", hpBonus: 12, atkBonus: 7, defBonus: 4, newSkillId: "braveBird" },
   { from: "starly", to: "staravia", level: 14, newName: "Staravia", hpBonus: 10, atkBonus: 6, defBonus: 4, newSkillId: "airSlash" },
+  { from: "makuhita", to: "hariyama", level: 16, newName: "Hariyama", hpBonus: 18, atkBonus: 6, defBonus: 4, newSkillId: "focusPunch" },
+  { from: "riolu", to: "lucario", level: 14, newName: "Lucario", hpBonus: 12, atkBonus: 8, defBonus: 5, newSkillId: "auraSphere" },
 ];
 
 /** Check if a species can evolve at a given level */

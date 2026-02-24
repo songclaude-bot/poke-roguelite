@@ -752,6 +752,33 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["gust", "quickAttack", "tackle"],
     floors: [],
   },
+  // ── Battle Arena ──
+  makuhita: {
+    id: "makuhita",
+    name: "Makuhita",
+    spriteKey: "makuhita",
+    types: [PokemonType.Fighting],
+    attackType: PokemonType.Fighting,
+    baseStats: { hp: 35, atk: 12, def: 5 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["karateChop", "drainPunch", "tackle"],
+    floors: [],
+  },
+  riolu: {
+    id: "riolu",
+    name: "Riolu",
+    spriteKey: "riolu",
+    types: [PokemonType.Fighting],
+    attackType: PokemonType.Fighting,
+    baseStats: { hp: 26, atk: 13, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["auraSphere", "quickAttack", "focusPunch"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -823,6 +850,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   sneasel: { 7: "icePunch", 10: "darkPulse" },
   taillow: { 7: "airSlash", 10: "braveBird" },
   starly: { 7: "wingAttack", 10: "airSlash" },
+  makuhita: { 7: "drainPunch", 10: "focusPunch" },
+  riolu: { 7: "auraSphere", 10: "focusPunch" },
 };
 
 /** Check if a species learns a new skill at this level */

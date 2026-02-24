@@ -985,6 +985,29 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Slices with blades of air.",
   },
+
+  // ── Additional Fighting Skills ──
+  auraSphere: {
+    id: "auraSphere",
+    name: "Aura Sphere",
+    type: PokemonType.Fighting,
+    power: 16,
+    pp: 10,
+    range: SkillRange.FrontLine,
+    accuracy: 100,
+    description: "Never misses. A sphere of aura energy.",
+  },
+  drainPunch: {
+    id: "drainPunch",
+    name: "Drain Punch",
+    type: PokemonType.Fighting,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front1,
+    accuracy: 90,
+    effect: SkillEffect.Heal,
+    description: "Drains HP from the target.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

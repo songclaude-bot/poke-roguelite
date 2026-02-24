@@ -325,6 +325,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [196, 196, 262, 262, 294, 294, 196, 196, 175, 175, 262, 262, 330, 330, 220, 196],
     tempo: 0.26, melodyType: "triangle", bassType: "sine",
   },
+  // Battle Arena — intense, rhythmic
+  battleArena: {
+    melody: [262, 330, 392, 330, 262, 330, 392, 440, 392, 330, 262, 220, 262, 330, 392, 330],
+    bass: [131, 131, 196, 196, 131, 131, 196, 196, 220, 220, 131, 131, 110, 110, 196, 196],
+    tempo: 0.22, melodyType: "sawtooth", bassType: "square",
+  },
   // Destiny Tower — grand, final
   destinyTower: {
     melody: [262, 330, 392, 523, 392, 330, 262, 196, 262, 392, 523, 659, 523, 392, 330, 262],
