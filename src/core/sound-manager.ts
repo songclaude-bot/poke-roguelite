@@ -218,6 +218,39 @@ export function sfxShop() {
   ], "square", sfxVolume * 0.3);
 }
 
+export function sfxCombo() {
+  playTone(880, 0.06, "square", sfxVolume * 0.35);
+  setTimeout(() => playTone(1320, 0.08, "square", sfxVolume * 0.35), 60);
+}
+
+export function sfxCritical() {
+  playTone(1200, 0.05, "sawtooth", sfxVolume * 0.45);
+  setTimeout(() => playTone(1600, 0.08, "square", sfxVolume * 0.35), 50);
+}
+
+export function sfxDodge() {
+  playTone(800, 0.1, "sine", sfxVolume * 0.25);
+  setTimeout(() => playTone(400, 0.08, "sine", sfxVolume * 0.2), 50);
+}
+
+export function sfxItemPickup() {
+  playTone(900, 0.04, "sine", sfxVolume * 0.25);
+  setTimeout(() => playTone(1200, 0.06, "sine", sfxVolume * 0.3), 40);
+}
+
+export function sfxBuff() {
+  playSequence([
+    { freq: 440, dur: 0.06, delay: 0 },
+    { freq: 554, dur: 0.06, delay: 0.06 },
+    { freq: 659, dur: 0.08, delay: 0.12 },
+  ], "triangle", sfxVolume * 0.3);
+}
+
+export function sfxWeatherChange() {
+  playTone(100, 0.3, "sawtooth", sfxVolume * 0.2);
+  setTimeout(() => playTone(120, 0.2, "sawtooth", sfxVolume * 0.15), 100);
+}
+
 // ── OGG BGM System (Pokemon Mystery Dungeon tracks from PokeAutoChess) ──
 
 let bgmAudio: HTMLAudioElement | null = null;

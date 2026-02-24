@@ -45,6 +45,7 @@ import {
   sfxLevelUp, sfxRecruit, sfxStairs, sfxDeath, sfxBossDefeat,
   sfxHeal, sfxSkill, sfxMenuOpen, sfxMenuClose,
   sfxEvolution, sfxTrap, sfxVictory, sfxGameOver, sfxShop,
+  sfxCombo, sfxCritical, sfxDodge, sfxItemPickup, sfxBuff, sfxWeatherChange,
   getBgmVolume, getSfxVolume, setBgmVolume, setSfxVolume,
 } from "../core/sound-manager";
 
@@ -1221,6 +1222,7 @@ export class DungeonScene extends Phaser.Scene {
       const wd = WEATHERS[this.currentWeather];
       this.weatherText.setText(`${wd.symbol} ${wd.name}: ${wd.description}`);
       this.weatherText.setColor(wd.color);
+      sfxWeatherChange();
       this.showLog(`The weather is ${wd.name}!`);
     }
     this.setupWeatherVisuals();
@@ -2245,7 +2247,7 @@ export class DungeonScene extends Phaser.Scene {
       this.inventory.push({ item: fi.item, count: 1 });
     }
 
-    sfxPickup();
+    sfxItemPickup();
     fi.sprite.destroy();
     this.floorItems.splice(idx, 1);
     this.showLog(`Picked up ${fi.item.name}!`);
@@ -2428,6 +2430,7 @@ export class DungeonScene extends Phaser.Scene {
       case "allPowerOrb": {
         this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 10 });
         this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
+        sfxBuff();
         this.showLog("Used All-Power Orb! ATK & DEF boosted!");
         break;
       }
@@ -2549,6 +2552,7 @@ export class DungeonScene extends Phaser.Scene {
       case "allPowerOrb": {
         this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 10 });
         this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
+        sfxBuff();
         this.showLog("Used All-Power Orb! ATK and DEF boosted for 10 turns!");
         break;
       }
@@ -3671,7 +3675,7 @@ export class DungeonScene extends Phaser.Scene {
       // Held item: dodge chance (defender is player)
       const dodgeChance = this.heldItemEffect.dodgeChance ?? 0;
       if (defender === this.player && dodgeChance > 0 && Math.random() * 100 < dodgeChance) {
-        sfxMove();
+        sfxDodge();
         this.showLog(`${defender.name} dodged ${attacker.name}'s attack!`);
         if (defender.sprite) {
           this.showDamagePopup(defender.sprite.x, defender.sprite.y, 0, 1, "Dodged!");
@@ -3703,7 +3707,8 @@ export class DungeonScene extends Phaser.Scene {
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
       // Sound effects based on effectiveness
-      if (effectiveness >= 2) sfxSuperEffective();
+      if (isCrit) sfxCritical();
+      else if (effectiveness >= 2) sfxSuperEffective();
       else if (effectiveness <= 0.5 && effectiveness > 0) sfxNotEffective();
       else sfxHit();
 
@@ -3797,7 +3802,7 @@ export class DungeonScene extends Phaser.Scene {
           // Held item: dodge chance (target is player, attacker is enemy)
           const skillDodge = this.heldItemEffect.dodgeChance ?? 0;
           if (target === this.player && !user.isAlly && user !== this.player && skillDodge > 0 && Math.random() * 100 < skillDodge) {
-            sfxMove();
+            sfxDodge();
             this.showLog(`${target.name} dodged ${user.name}'s ${skill.name}!`);
             if (target.sprite) {
               this.showDamagePopup(target.sprite.x, target.sprite.y, 0, 1, "Dodged!");
@@ -3823,6 +3828,8 @@ export class DungeonScene extends Phaser.Scene {
             this.showDamagePopup(target.sprite.x, target.sprite.y, dmg, effectiveness);
             if (target !== this.player) this.showEnemyHpBar(target);
           }
+
+          if (skillIsCrit) sfxCritical();
 
           let logMsg = `${user.name}'s ${skill.name} hit ${target.name}! ${dmg} dmg!`;
           if (skillIsCrit) logMsg += " Critical hit!";
@@ -3863,6 +3870,7 @@ export class DungeonScene extends Phaser.Scene {
 
             // Log
             this.showLog(`COMBO! ${comboAlly.name} follows up for ${comboDmg} damage!`);
+            sfxCombo();
 
             // Camera shake
             this.cameras.main.shake(100, 0.005);
@@ -3931,6 +3939,7 @@ export class DungeonScene extends Phaser.Scene {
     switch (skill.effect) {
       case SkillEffect.AtkUp:
         target.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 5 });
+        sfxBuff();
         this.showLog(`${target.name}'s ATK rose!`);
         if (target.sprite) target.sprite.setTint(0xff8844);
         this.time.delayedCall(300, () => { if (target.sprite) target.sprite.clearTint(); });
@@ -3938,6 +3947,7 @@ export class DungeonScene extends Phaser.Scene {
 
       case SkillEffect.DefUp:
         target.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 5 });
+        sfxBuff();
         this.showLog(`${target.name}'s DEF rose!`);
         break;
 
