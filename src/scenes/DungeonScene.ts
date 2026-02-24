@@ -29,7 +29,7 @@ import {
   deserializeSkills as deserializeSkillsFn,
   goldFromRun, loadMeta, saveMeta,
 } from "../core/save-system";
-import { TrapDef, TrapType, rollTrap, trapsPerFloor } from "../core/trap";
+import { TrapDef, TrapType, rollTrap, trapsPerFloor, FloorTrap, TRAPS, generateTraps } from "../core/trap";
 import { AbilityId, SPECIES_ABILITIES, ABILITIES } from "../core/ability";
 import { WeatherType, WEATHERS, weatherDamageMultiplier, isWeatherImmune, rollFloorWeather } from "../core/weather";
 import { ShopItem, generateShopItems, shouldSpawnShop } from "../core/shop";
@@ -138,7 +138,8 @@ export class DungeonScene extends Phaser.Scene {
   private enemiesDefeated = 0;
 
   // Trap state
-  private floorTraps: { x: number; y: number; trap: TrapDef; sprite: Phaser.GameObjects.Text; revealed: boolean }[] = [];
+  private floorTraps: FloorTrap[] = [];
+  private trapGraphics: Phaser.GameObjects.Graphics[] = [];
 
   // Belly (hunger) state
   private belly = 100;
@@ -277,6 +278,7 @@ export class DungeonScene extends Phaser.Scene {
     this.turnManager = new TurnManager();
     this.persistentAllies = data?.allies ?? null;
     this.floorTraps = [];
+    this.trapGraphics = [];
     const bellyBonus = getUpgradeBonus(meta, "bellyMax") * 20;
     this.maxBelly = 100 + bellyBonus;
     this.belly = data?.belly ?? this.maxBelly;
@@ -974,26 +976,20 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     // ── Spawn floor traps (hidden) ──
-    const trapCount = trapsPerFloor(this.currentFloor);
-    for (let i = 0; i < trapCount; i++) {
-      const room = rooms[Math.floor(Math.random() * rooms.length)];
-      const tx = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
-      const ty = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
-      if (terrain[ty][tx] !== TerrainType.GROUND) continue;
-      if (tx === stairsPos.x && ty === stairsPos.y) continue;
-      if (tx === playerStart.x && ty === playerStart.y) continue;
-      // Don't overlap with items
-      if (this.floorItems.some(fi => fi.x === tx && fi.y === ty)) continue;
-
-      const trap = rollTrap();
-      const sprite = this.add.text(
-        tx * TILE_DISPLAY + TILE_DISPLAY / 2,
-        ty * TILE_DISPLAY + TILE_DISPLAY / 2,
-        trap.symbol, { fontSize: "14px", color: trap.color, fontFamily: "monospace" }
-      ).setOrigin(0.5).setDepth(5).setAlpha(0); // hidden initially
-
-      this.floorTraps.push({ x: tx, y: ty, trap, sprite, revealed: false });
-    }
+    const trapCount = trapsPerFloor(this.currentFloor, this.dungeonDef.difficulty);
+    // Collect occupied positions (items, enemies, etc.)
+    const occupiedPositions = new Set<string>();
+    for (const fi of this.floorItems) occupiedPositions.add(`${fi.x},${fi.y}`);
+    for (const e of this.enemies) occupiedPositions.add(`${e.tileX},${e.tileY}`);
+    for (const a of this.allies) occupiedPositions.add(`${a.tileX},${a.tileY}`);
+    this.floorTraps = generateTraps(
+      width, height, terrain as unknown as number[][],
+      trapCount,
+      stairsPos.x, stairsPos.y,
+      playerStart.x, playerStart.y,
+      occupiedPositions,
+      TerrainType.GROUND as unknown as number,
+    );
 
     // ── Kecleon Shop (20% chance, not on boss floors) ──
     const isBossFloor = this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors;
@@ -1631,10 +1627,10 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // ── Revealed traps (purple dots) ──
-    this.minimapGfx.fillStyle(0xa855f7, 1);
+    // ── Revealed traps (colored dots based on trap type) ──
     for (const tr of this.floorTraps) {
       if (tr.revealed) {
+        this.minimapGfx.fillStyle(tr.trap.hexColor, 1);
         this.minimapGfx.fillRect(mx + tr.x * t, my + tr.y * t, t, t);
       }
     }
@@ -2569,59 +2565,49 @@ export class DungeonScene extends Phaser.Scene {
   // ── Traps ──
 
   private checkTraps() {
-    const idx = this.floorTraps.findIndex(
-      t => t.x === this.player.tileX && t.y === this.player.tileY
+    const ft = this.floorTraps.find(
+      t => t.x === this.player.tileX && t.y === this.player.tileY && !t.triggered
     );
-    if (idx === -1) return;
+    if (!ft) return;
 
-    const ft = this.floorTraps[idx];
     sfxTrap();
-    // Reveal the trap
-    if (!ft.revealed) {
-      ft.revealed = true;
-      ft.sprite.setAlpha(1);
-    }
+    ft.triggered = true;
+    ft.revealed = true;
 
     // Ability: Rock Head — immune to trap damage
     if (this.player.ability === AbilityId.RockHead) {
       this.showLog(`Stepped on a ${ft.trap.name}! Rock Head negated it!`);
-      ft.sprite.destroy();
-      this.floorTraps.splice(idx, 1);
+      this.drawTrap(ft);
+      this.updateHUD();
       return;
     }
 
-    // Ability: Levitate — immune to ground-based traps (Spike, Warp, Hunger)
+    // Ability: Levitate — immune to ground-based traps (Spike, Warp, Blast)
     if (this.player.ability === AbilityId.Levitate &&
-        (ft.trap.type === TrapType.Spike || ft.trap.type === TrapType.Warp || ft.trap.type === TrapType.Hunger)) {
+        (ft.trap.type === TrapType.Spike || ft.trap.type === TrapType.Warp || ft.trap.type === TrapType.Blast)) {
       this.showLog(`Stepped on a ${ft.trap.name}! Levitate avoided it!`);
-      ft.sprite.destroy();
-      this.floorTraps.splice(idx, 1);
+      this.drawTrap(ft);
+      this.updateHUD();
       return;
     }
 
     this.showLog(`Stepped on a ${ft.trap.name}! ${ft.trap.description}`);
+    this.cameras.main.shake(150, 0.008);
 
     switch (ft.trap.type) {
       case TrapType.Spike: {
-        const dmg = 15;
-        this.player.stats.hp = Math.max(0, this.player.stats.hp - dmg);
+        const dmg = Math.floor(this.player.stats.maxHp * 0.15);
+        this.player.stats.hp = Math.max(1, this.player.stats.hp - dmg);
         if (this.player.sprite) this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, dmg, 1.0);
-        this.cameras.main.shake(150, 0.005);
         this.checkPlayerDeath();
         break;
       }
       case TrapType.Poison:
         if (!this.player.statusEffects.some(s => s.type === SkillEffect.Burn)) {
           this.player.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
+          this.showLog("You were burned!");
         }
         if (this.player.sprite) this.player.sprite.setTint(0xa855f7);
-        this.time.delayedCall(300, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
-        break;
-      case TrapType.Slow:
-        if (!this.player.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
-          this.player.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 3 });
-        }
-        if (this.player.sprite) this.player.sprite.setTint(0xfbbf24);
         this.time.delayedCall(300, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
         break;
       case TrapType.Warp: {
@@ -2631,7 +2617,6 @@ export class DungeonScene extends Phaser.Scene {
 
         // Ability: RunAway — warp near stairs instead of random
         if (this.player.ability === AbilityId.RunAway) {
-          // Find open tile near stairs
           const offsets = [{x:0,y:-1},{x:1,y:0},{x:0,y:1},{x:-1,y:0},{x:1,y:-1},{x:1,y:1},{x:-1,y:1},{x:-1,y:-1}];
           let found = false;
           for (const off of offsets) {
@@ -2646,7 +2631,6 @@ export class DungeonScene extends Phaser.Scene {
           if (!found) { wx = stairsPos.x; wy = stairsPos.y; }
           this.showLog("Run Away warped you near the stairs!");
         } else {
-          // Normal: teleport to random ground tile
           do {
             wx = Math.floor(Math.random() * width);
             wy = Math.floor(Math.random() * height);
@@ -2663,32 +2647,98 @@ export class DungeonScene extends Phaser.Scene {
         this.cameras.main.flash(200, 100, 100, 255);
         break;
       }
-      case TrapType.Spin:
-        // Confusion: treated as paralyze for simplicity
+      case TrapType.Spin: {
+        // Confusion: reduce accuracy for 5 turns (shown as paralyze debuff)
+        this.showLog("You got confused!");
         if (!this.player.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
-          this.player.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 3 });
+          this.player.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 5 });
         }
         this.cameras.main.shake(200, 0.01);
         break;
-      case TrapType.Sticky:
+      }
+      case TrapType.Slowdown: {
+        const reduction = Math.floor(this.player.stats.atk * 0.1);
+        this.player.stats.atk = Math.max(1, this.player.stats.atk - reduction);
+        this.showLog(`ATK reduced by ${reduction} for this floor!`);
+        if (this.player.sprite) this.player.sprite.setTint(0xf97316);
+        this.time.delayedCall(400, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
+        break;
+      }
+      case TrapType.Blast: {
+        // Deal 25% max HP damage to player
+        const blastDmg = Math.floor(this.player.stats.maxHp * 0.25);
+        this.player.stats.hp = Math.max(1, this.player.stats.hp - blastDmg);
+        if (this.player.sprite) this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, blastDmg, 1.0);
+        // Also damage nearby enemies/allies in 3x3 area
+        for (const entity of this.allEntities) {
+          if (entity === this.player || !entity.alive) continue;
+          const dx = Math.abs(entity.tileX - ft.x);
+          const dy = Math.abs(entity.tileY - ft.y);
+          if (dx <= 1 && dy <= 1) {
+            const entityDmg = Math.floor(entity.stats.maxHp * 0.25);
+            entity.stats.hp = Math.max(1, entity.stats.hp - entityDmg);
+            if (entity.sprite) this.showDamagePopup(entity.sprite.x, entity.sprite.y, entityDmg, 1.0);
+            this.showLog(`${entity.name} was caught in the blast!`);
+          }
+        }
+        // Visual: flash red
+        this.cameras.main.flash(200, 255, 50, 50);
+        this.checkPlayerDeath();
+        break;
+      }
+      case TrapType.Trip:
         if (this.inventory.length > 0) {
           const lostIdx = Math.floor(Math.random() * this.inventory.length);
           const lost = this.inventory[lostIdx];
-          this.showLog(`Lost ${lost.item.name}!`);
+          this.showLog(`Dropped ${lost.item.name}!`);
           lost.count--;
           if (lost.count <= 0) this.inventory.splice(lostIdx, 1);
+        } else {
+          this.showLog("Nothing to drop!");
         }
         break;
-      case TrapType.Hunger:
-        this.belly = Math.max(0, this.belly - 20);
-        this.showLog(`Belly drained to ${this.belly}!`);
+      case TrapType.Seal: {
+        const usableSkills = this.player.skills.filter(s => s.currentPp > 0);
+        if (usableSkills.length > 0) {
+          const skill = usableSkills[Math.floor(Math.random() * usableSkills.length)];
+          skill.currentPp = 0;
+          this.showLog(`${skill.name} was sealed!`);
+          if (this.player.sprite) this.player.sprite.setTint(0x6366f1);
+          this.time.delayedCall(400, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
+        } else {
+          this.showLog("No skills to seal!");
+        }
         break;
+      }
     }
 
-    // Remove trap after triggering
-    ft.sprite.destroy();
-    this.floorTraps.splice(idx, 1);
+    this.drawTrap(ft);
     this.updateHUD();
+  }
+
+  /** Draw a revealed trap marker as a small colored circle on the tile */
+  private drawTrap(trap: FloorTrap) {
+    if (!trap.revealed) return;
+    const gfx = this.add.graphics();
+    const cx = trap.x * TILE_DISPLAY + TILE_DISPLAY / 2;
+    const cy = trap.y * TILE_DISPLAY + TILE_DISPLAY / 2;
+    gfx.fillStyle(trap.trap.hexColor, 0.6);
+    gfx.fillCircle(cx, cy, 4);
+    gfx.setDepth(3);
+    this.trapGraphics.push(gfx);
+  }
+
+  /** Reveal traps adjacent to the player (1 tile radius) */
+  private revealNearbyTraps() {
+    for (const trap of this.floorTraps) {
+      if (trap.revealed) continue;
+      const dx = Math.abs(trap.x - this.player.tileX);
+      const dy = Math.abs(trap.y - this.player.tileY);
+      if (dx <= 1 && dy <= 1) {
+        trap.revealed = true;
+        this.drawTrap(trap);
+      }
+    }
   }
 
   // ── Belly (Hunger) ──
@@ -3203,6 +3253,7 @@ export class DungeonScene extends Phaser.Scene {
       }
 
       this.checkTraps();
+      this.revealNearbyTraps();
       this.checkStairs();
       this.checkShop();
       this.checkMonsterHouse();
