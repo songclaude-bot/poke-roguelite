@@ -30,6 +30,7 @@ export class HubScene extends Phaser.Scene {
     dungeonId?: string;
     starter?: string;
     challengeMode?: string;
+    pokemonSeen?: string[];
   }) {
     this.meta = loadMeta();
 
@@ -57,6 +58,18 @@ export class HubScene extends Phaser.Scene {
       // Starter usage tracking
       if (data.starter && !this.meta.startersUsed.includes(data.starter)) {
         this.meta.startersUsed.push(data.starter);
+      }
+      // Pokedex: merge seen Pokemon from this run
+      if (data.pokemonSeen && data.pokemonSeen.length > 0) {
+        const seenSet = new Set(this.meta.pokemonSeen);
+        for (const id of data.pokemonSeen) {
+          seenSet.add(id);
+        }
+        this.meta.pokemonSeen = Array.from(seenSet);
+      }
+      // Pokedex: track starter as "used"
+      if (data.starter && !this.meta.pokemonUsed.includes(data.starter)) {
+        this.meta.pokemonUsed.push(data.starter);
       }
       saveMeta(this.meta);
     }
@@ -146,23 +159,28 @@ export class HubScene extends Phaser.Scene {
     const currentStarter = this.meta.starter ?? "mudkip";
     const starterName = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
 
-    const fixedY = GAME_HEIGHT - 118;
+    const fixedY = GAME_HEIGHT - 152;
     // Solid background behind fixed buttons — covers from scroll end to bottom
     const fixedBgTop = fixedY - 30;
     const fixedBgH = GAME_HEIGHT - fixedBgTop;
     this.add.rectangle(GAME_WIDTH / 2, fixedBgTop + fixedBgH / 2, GAME_WIDTH, fixedBgH, 0x1a2744).setDepth(50);
 
-    const starterBtnResult = this.createFixedButton(GAME_WIDTH / 2, fixedY, btnW, 32,
+    const starterBtnResult = this.createFixedButton(GAME_WIDTH / 2, fixedY, btnW, 30,
       `Starter: ${starterName}`, "Tap to change", "#f472b6",
       () => this.showStarterSelect()
     );
     this.starterLabel = starterBtnResult.titleText;
     this.starterDesc = starterBtnResult.descText;
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + 36, btnW, 32,
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + 34, btnW, 30,
       "Upgrade Shop", `Gold: ${this.meta.gold}`, "#fbbf24",
       () => this.scene.start("UpgradeScene")
     );
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + 72, btnW, 32,
+    const seenCount = (this.meta.pokemonSeen ?? []).length;
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + 68, btnW, 30,
+      "Pokedex", `Seen: ${seenCount} Pokemon`, "#e879f9",
+      () => this.scene.start("PokedexScene")
+    );
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + 102, btnW, 30,
       "Records", `Clears: ${this.meta.totalClears}  Best: B${this.meta.bestFloor}F`, "#60a5fa",
       () => this.scene.start("AchievementScene")
     );

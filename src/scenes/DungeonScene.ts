@@ -179,6 +179,9 @@ export class DungeonScene extends Phaser.Scene {
   private challengeTurnLimit = 0; // speedrun: max turns allowed
   private challengeBadgeText: Phaser.GameObjects.Text | null = null;
 
+  // Pokedex tracking: species encountered this run
+  private seenSpecies = new Set<string>();
+
   constructor() {
     super({ key: "DungeonScene" });
   }
@@ -237,6 +240,8 @@ export class DungeonScene extends Phaser.Scene {
     this.maxBelly = 100 + bellyBonus;
     this.belly = data?.belly ?? this.maxBelly;
     this.starterId = data?.starter ?? "mudkip";
+    this.seenSpecies = new Set<string>();
+    this.seenSpecies.add(this.starterId); // starter is always "seen"
     this.shopItems = [];
     this.shopRoom = null;
     this.shopUI = [];
@@ -670,6 +675,7 @@ export class DungeonScene extends Phaser.Scene {
         }
         this.allies.push(ally);
         this.allEntities.push(ally);
+        this.seenSpecies.add(allyData.speciesId); // Pokedex tracking
       }
     }
 
@@ -718,6 +724,7 @@ export class DungeonScene extends Phaser.Scene {
         }
         this.enemies.push(enemy);
         this.allEntities.push(enemy);
+        this.seenSpecies.add(sp.id); // Pokedex tracking
       }
     }
 
@@ -787,6 +794,7 @@ export class DungeonScene extends Phaser.Scene {
         this.bossEntity = boss;
         this.enemies.push(boss);
         this.allEntities.push(boss);
+        this.seenSpecies.add(sp.id); // Pokedex tracking
       }
     }
 
@@ -842,6 +850,7 @@ export class DungeonScene extends Phaser.Scene {
         this.bossEntity = boss;
         this.enemies.push(boss);
         this.allEntities.push(boss);
+        this.seenSpecies.add(sp.id); // Pokedex tracking
       }
     }
 
@@ -1666,6 +1675,7 @@ export class DungeonScene extends Phaser.Scene {
           dungeonId: this.dungeonDef.id,
           starter: this.starterId,
           challengeMode: this.challengeMode ?? undefined,
+          pokemonSeen: Array.from(this.seenSpecies),
         });
       });
     });
@@ -2040,6 +2050,7 @@ export class DungeonScene extends Phaser.Scene {
             dungeonId: this.dungeonDef.id,
             starter: this.starterId,
             challengeMode: this.challengeMode ?? undefined,
+            pokemonSeen: Array.from(this.seenSpecies),
           });
         });
         break;
@@ -2166,6 +2177,7 @@ export class DungeonScene extends Phaser.Scene {
             dungeonId: this.dungeonDef.id,
             starter: this.starterId,
             challengeMode: this.challengeMode ?? undefined,
+            pokemonSeen: Array.from(this.seenSpecies),
           });
         });
         break;
@@ -2574,6 +2586,7 @@ export class DungeonScene extends Phaser.Scene {
         }
         this.enemies.push(enemy);
         this.allEntities.push(enemy);
+        this.seenSpecies.add(sp.id); // Pokedex tracking
       }
     }
   }
@@ -2784,6 +2797,7 @@ export class DungeonScene extends Phaser.Scene {
         dungeonId: this.dungeonDef.id,
         starter: this.starterId,
         challengeMode: this.challengeMode ?? undefined,
+        pokemonSeen: Array.from(this.seenSpecies),
       });
     });
 
@@ -2840,6 +2854,7 @@ export class DungeonScene extends Phaser.Scene {
         dungeonId: this.dungeonDef.id,
         starter: this.starterId,
         challengeMode: this.challengeMode ?? undefined,
+        pokemonSeen: Array.from(this.seenSpecies),
       });
     });
   }

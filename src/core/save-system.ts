@@ -55,6 +55,9 @@ export interface MetaSaveData {
   endlessBestFloor: number;
   challengeClears: number;
   startersUsed: string[];  // array of starter IDs used
+  // Pokedex tracking
+  pokemonSeen: string[];   // species IDs the player has seen (fought or used)
+  pokemonUsed: string[];   // species IDs the player has used as starter
 }
 
 const SAVE_VERSION = 1;
@@ -106,6 +109,8 @@ function defaultMeta(): MetaSaveData {
     endlessBestFloor: 0,
     challengeClears: 0,
     startersUsed: [],
+    pokemonSeen: [],
+    pokemonUsed: [],
   };
 }
 
@@ -121,6 +126,8 @@ export function loadMeta(): MetaSaveData {
     if (data.endlessBestFloor === undefined) data.endlessBestFloor = 0;
     if (data.challengeClears === undefined) data.challengeClears = 0;
     if (data.startersUsed === undefined) data.startersUsed = [];
+    if (data.pokemonSeen === undefined) data.pokemonSeen = [];
+    if (data.pokemonUsed === undefined) data.pokemonUsed = [];
     return data;
   } catch {
     return defaultMeta();
