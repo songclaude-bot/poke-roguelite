@@ -248,14 +248,26 @@
 - 날짜: 2026-02-24
 - 핵심: Houndour/Sneasel/Riolu/Larvitar/Taillow/Starly 스타터 추가 (총 26종)
 
+## Phase 39: Frozen Tundra
+
+### 39. Ice 포켓몬 + 27번째 던전
+- 날짜: 2026-02-24
+- 핵심: Swinub(Ice/Ground)/Spheal(Ice/Water), avalanche/icyWind 스킬, Frozen Tundra 14층, Frost Mamoswine 보스
+
+## Phase 40: Meadow Path
+
+### 40. Normal 포켓몬 + 28번째 던전
+- 날짜: 2026-02-24
+- 핵심: Zigzagoon/Whismur, hyperVoice 스킬, Meadow Path 8층, Booming Exploud 보스
+
 ---
 
-## 현재 게임 규모 (v0.30.0)
+## 현재 게임 규모 (v0.35.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **25개 던전**: Beach Cave → Rocky Cavern + Destiny Tower
-- **60종+ 포켓몬** (진화 포함 70종+)
-- **90종+ 기술**
+- **28개 던전**: Beach Cave → Meadow Path + Destiny Tower
+- **70종+ 포켓몬** (진화 포함 80종+)
+- **100종+ 기술**
 - **20종 아이템** (6종 TM 포함)
 - **26종 스타터** (클리어 수로 해금)
-- **50종+ 진화 경로**
+- **55종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
