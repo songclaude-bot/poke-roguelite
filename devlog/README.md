@@ -163,3 +163,24 @@
 ### 19-1. Dragon 타입 + 12번째 던전
 - 날짜: 2026-02-24
 - 핵심: Dragon 타입 상성(Dragon 2x, Fairy 면역), Dratini/Bagon/Gible, 5종 Dragon 스킬, Dragon's Lair 16층, Elder Garchomp 보스(6.0x)
+
+## Phase 20: Destiny Tower
+
+### 20-1. 최종 던전
+- 날짜: 2026-02-24
+- 핵심: Destiny Tower 20층, 3.5x 난이도, Apex Garchomp 보스(7.0x), 모든 타입 혼합, 15클리어 해금
+
+## Phase 21-22: UI + Poochyena
+
+### 21-22. 스크롤 UI + 추가 콘텐츠
+- 날짜: 2026-02-24
+- 핵심: 허브 스크롤 가능 던전 리스트, Poochyena 추가, 16종 스타터, 35종+ 포켓몬
+
+---
+
+## 현재 게임 규모 (v0.20.0)
+- **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
+- **14개 던전**: Beach Cave → Destiny Tower
+- **35종+ 포켓몬** (진화 포함 50종+)
+- **60종+ 기술**
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
