@@ -17,6 +17,9 @@ import {
   getNGPlusLevel, canActivateNGPlus, activateNGPlus,
   getCurrentBonuses, getNextNGPlusRequirement,
 } from "../core/new-game-plus";
+import {
+  calculatePassiveIncome, getIncomeRate, updateLastVisit,
+} from "../core/passive-income";
 
 /**
  * HubScene — the town between dungeon runs.
@@ -134,7 +137,14 @@ export class HubScene extends Phaser.Scene {
     this.add.text(GAME_WIDTH / 2, 55, `Gold: ${this.meta.gold}`, {
       fontSize: "12px", color: "#fde68a", fontFamily: "monospace",
     }).setOrigin(0.5);
-    this.add.text(GAME_WIDTH / 2, 72, `Runs: ${this.meta.totalRuns}  Clears: ${this.meta.totalClears}`, {
+
+    // Passive income rate display
+    const incomeRate = getIncomeRate(this.meta);
+    this.add.text(GAME_WIDTH / 2, 68, `+${incomeRate}G/hr`, {
+      fontSize: "9px", color: "#c9a833", fontFamily: "monospace",
+    }).setOrigin(0.5);
+
+    this.add.text(GAME_WIDTH / 2, 80, `Runs: ${this.meta.totalRuns}  Clears: ${this.meta.totalClears}`, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace",
     }).setOrigin(0.5);
 
@@ -616,6 +626,15 @@ export class HubScene extends Phaser.Scene {
       delay: 50, loop: true,
       callback: () => updateIndicator(),
     });
+
+    // ── Passive Income: Welcome Back Popup ──
+    const passiveResult = calculatePassiveIncome(this.meta);
+    if (passiveResult.gold > 0) {
+      this.showPassiveIncomePopup(passiveResult.gold, passiveResult.hours, getIncomeRate(this.meta));
+    }
+
+    // Update last visit timestamp (always, even on first visit)
+    updateLastVisit(this.meta);
   }
 
   private createButton(
@@ -732,6 +751,91 @@ export class HubScene extends Phaser.Scene {
     const cleanup = () => { overlay.destroy(); text.destroy(); close.destroy(); };
     close.on("pointerdown", cleanup);
     overlay.on("pointerdown", cleanup);
+  }
+
+  private showPassiveIncomePopup(gold: number, hours: number, rate: number) {
+    const uiItems: Phaser.GameObjects.GameObject[] = [];
+
+    // Semi-transparent overlay (non-blocking — tap to dismiss)
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6
+    ).setDepth(300).setInteractive();
+    uiItems.push(overlay);
+
+    // Popup panel background
+    const panelW = 260;
+    const panelH = 140;
+    const panelX = GAME_WIDTH / 2;
+    const panelY = GAME_HEIGHT / 2 - 40;
+    const panel = this.add.rectangle(panelX, panelY, panelW, panelH, 0x1a1a2e, 0.95)
+      .setStrokeStyle(2, 0xfbbf24).setDepth(301);
+    uiItems.push(panel);
+
+    // Title
+    const titleText = this.add.text(panelX, panelY - 50, "Welcome back!", {
+      fontSize: "14px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(302);
+    uiItems.push(titleText);
+
+    // Hours info
+    const hoursText = this.add.text(panelX, panelY - 28,
+      `Away for ${hours} hour${hours !== 1 ? "s" : ""}`, {
+      fontSize: "9px", color: "#94a3b8", fontFamily: "monospace",
+    }).setOrigin(0.5).setDepth(302);
+    uiItems.push(hoursText);
+
+    // Gold amount (animated counting up)
+    const goldDisplay = this.add.text(panelX, panelY, "0 Gold", {
+      fontSize: "16px", color: "#fde68a", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(302);
+    uiItems.push(goldDisplay);
+
+    // Animate the gold counter
+    const countDuration = Math.min(1500, gold * 20);
+    this.tweens.addCounter({
+      from: 0,
+      to: gold,
+      duration: Math.max(300, countDuration),
+      ease: "Cubic.easeOut",
+      onUpdate: (tween) => {
+        const val = Math.floor(tween.getValue() ?? 0);
+        goldDisplay.setText(`+${val} Gold`);
+      },
+      onComplete: () => {
+        goldDisplay.setText(`+${gold} Gold`);
+      },
+    });
+
+    // Rate info
+    const rateText = this.add.text(panelX, panelY + 25,
+      `Income rate: ${rate}G/hr`, {
+      fontSize: "9px", color: "#c9a833", fontFamily: "monospace",
+    }).setOrigin(0.5).setDepth(302);
+    uiItems.push(rateText);
+
+    // Collect button
+    const collectBtn = this.add.text(panelX, panelY + 52, "[ Collect ]", {
+      fontSize: "13px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(302).setInteractive({ useHandCursor: true });
+    uiItems.push(collectBtn);
+
+    let collected = false;
+    const collect = () => {
+      if (collected) return;
+      collected = true;
+      this.meta.gold += gold;
+      this.meta.totalGold += gold;
+      saveMeta(this.meta);
+      uiItems.forEach(o => o.destroy());
+    };
+
+    collectBtn.on("pointerdown", collect);
+    overlay.on("pointerdown", collect);
+
+    // Auto-dismiss after 5 seconds
+    this.time.delayedCall(5000, () => {
+      if (!collected) collect();
+    });
   }
 
   private showNGPlusPanel() {
