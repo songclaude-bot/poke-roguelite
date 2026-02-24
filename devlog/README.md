@@ -532,3 +532,22 @@
 - **131종+ 진화 경로**
 - **Auto-save, Enemy HP bars, Status tints, Enhanced animations**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+## Phase 96-104: 4th Dungeons Batch 1 (v1.0.0 → v1.1.0)
+
+### Water/Fire/Grass 4th 던전
+- Tidal Grotto (Water): Wimpod(0767)/Tympole(0535), waterfall 스킬, 16층
+- Blazing Caldera (Fire): Salandit(0757)/Larvesta(0636), fireWhip 스킬, 16층
+- Verdant Canopy (Grass): Fomantis(0753)/Morelull(0755), leafStorm 스킬, 16층
+
+### Electric/Poison/Ground 4th 던전
+- Sparking Plant (Electric): Charjabug(0737)/Helioptile(0694), electricTerrain 스킬, 16층
+- Venomous Reef (Poison): Mareanie(0747)/Croagunk(0453), poisonJab 스킬, 16층
+- Shifting Sands (Ground): Sandygast(0769)/Silicobra(0843), scorchingSand 스킬, 16층
+
+### Rock/Bug/Fighting 4th 던전
+- Crystal Cavern (Rock): Carbink(0703)/Minior(0774), stealthRock 스킬, 16층
+- Silk Web (Bug): Dewpider(0751)/Sizzlipede(0850), lunge 스킬, 16층
+- Champion Dojo (Fighting): Pancham(0674)/Hawlucha(0701), skyUppercut 스킬, 16층
+
+- **신규 포켓몬 18종**, 115종 스타터, 4th 던전 난이도 3.5, 보스 7.5x

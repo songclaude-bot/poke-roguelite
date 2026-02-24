@@ -112,7 +112,7 @@ export class HubScene extends Phaser.Scene {
       )
     );
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v0.22.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.1.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
@@ -418,6 +418,25 @@ export class HubScene extends Phaser.Scene {
       { id: "vullaby", name: "Vullaby", unlock: 13 },
       { id: "stufful", name: "Stufful", unlock: 14 },
       { id: "furfrou", name: "Furfrou", unlock: 12 },
+      // 4th dungeon starters (Phase 96-104)
+      { id: "wimpod", name: "Wimpod", unlock: 15 },
+      { id: "tympole", name: "Tympole", unlock: 14 },
+      { id: "salandit", name: "Salandit", unlock: 15 },
+      { id: "larvesta", name: "Larvesta", unlock: 14 },
+      { id: "fomantis", name: "Fomantis", unlock: 13 },
+      { id: "morelull", name: "Morelull", unlock: 14 },
+      { id: "charjabug", name: "Charjabug", unlock: 15 },
+      { id: "helioptile", name: "Helioptile", unlock: 14 },
+      { id: "mareanie", name: "Mareanie", unlock: 15 },
+      { id: "croagunk", name: "Croagunk", unlock: 14 },
+      { id: "sandygast", name: "Sandygast", unlock: 15 },
+      { id: "silicobra", name: "Silicobra", unlock: 14 },
+      { id: "carbink", name: "Carbink", unlock: 15 },
+      { id: "minior", name: "Minior", unlock: 14 },
+      { id: "dewpider", name: "Dewpider", unlock: 13 },
+      { id: "sizzlipede", name: "Sizzlipede", unlock: 14 },
+      { id: "pancham", name: "Pancham", unlock: 15 },
+      { id: "hawlucha", name: "Hawlucha", unlock: 14 },
     ];
 
     const current = this.meta.starter ?? "mudkip";
