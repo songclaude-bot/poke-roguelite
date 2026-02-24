@@ -112,7 +112,7 @@ export class HubScene extends Phaser.Scene {
       )
     );
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v0.21.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v0.22.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
@@ -337,11 +337,22 @@ export class HubScene extends Phaser.Scene {
       { id: "dratini", name: "Dratini", unlock: 10 },
       { id: "ralts", name: "Ralts", unlock: 11 },
       { id: "poochyena", name: "Poochyena", unlock: 7 },
+      { id: "beldum", name: "Beldum", unlock: 12 },
+      { id: "sandshrew", name: "Sandshrew", unlock: 13 },
+      { id: "trapinch", name: "Trapinch", unlock: 14 },
+      { id: "skarmory", name: "Skarmory", unlock: 15 },
     ];
 
     const current = this.meta.starter ?? "mudkip";
-    let sy = 65;
 
+    // Scrollable container for starters
+    const scrollTop2 = 50;
+    const scrollBottom2 = GAME_HEIGHT - 50;
+    const scrollH2 = scrollBottom2 - scrollTop2;
+    const container2 = this.add.container(0, 0).setDepth(202);
+    uiItems.push(container2);
+
+    let sy = scrollTop2 + 10;
     for (const s of starters) {
       const isUnlocked = this.meta.totalClears >= s.unlock;
       const isCurrent = s.id === current;
@@ -351,42 +362,65 @@ export class HubScene extends Phaser.Scene {
         ? (isCurrent ? "Currently selected" : "Tap to select")
         : `Need ${s.unlock} clears (have ${this.meta.totalClears})`;
 
-      const bg = this.add.rectangle(GAME_WIDTH / 2, sy, 300, 36, 0x1a1a2e, 0.9)
-        .setStrokeStyle(1, isCurrent ? 0xfbbf24 : isUnlocked ? 0x334155 : 0x222233)
-        .setDepth(201);
-      uiItems.push(bg);
+      const bg2 = this.add.rectangle(GAME_WIDTH / 2, sy, 300, 30, 0x1a1a2e, 0.95)
+        .setStrokeStyle(1, isCurrent ? 0xfbbf24 : isUnlocked ? 0x334155 : 0x222233);
+      container2.add(bg2);
 
-      const nameText = this.add.text(GAME_WIDTH / 2 - 130, sy - 8, label, {
-        fontSize: "12px", color, fontFamily: "monospace", fontStyle: "bold",
-      }).setDepth(202);
-      uiItems.push(nameText);
+      const nameText = this.add.text(GAME_WIDTH / 2 - 130, sy - 7, label, {
+        fontSize: "11px", color, fontFamily: "monospace", fontStyle: "bold",
+      });
+      container2.add(nameText);
 
-      const descText = this.add.text(GAME_WIDTH / 2 - 130, sy + 6, desc, {
-        fontSize: "8px", color: "#666680", fontFamily: "monospace",
-      }).setDepth(202);
-      uiItems.push(descText);
+      const descText = this.add.text(GAME_WIDTH / 2 - 130, sy + 5, desc, {
+        fontSize: "7px", color: "#666680", fontFamily: "monospace",
+      });
+      container2.add(descText);
 
       if (isUnlocked && !isCurrent) {
-        bg.setInteractive({ useHandCursor: true });
-        bg.on("pointerover", () => bg.setFillStyle(0x2a2a4e, 1));
-        bg.on("pointerout", () => bg.setFillStyle(0x1a1a2e, 0.9));
-        bg.on("pointerdown", () => {
+        bg2.setInteractive({ useHandCursor: true });
+        bg2.on("pointerover", () => bg2.setFillStyle(0x2a2a4e, 1));
+        bg2.on("pointerout", () => bg2.setFillStyle(0x1a1a2e, 0.95));
+        bg2.on("pointerdown", () => {
           this.meta.starter = s.id;
           saveMeta(this.meta);
           uiItems.forEach(o => o.destroy());
-          this.scene.restart(); // Rebuild hub with new starter
+          this.scene.restart();
         });
       }
 
-      sy += 46;
+      sy += 36;
     }
 
-    const closeBtn = this.add.text(GAME_WIDTH / 2, sy + 10, "[Close]", {
-      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
-    }).setOrigin(0.5).setDepth(201).setInteractive();
-    uiItems.push(closeBtn);
-
+    // Close button inside scroll
+    const closeBtn = this.add.text(GAME_WIDTH / 2, sy + 5, "[Close]", {
+      fontSize: "13px", color: "#60a5fa", fontFamily: "monospace",
+    }).setOrigin(0.5).setInteractive();
+    container2.add(closeBtn);
     closeBtn.on("pointerdown", () => uiItems.forEach(o => o.destroy()));
-    overlay.on("pointerdown", () => uiItems.forEach(o => o.destroy()));
+
+    // Mask + scroll
+    const contentH2 = sy + 30 - scrollTop2;
+    const maxScroll2 = Math.max(0, contentH2 - scrollH2);
+    const maskShape2 = this.make.graphics({ x: 0, y: 0 });
+    maskShape2.fillRect(0, scrollTop2, GAME_WIDTH, scrollH2);
+    uiItems.push(maskShape2 as unknown as Phaser.GameObjects.GameObject);
+    container2.setMask(maskShape2.createGeometryMask());
+
+    if (maxScroll2 > 0) {
+      let dragStart2 = 0;
+      let scrollOff2 = 0;
+      overlay.on("pointerdown", (ptr: Phaser.Input.Pointer) => {
+        dragStart2 = ptr.y;
+      });
+      this.input.on("pointermove", (ptr: Phaser.Input.Pointer) => {
+        if (!ptr.isDown) return;
+        const dy = ptr.y - dragStart2;
+        dragStart2 = ptr.y;
+        scrollOff2 = Math.max(-maxScroll2, Math.min(0, scrollOff2 + dy));
+        container2.y = scrollOff2;
+      });
+    } else {
+      overlay.on("pointerdown", () => uiItems.forEach(o => o.destroy()));
+    }
   }
 }
