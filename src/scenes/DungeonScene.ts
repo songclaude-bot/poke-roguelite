@@ -517,8 +517,11 @@ export class DungeonScene extends Phaser.Scene {
     const map = this.make.tilemap({
       data: tileData, tileWidth: TILE_SIZE, tileHeight: TILE_SIZE,
     });
-    const tileset = map.addTilesetImage(this.dungeonDef.tilesetKey)!;
-    map.createLayer(0, tileset, 0, 0)!.setScale(TILE_SCALE);
+    const tileset = map.addTilesetImage(this.dungeonDef.tilesetKey);
+    if (tileset) {
+      const layer = map.createLayer(0, tileset, 0, 0);
+      if (layer) layer.setScale(TILE_SCALE);
+    }
 
     // Stairs marker
     const stairsGfx = this.add.graphics();
@@ -529,12 +532,16 @@ export class DungeonScene extends Phaser.Scene {
     stairsGfx.fillTriangle(sx, sy + 14, sx + 10, sy, sx - 10, sy);
     stairsGfx.setDepth(5);
 
-    // ── Create animations for needed species ──
+    // ── Create animations for needed species (wrapped in try/catch to protect UI) ──
     const neededKeys = new Set<string>([this.starterId, ...this.dungeonDef.enemySpeciesIds]);
     for (const key of neededKeys) {
-      const sp = SPECIES[key];
-      if (!sp || this.anims.exists(`${key}-walk-0`)) continue;
-      this.createAnimations(sp.spriteKey, sp.walkFrames, sp.idleFrames);
+      try {
+        const sp = SPECIES[key];
+        if (!sp || this.anims.exists(`${key}-walk-0`)) continue;
+        this.createAnimations(sp.spriteKey, sp.walkFrames, sp.idleFrames);
+      } catch (e) {
+        console.warn(`[DungeonScene] Failed to create animations for "${key}":`, e);
+      }
     }
 
     // ── Player entity ──
@@ -559,13 +566,23 @@ export class DungeonScene extends Phaser.Scene {
       ability: SPECIES_ABILITIES[this.starterId] ?? SPECIES_ABILITIES["mudkip"],
       speciesId: this.starterId,
     };
-    this.player.sprite = this.add.sprite(
-      this.tileToPixelX(this.player.tileX),
-      this.tileToPixelY(this.player.tileY),
-      `${playerSp.spriteKey}-idle`
-    );
-    this.player.sprite.setScale(TILE_SCALE).setDepth(10);
-    this.player.sprite.play(`${playerSp.spriteKey}-idle-${Direction.Down}`);
+    const playerTextureKey = `${playerSp.spriteKey}-idle`;
+    if (this.textures.exists(playerTextureKey)) {
+      this.player.sprite = this.add.sprite(
+        this.tileToPixelX(this.player.tileX),
+        this.tileToPixelY(this.player.tileY),
+        playerTextureKey
+      );
+      this.player.sprite.setScale(TILE_SCALE).setDepth(10);
+      const animKey = `${playerSp.spriteKey}-idle-${Direction.Down}`;
+      if (this.anims.exists(animKey)) this.player.sprite.play(animKey);
+    } else {
+      // Fallback: draw a colored circle as placeholder
+      const gfx = this.add.graphics();
+      gfx.fillStyle(0x4ade80, 1);
+      gfx.fillCircle(this.tileToPixelX(this.player.tileX), this.tileToPixelY(this.player.tileY), TILE_DISPLAY / 3);
+      gfx.setDepth(10);
+    }
     this.allEntities.push(this.player);
 
     // ── Spawn persistent allies ──
@@ -589,10 +606,14 @@ export class DungeonScene extends Phaser.Scene {
           statusEffects: [], isAlly: true, speciesId: allyData.speciesId,
           ability: SPECIES_ABILITIES[allyData.speciesId],
         };
-        ally.sprite = this.add.sprite(
-          this.tileToPixelX(ally.tileX), this.tileToPixelY(ally.tileY), `${sp.spriteKey}-idle`
-        ).setScale(TILE_SCALE).setDepth(10);
-        ally.sprite.play(`${sp.spriteKey}-idle-${Direction.Down}`);
+        const allyTex = `${sp.spriteKey}-idle`;
+        if (this.textures.exists(allyTex)) {
+          ally.sprite = this.add.sprite(
+            this.tileToPixelX(ally.tileX), this.tileToPixelY(ally.tileY), allyTex
+          ).setScale(TILE_SCALE).setDepth(10);
+          const allyAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+          if (this.anims.exists(allyAnim)) ally.sprite.play(allyAnim);
+        }
         this.allies.push(ally);
         this.allEntities.push(ally);
       }
@@ -630,11 +651,15 @@ export class DungeonScene extends Phaser.Scene {
           speciesId: sp.spriteKey, // for recruitment
           ability: SPECIES_ABILITIES[sp.spriteKey],
         };
-        enemy.sprite = this.add.sprite(
-          this.tileToPixelX(ex), this.tileToPixelY(ey), `${sp.spriteKey}-idle`
-        );
-        enemy.sprite.setScale(TILE_SCALE).setDepth(9);
-        enemy.sprite.play(`${sp.spriteKey}-idle-${Direction.Down}`);
+        const eTex = `${sp.spriteKey}-idle`;
+        if (this.textures.exists(eTex)) {
+          enemy.sprite = this.add.sprite(
+            this.tileToPixelX(ex), this.tileToPixelY(ey), eTex
+          );
+          enemy.sprite.setScale(TILE_SCALE).setDepth(9);
+          const eAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+          if (this.anims.exists(eAnim)) enemy.sprite.play(eAnim);
+        }
         this.enemies.push(enemy);
         this.allEntities.push(enemy);
       }
@@ -689,11 +714,15 @@ export class DungeonScene extends Phaser.Scene {
           isBoss: true,
           ability: SPECIES_ABILITIES[sp.spriteKey],
         };
-        boss.sprite = this.add.sprite(
-          this.tileToPixelX(bx), this.tileToPixelY(by), `${sp.spriteKey}-idle`
-        );
-        boss.sprite.setScale(TILE_SCALE * 1.5).setDepth(11);
-        boss.sprite.play(`${sp.spriteKey}-idle-${Direction.Down}`);
+        const bossTex = `${sp.spriteKey}-idle`;
+        if (this.textures.exists(bossTex)) {
+          boss.sprite = this.add.sprite(
+            this.tileToPixelX(bx), this.tileToPixelY(by), bossTex
+          );
+          boss.sprite.setScale(TILE_SCALE * 1.5).setDepth(11);
+          const bossAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+          if (this.anims.exists(bossAnim)) boss.sprite.play(bossAnim);
+        }
         // Red tint aura for boss
         boss.sprite.setTint(0xff6666);
         this.time.delayedCall(800, () => { if (boss.sprite) boss.sprite.clearTint(); });
@@ -827,10 +856,13 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── HUD ──
     // Portrait sprite (small idle frame)
-    this.portraitSprite = this.add.sprite(20, 20, `${this.starterId}-idle`)
-      .setScrollFactor(0).setDepth(101).setScale(1.2);
-    if (this.anims.exists(`${this.starterId}-idle-0`)) {
-      this.portraitSprite.play(`${this.starterId}-idle-0`);
+    const portraitTex = `${this.starterId}-idle`;
+    if (this.textures.exists(portraitTex)) {
+      this.portraitSprite = this.add.sprite(20, 20, portraitTex)
+        .setScrollFactor(0).setDepth(101).setScale(1.2);
+      if (this.anims.exists(`${this.starterId}-idle-0`)) {
+        this.portraitSprite.play(`${this.starterId}-idle-0`);
+      }
     }
 
     // HP Bar background
@@ -970,6 +1002,11 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private createAnimations(key: string, walkFrames: number, idleFrames: number) {
+    // Guard: skip if textures aren't loaded (prevents crash that kills all UI)
+    if (!this.textures.exists(`${key}-walk`) || !this.textures.exists(`${key}-idle`)) {
+      console.warn(`[DungeonScene] Missing sprite textures for "${key}", skipping animations`);
+      return;
+    }
     for (let dir = 0; dir < 8; dir++) {
       this.anims.create({
         key: `${key}-walk-${dir}`,
@@ -2340,11 +2377,15 @@ export class DungeonScene extends Phaser.Scene {
           speciesId: sp.spriteKey,
           ability: SPECIES_ABILITIES[sp.spriteKey],
         };
-        enemy.sprite = this.add.sprite(
-          this.tileToPixelX(ex), this.tileToPixelY(ey), `${sp.spriteKey}-idle`
-        );
-        enemy.sprite.setScale(TILE_SCALE).setDepth(9);
-        enemy.sprite.play(`${sp.spriteKey}-idle-${Direction.Down}`);
+        const eTex = `${sp.spriteKey}-idle`;
+        if (this.textures.exists(eTex)) {
+          enemy.sprite = this.add.sprite(
+            this.tileToPixelX(ex), this.tileToPixelY(ey), eTex
+          );
+          enemy.sprite.setScale(TILE_SCALE).setDepth(9);
+          const eAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+          if (this.anims.exists(eAnim)) enemy.sprite.play(eAnim);
+        }
         this.enemies.push(enemy);
         this.allEntities.push(enemy);
       }
@@ -3279,14 +3320,17 @@ export class DungeonScene extends Phaser.Scene {
       ability: entity.ability,
     };
 
-    ally.sprite = this.add.sprite(
-      this.tileToPixelX(ally.tileX), this.tileToPixelY(ally.tileY),
-      `${sp.spriteKey}-idle`
-    ).setScale(TILE_SCALE).setDepth(10);
-    ally.sprite.play(`${sp.spriteKey}-idle-${Direction.Down}`);
+    const recruitTex = `${sp.spriteKey}-idle`;
+    if (this.textures.exists(recruitTex)) {
+      ally.sprite = this.add.sprite(
+        this.tileToPixelX(ally.tileX), this.tileToPixelY(ally.tileY), recruitTex
+      ).setScale(TILE_SCALE).setDepth(10);
+      const recruitAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+      if (this.anims.exists(recruitAnim)) ally.sprite.play(recruitAnim);
+    }
 
     // Recruitment animation — pink heart + flash
-    ally.sprite.setTint(0xff88cc);
+    if (ally.sprite) ally.sprite.setTint(0xff88cc);
     this.time.delayedCall(400, () => { if (ally.sprite) ally.sprite.clearTint(); });
 
     const heart = this.add.text(

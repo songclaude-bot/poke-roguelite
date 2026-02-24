@@ -779,3 +779,34 @@
 - **275종+ 기술**
 - **HubScene 리팩터링**: 가상 스크롤 스타터 선택 UI
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 11: 11th Tier Legendary Post-Game Dungeons
+
+### 11-1. Water/Fire/Grass/Electric/Poison/Ground (Phase 188-190)
+- 날짜: 2026-02-24
+- Suicune, Lugia, Entei, Ho-Oh, Celebi, Virizion, Raikou, Zekrom, Nihilego, Naganadel, Groudon, Landorus
+- Ocean Sovereignty (Water), Sacred Pyre (Fire), Timeless Grove (Grass)
+- Thunder Sovereignty (Electric), Ultra Venom Nexus (Poison), Pangaea Throne (Ground)
+
+### 11-2. Rock/Bug/Fighting/Steel/Ghost/Psychic (Phase 191-193)
+- 날짜: 2026-02-24
+- Regirock, Stakataka, Genesect, Buzzwole, Cobalion, Marshadow, Registeel, Solgaleo, Giratina, Lunala, Mewtwo, Deoxys
+- Petrified Colossus (Rock), Cyber Hive (Bug), Justice Hall (Fighting)
+- Iron Sanctuary (Steel), Distortion Rift (Ghost), Genesis Chamber (Psychic)
+
+### 11-3. Ice/Dark/Fairy/Dragon/Flying/Normal (Phase 194-196)
+- 날짜: 2026-02-24
+- Regice, Kyurem, Yveltal, Hoopa, Xerneas, Magearna, Rayquaza, Dialga, Tornadus, Articuno, Arceus, Regigigas
+- Frozen Regolith (Ice), Nihility Abyss (Dark), Eternal Garden (Fairy)
+- Temporal Spire (Dragon), Storm Sovereign (Flying), Origin Hall (Normal)
+
+### v1.9.0 마일스톤
+- **전 18타입 × 11개 던전 = 198개 던전** + Destiny Tower = 총 199개 던전!
+- **전설/환상 포켓몬 36종** 추가 (Phases 188-196)
+- **385종 스타터** (전체)
+- **500종+ 포켓몬** (진화 포함)
+- **350종+ 기술**
+- **포스트게임 컨텐츠**: 50클리어 이상 해금 전설 던전
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/

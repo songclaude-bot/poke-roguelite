@@ -116,7 +116,7 @@ export class HubScene extends Phaser.Scene {
       )
     );
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.8.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.9.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
@@ -819,6 +819,43 @@ export class HubScene extends Phaser.Scene {
       { id: "talonflame", name: "Talonflame", unlock: 23 },
       { id: "slaking", name: "Slaking", unlock: 24 },
       { id: "lopunny", name: "Lopunny", unlock: 23 },
+      // 11th dungeon starters (Legendary post-game)
+      { id: "suicune", name: "Suicune", unlock: 26 },
+      { id: "lugia", name: "Lugia", unlock: 25 },
+      { id: "entei", name: "Entei", unlock: 26 },
+      { id: "hoOh", name: "Ho-Oh", unlock: 25 },
+      { id: "celebi", name: "Celebi", unlock: 26 },
+      { id: "virizion", name: "Virizion", unlock: 25 },
+      { id: "raikou", name: "Raikou", unlock: 26 },
+      { id: "zekrom", name: "Zekrom", unlock: 25 },
+      { id: "nihilego", name: "Nihilego", unlock: 26 },
+      { id: "naganadel", name: "Naganadel", unlock: 25 },
+      { id: "groudon", name: "Groudon", unlock: 26 },
+      { id: "landorus", name: "Landorus", unlock: 25 },
+      { id: "regirock", name: "Regirock", unlock: 26 },
+      { id: "stakataka", name: "Stakataka", unlock: 25 },
+      { id: "genesect", name: "Genesect", unlock: 26 },
+      { id: "buzzwole", name: "Buzzwole", unlock: 25 },
+      { id: "cobalion", name: "Cobalion", unlock: 26 },
+      { id: "marshadow", name: "Marshadow", unlock: 25 },
+      { id: "registeel", name: "Registeel", unlock: 26 },
+      { id: "solgaleo", name: "Solgaleo", unlock: 25 },
+      { id: "giratina", name: "Giratina", unlock: 26 },
+      { id: "lunala", name: "Lunala", unlock: 25 },
+      { id: "mewtwo", name: "Mewtwo", unlock: 26 },
+      { id: "deoxys", name: "Deoxys", unlock: 25 },
+      { id: "regice", name: "Regice", unlock: 26 },
+      { id: "kyurem", name: "Kyurem", unlock: 25 },
+      { id: "yveltal", name: "Yveltal", unlock: 26 },
+      { id: "hoopa", name: "Hoopa", unlock: 25 },
+      { id: "xerneas", name: "Xerneas", unlock: 26 },
+      { id: "magearna", name: "Magearna", unlock: 25 },
+      { id: "rayquaza", name: "Rayquaza", unlock: 26 },
+      { id: "dialga", name: "Dialga", unlock: 25 },
+      { id: "tornadus", name: "Tornadus", unlock: 26 },
+      { id: "articuno", name: "Articuno", unlock: 25 },
+      { id: "arceus", name: "Arceus", unlock: 26 },
+      { id: "regigigas", name: "Regigigas", unlock: 25 },
     ];
   }
 }
