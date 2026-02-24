@@ -91,6 +91,7 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     toxicSwamp: [WeatherType.Rain, WeatherType.Sandstorm],
     moonlitCave: [WeatherType.Hail],
     dragonsLair: [WeatherType.Sandstorm, WeatherType.Hail],
+    destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 
   const pool = pools[dungeonId] ?? [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail];
