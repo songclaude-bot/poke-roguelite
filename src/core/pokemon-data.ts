@@ -329,6 +329,32 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["poisonSting", "signalBeam", "stringShot"],
     floors: [],
   },
+  abra: {
+    id: "abra",
+    name: "Abra",
+    spriteKey: "abra",
+    types: [PokemonType.Psychic],
+    attackType: PokemonType.Psychic,
+    baseStats: { hp: 20, atk: 12, def: 5 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 24, idleFrameHeight: 48,
+    walkFrames: 8, idleFrames: 6,
+    skillIds: ["confusion", "psybeam", "hypnosis"],
+    floors: [],
+  },
+  natu: {
+    id: "natu",
+    name: "Natu",
+    spriteKey: "natu",
+    types: [PokemonType.Psychic, PokemonType.Flying],
+    attackType: PokemonType.Psychic,
+    baseStats: { hp: 24, atk: 10, def: 7 },
+    walkFrameWidth: 24, walkFrameHeight: 24,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["confusion", "nightShade", "psybeam"],
+    floors: [],
+  },
   meditite: {
     id: "meditite",
     name: "Meditite",
@@ -737,6 +763,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   mareep: { 7: "spark", 10: "thunderbolt" },
   wurmple: { 6: "pinMissile", 9: "signalBeam" },
   spinarak: { 7: "signalBeam", 10: "pinMissile" },
+  abra: { 7: "psybeam", 10: "psychic" },
+  natu: { 7: "psybeam", 10: "psychic" },
 };
 
 /** Check if a species learns a new skill at this level */

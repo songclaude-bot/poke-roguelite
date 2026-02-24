@@ -926,6 +926,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 85,
     description: "Fires sharp pins rapidly.",
   },
+
+  // ── Additional Psychic Skills ──
+  psychic: {
+    id: "psychic",
+    name: "Psychic",
+    type: PokemonType.Psychic,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Around,
+    accuracy: 90,
+    description: "Powerful psychic force hits all around.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
