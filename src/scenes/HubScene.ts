@@ -120,90 +120,225 @@ export class HubScene extends Phaser.Scene {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
-    // ── Scrollable dungeon list ──
+    // ── Scrollable dungeon list with collapsible tiers ──
     const scrollTop = y;
     const scrollBottom = fixedY - 16;
     const scrollH = scrollBottom - scrollTop;
 
-    // Container for all dungeon buttons
-    const container = this.add.container(0, 0).setDepth(10);
-    let cy2 = scrollTop;
+    // Tier definitions: difficulty range → tier info
+    const TIER_DEFS: { id: string; name: string; label: string; minDiff: number; maxDiff: number; color: number; textColor: string }[] = [
+      { id: "t1",  name: "Beginner",     label: "Tier 1",  minDiff: 0,   maxDiff: 1.09,  color: 0x334455, textColor: "#7a8a9a" },
+      { id: "t2",  name: "Novice",        label: "Tier 2",  minDiff: 1.1, maxDiff: 1.69,  color: 0x2a4a3a, textColor: "#88b899" },
+      { id: "t3",  name: "Intermediate",  label: "Tier 3",  minDiff: 1.7, maxDiff: 2.09,  color: 0x3a4a2a, textColor: "#a8c888" },
+      { id: "t4",  name: "Advanced",      label: "Tier 4",  minDiff: 2.1, maxDiff: 3.09,  color: 0x4a4a2a, textColor: "#c8c888" },
+      { id: "t5",  name: "Expert",        label: "Tier 5",  minDiff: 3.1, maxDiff: 4.09,  color: 0x5a3a2a, textColor: "#d8a878" },
+      { id: "t6",  name: "Master",        label: "Tier 6",  minDiff: 4.1, maxDiff: 4.59,  color: 0x5a2a3a, textColor: "#d888a8" },
+      { id: "t7",  name: "Champion",      label: "Tier 7",  minDiff: 4.6, maxDiff: 5.09,  color: 0x4a2a5a, textColor: "#b888d8" },
+      { id: "t8",  name: "Elite",         label: "Tier 8",  minDiff: 5.1, maxDiff: 5.59,  color: 0x3a2a5a, textColor: "#9888d8" },
+      { id: "t9",  name: "Legendary",     label: "Tier 9",  minDiff: 5.6, maxDiff: 6.09,  color: 0x2a3a6a, textColor: "#88a8e8" },
+      { id: "t10", name: "Mythical",      label: "Tier 10", minDiff: 6.1, maxDiff: 6.59,  color: 0x2a4a6a, textColor: "#88c8e8" },
+      { id: "t11", name: "Godlike",       label: "Tier 11", minDiff: 6.6, maxDiff: 7.99,  color: 0x5a2a5a, textColor: "#e888e8" },
+      { id: "t12", name: "FINAL",         label: "Tier 12", minDiff: 8.0, maxDiff: 9.99,  color: 0x6a1a1a, textColor: "#f85858" },
+      { id: "sp",  name: "Destiny Tower", label: "Special", minDiff: -1,  maxDiff: -1,    color: 0x6a5a1a, textColor: "#ffd700" },
+    ];
 
-    const header = this.add.text(15, cy2, "── Dungeons ──", {
-      fontSize: "10px", color: "#94a3b8", fontFamily: "monospace",
-    });
-    container.add(header);
-    cy2 += 18;
+    // Group dungeons by tier
+    const allDungeons = Object.values(DUNGEONS);
+    const tierGroups: { tier: typeof TIER_DEFS[0]; dungeons: DungeonDef[] }[] = TIER_DEFS.map(t => ({ tier: t, dungeons: [] }));
 
-    for (const dg of Object.values(DUNGEONS)) {
-      const isUnlocked = dg.unlockClears <= this.meta.totalClears;
-      const color = isUnlocked ? "#e0e0e0" : "#444460";
-      const desc = isUnlocked ? dg.description : `Unlock: ${dg.unlockClears} clears needed`;
-
-      const bg = this.add.rectangle(GAME_WIDTH / 2, cy2, btnW, 38, 0x1a1a2e, 0.9)
-        .setStrokeStyle(1, isUnlocked ? 0x334155 : 0x222233);
-      container.add(bg);
-
-      if (isUnlocked) {
-        const dgId = dg.id;
-        bg.setInteractive({ useHandCursor: true });
-        bg.on("pointerover", () => bg.setFillStyle(0x2a2a4e, 1));
-        bg.on("pointerout", () => bg.setFillStyle(0x1a1a2e, 0.9));
-        bg.on("pointerdown", () => this.enterDungeon(dgId));
+    for (const dg of allDungeons) {
+      // Special case: Destiny Tower always goes to the "Special" tier
+      if (dg.id === "destinyTower") {
+        tierGroups[tierGroups.length - 1].dungeons.push(dg);
+        continue;
       }
-
-      const t1 = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 10, cy2 - 9, dg.name, {
-        fontSize: "11px", color, fontFamily: "monospace", fontStyle: "bold",
-      });
-      const t2 = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 10, cy2 + 5, desc, {
-        fontSize: "8px", color: "#666680", fontFamily: "monospace",
-      });
-      container.add([t1, t2]);
-      cy2 += 44;
+      for (const tg of tierGroups) {
+        if (tg.tier.id === "sp") continue;
+        if (dg.difficulty >= tg.tier.minDiff && dg.difficulty <= tg.tier.maxDiff) {
+          tg.dungeons.push(dg);
+          break;
+        }
+      }
     }
 
-    const contentH = cy2 - scrollTop;
-    const maxScroll = Math.max(0, contentH - scrollH);
+    // Remove empty tiers
+    const activeTiers = tierGroups.filter(tg => tg.dungeons.length > 0);
+
+    // Determine which tier is expanded by default: the highest tier that has at least one unlocked dungeon
+    const expandedState: Record<string, boolean> = {};
+    let highestUnlockedTierId: string | null = null;
+    for (const tg of activeTiers) {
+      const hasUnlocked = tg.dungeons.some(d => d.unlockClears <= this.meta.totalClears);
+      expandedState[tg.tier.id] = false;
+      if (hasUnlocked) highestUnlockedTierId = tg.tier.id;
+    }
+    if (highestUnlockedTierId) expandedState[highestUnlockedTierId] = true;
+
+    // Container for all dungeon buttons
+    const container = this.add.container(0, 0).setDepth(10);
 
     // Mask for scrollable area
     const maskShape = this.make.graphics({ x: 0, y: 0 });
     maskShape.fillRect(0, scrollTop, GAME_WIDTH, scrollH);
-    const mask = maskShape.createGeometryMask();
-    container.setMask(mask);
+    const geoMask = maskShape.createGeometryMask();
+    container.setMask(geoMask);
+
+    // Scroll state
+    let scrollOffset = 0;
+    let maxScroll = 0;
+    let contentH = 0;
+
+    // Scroll indicator
+    const indicator = this.add.rectangle(
+      GAME_WIDTH - 4, scrollTop, 3, 20, 0x667eea, 0.5
+    ).setOrigin(0.5, 0).setDepth(11).setVisible(false);
+
+    // Track the Y position of the highest unlocked tier header for auto-scroll
+    let highestUnlockedTierY = 0;
+
+    const renderList = () => {
+      // Clear container
+      container.removeAll(true);
+      let cy = scrollTop;
+
+      const listHeader = this.add.text(15, cy, "── Dungeons ──", {
+        fontSize: "10px", color: "#94a3b8", fontFamily: "monospace",
+      });
+      container.add(listHeader);
+      cy += 18;
+
+      for (const tg of activeTiers) {
+        const { tier, dungeons } = tg;
+        const isExpanded = expandedState[tier.id];
+        const unlockedCount = dungeons.filter(d => d.unlockClears <= this.meta.totalClears).length;
+        const allLocked = unlockedCount === 0;
+        const arrow = isExpanded ? "\u25BC" : "\u25B6";
+        const lockIcon = allLocked ? " \uD83D\uDD12" : "";
+        const headerText = `${arrow} ${tier.label}: ${tier.name} (${dungeons.length})${lockIcon}`;
+
+        // Track position for auto-scroll
+        if (tier.id === highestUnlockedTierId) {
+          highestUnlockedTierY = cy - scrollTop;
+        }
+
+        // Tier header background
+        const hdrBg = this.add.rectangle(GAME_WIDTH / 2, cy, btnW, 28, tier.color, 0.85)
+          .setStrokeStyle(1, allLocked ? 0x222233 : 0x556677);
+        container.add(hdrBg);
+
+        // Tier header text
+        const hdrText = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 8, cy - 6, headerText, {
+          fontSize: "10px", color: allLocked ? "#555566" : tier.textColor,
+          fontFamily: "monospace", fontStyle: "bold",
+        });
+        container.add(hdrText);
+
+        // Unlocked count subtitle
+        const hdrSub = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 8, cy - 6,
+          `${unlockedCount}/${dungeons.length} unlocked`, {
+          fontSize: "7px", color: allLocked ? "#444455" : "#778899",
+          fontFamily: "monospace",
+        }).setOrigin(1, 0);
+        container.add(hdrSub);
+
+        // Make header tappable
+        hdrBg.setInteractive({ useHandCursor: true });
+        const tierId = tier.id;
+        hdrBg.on("pointerover", () => hdrBg.setAlpha(1));
+        hdrBg.on("pointerout", () => hdrBg.setAlpha(0.85));
+        hdrBg.on("pointerdown", () => {
+          expandedState[tierId] = !expandedState[tierId];
+          const prevScroll = scrollOffset;
+          renderList();
+          // Restore scroll position (clamped to new max)
+          scrollOffset = Math.max(-maxScroll, Math.min(0, prevScroll));
+          container.y = scrollOffset;
+          updateIndicator();
+        });
+
+        cy += 32;
+
+        // Render dungeon items if expanded
+        if (isExpanded) {
+          for (const dg of dungeons) {
+            const isUnlocked = dg.unlockClears <= this.meta.totalClears;
+            const color = isUnlocked ? "#e0e0e0" : "#444460";
+            const desc = isUnlocked ? dg.description : `Unlock: ${dg.unlockClears} clears needed`;
+
+            const bg = this.add.rectangle(GAME_WIDTH / 2, cy, btnW - 8, 38, 0x1a1a2e, 0.9)
+              .setStrokeStyle(1, isUnlocked ? 0x334155 : 0x222233);
+            container.add(bg);
+
+            if (isUnlocked) {
+              const dgId = dg.id;
+              bg.setInteractive({ useHandCursor: true });
+              bg.on("pointerover", () => bg.setFillStyle(0x2a2a4e, 1));
+              bg.on("pointerout", () => bg.setFillStyle(0x1a1a2e, 0.9));
+              bg.on("pointerdown", () => this.enterDungeon(dgId));
+            }
+
+            const t1 = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 14, cy - 9, dg.name, {
+              fontSize: "11px", color, fontFamily: "monospace", fontStyle: "bold",
+            });
+            const t2 = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 14, cy + 5, desc, {
+              fontSize: "8px", color: "#666680", fontFamily: "monospace",
+            });
+            container.add([t1, t2]);
+            cy += 44;
+          }
+        }
+      }
+
+      contentH = cy - scrollTop;
+      maxScroll = Math.max(0, contentH - scrollH);
+      // Update indicator visibility and size
+      if (maxScroll > 0) {
+        const indicatorH = Math.max(20, (scrollH / contentH) * scrollH);
+        indicator.setVisible(true).setSize(3, indicatorH);
+      } else {
+        indicator.setVisible(false);
+      }
+    };
+
+    const updateIndicator = () => {
+      if (maxScroll <= 0) return;
+      const indicatorH = indicator.height;
+      const ratio = -scrollOffset / maxScroll;
+      indicator.y = scrollTop + ratio * (scrollH - indicatorH);
+    };
+
+    // Initial render
+    renderList();
+
+    // Auto-scroll to the highest unlocked tier
+    if (highestUnlockedTierY > scrollH / 2 && maxScroll > 0) {
+      scrollOffset = -Math.min(maxScroll, Math.max(0, highestUnlockedTierY - 10));
+      container.y = scrollOffset;
+      updateIndicator();
+    }
 
     // Touch/mouse scroll
-    if (maxScroll > 0) {
-      let dragStartY = 0;
-      let scrollOffset = 0;
+    let dragStartY = 0;
 
-      this.input.on("pointerdown", (ptr: Phaser.Input.Pointer) => {
-        if (ptr.y >= scrollTop && ptr.y <= scrollBottom) {
-          dragStartY = ptr.y;
-        }
-      });
-
-      this.input.on("pointermove", (ptr: Phaser.Input.Pointer) => {
-        if (!ptr.isDown || ptr.y < scrollTop || ptr.y > scrollBottom) return;
-        const dy = ptr.y - dragStartY;
+    this.input.on("pointerdown", (ptr: Phaser.Input.Pointer) => {
+      if (ptr.y >= scrollTop && ptr.y <= scrollBottom) {
         dragStartY = ptr.y;
-        scrollOffset = Math.max(-maxScroll, Math.min(0, scrollOffset + dy));
-        container.y = scrollOffset;
-      });
+      }
+    });
 
-      // Scroll indicator
-      const indicatorH = Math.max(20, (scrollH / contentH) * scrollH);
-      const indicator = this.add.rectangle(
-        GAME_WIDTH - 4, scrollTop, 3, indicatorH, 0x667eea, 0.5
-      ).setOrigin(0.5, 0);
+    this.input.on("pointermove", (ptr: Phaser.Input.Pointer) => {
+      if (!ptr.isDown || ptr.y < scrollTop || ptr.y > scrollBottom) return;
+      const dy = ptr.y - dragStartY;
+      dragStartY = ptr.y;
+      scrollOffset = Math.max(-maxScroll, Math.min(0, scrollOffset + dy));
+      container.y = scrollOffset;
+      updateIndicator();
+    });
 
-      this.time.addEvent({
-        delay: 50, loop: true,
-        callback: () => {
-          const ratio = -scrollOffset / maxScroll;
-          indicator.y = scrollTop + ratio * (scrollH - indicatorH);
-        },
-      });
-    }
+    this.time.addEvent({
+      delay: 50, loop: true,
+      callback: () => updateIndicator(),
+    });
   }
 
   private createButton(
