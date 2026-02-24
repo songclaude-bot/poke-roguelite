@@ -112,7 +112,7 @@ export class HubScene extends Phaser.Scene {
       )
     );
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.2.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.3.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
@@ -458,6 +458,43 @@ export class HubScene extends Phaser.Scene {
       { id: "archen", name: "Archen", unlock: 15 },
       { id: "wooloo", name: "Wooloo", unlock: 14 },
       { id: "skwovet", name: "Skwovet", unlock: 15 },
+      // 5th dungeon starters
+      { id: "bruxish", name: "Bruxish", unlock: 17 },
+      { id: "chewtle", name: "Chewtle", unlock: 16 },
+      { id: "litleo", name: "Litleo", unlock: 15 },
+      { id: "torchic", name: "Torchic", unlock: 16 },
+      { id: "gossifleur", name: "Gossifleur", unlock: 17 },
+      { id: "bounsweet", name: "Bounsweet", unlock: 16 },
+      { id: "yamper", name: "Yamper", unlock: 17 },
+      { id: "pincurchin", name: "Pincurchin", unlock: 16 },
+      { id: "skrelp", name: "Skrelp", unlock: 15 },
+      { id: "toxel", name: "Toxel", unlock: 16 },
+      { id: "drilbur", name: "Drilbur", unlock: 17 },
+      { id: "barboach", name: "Barboach", unlock: 16 },
+      { id: "nacli", name: "Nacli", unlock: 17 },
+      { id: "tyrunt", name: "Tyrunt", unlock: 16 },
+      { id: "blipbug", name: "Blipbug", unlock: 15 },
+      { id: "cutiefly", name: "Cutiefly", unlock: 16 },
+      { id: "clobbopus", name: "Clobbopus", unlock: 17 },
+      { id: "passimian", name: "Passimian", unlock: 16 },
+      { id: "tinkatink", name: "Tinkatink", unlock: 17 },
+      { id: "varoom", name: "Varoom", unlock: 16 },
+      { id: "greavard", name: "Greavard", unlock: 15 },
+      { id: "sinistea", name: "Sinistea", unlock: 16 },
+      { id: "flittle", name: "Flittle", unlock: 17 },
+      { id: "espurr", name: "Espurr", unlock: 16 },
+      { id: "cetoddle", name: "Cetoddle", unlock: 17 },
+      { id: "frigibax", name: "Frigibax", unlock: 16 },
+      { id: "zorua", name: "Zorua", unlock: 15 },
+      { id: "pawniard", name: "Pawniard", unlock: 16 },
+      { id: "fidough", name: "Fidough", unlock: 17 },
+      { id: "dedenne", name: "Dedenne", unlock: 16 },
+      { id: "cyclizar", name: "Cyclizar", unlock: 17 },
+      { id: "tatsugiri", name: "Tatsugiri", unlock: 16 },
+      { id: "wingull", name: "Wingull", unlock: 15 },
+      { id: "swablu", name: "Swablu", unlock: 16 },
+      { id: "lechonk", name: "Lechonk", unlock: 15 },
+      { id: "tandemaus", name: "Tandemaus", unlock: 16 },
     ];
 
     const current = this.meta.starter ?? "mudkip";

@@ -575,4 +575,51 @@
 - **133종 스타터** (전체)
 - **200종+ 포켓몬** (진화 포함)
 - **160종+ 기술**
+
+---
+
+## Phase 5: 5th Dungeons (18층, 난이도 4.0, 보스 8.0x)
+
+### 5-1. Water/Fire/Grass 5th 던전 (Phase 118-120)
+- 날짜: 2026-02-24
+- Abyssal Depths (Water): Bruxish(0779)/Chewtle(0833), liquidation 스킬, 18층
+- Volcanic Core (Fire): Litleo(0667)/Torchic(0255), blazeKick 스킬, 18층
+- Ancient Woods (Grass): Gossifleur(0829)/Bounsweet(0761), tropicalKick 스킬, 18층
+
+### 5-2. Electric/Poison/Ground 5th 던전 (Phase 121-123)
+- 날짜: 2026-02-24
+- Thunder Dome (Electric): Yamper(0835)/Pincurchin(0871), nuzzle 스킬, 18층
+- Miasma Swamp (Poison): Skrelp(0690)/Toxel(0848), 18층
+- Tectonic Rift (Ground): Drilbur(0529)/Barboach(0339), muddyWater 스킬, 18층
+
+### 5-3. Rock/Bug/Fighting 5th 던전 (Phase 124-126)
+- 날짜: 2026-02-24
+- Crystal Depths (Rock): Nacli(0932)/Tyrunt(0696), rockBlast 스킬, 18층
+- Silkwood Grove (Bug): Blipbug(0824)/Cutiefly(0742), bugBuzz 스킬, 18층
+- Warlord's Arena (Fighting): Clobbopus(0852)/Passimian(0766), closeCombat 스킬, 18층
+
+### 5-4. Steel/Ghost/Psychic 5th 던전 (Phase 127-129)
+- 날짜: 2026-02-24
+- Steelworks Citadel (Steel): Tinkatink(0957)/Varoom(0965), smartStrike 스킬, 18층
+- Spectral Crypt (Ghost): Greavard(0971)/Sinistea(0854), poltergeist 스킬, 18층
+- Astral Sanctum (Psychic): Flittle(0955)/Espurr(0677), 18층
+
+### 5-5. Ice/Dark/Fairy 5th 던전 (Phase 130-132)
+- 날짜: 2026-02-24
+- Glacial Abyss (Ice): Cetoddle(0974)/Frigibax(0996), icicleCrash 스킬, 18층
+- Shadow Labyrinth (Dark): Zorua(0570)/Pawniard(0624), 18층
+- Faerie Garden (Fairy): Fidough(0926)/Dedenne(0702), 18층
+
+### 5-6. Dragon/Flying/Normal 5th 던전 (Phase 133-135)
+- 날짜: 2026-02-24
+- Dragon's Den (Dragon): Cyclizar(0967)/Tatsugiri(0978), scaleShot 스킬, 18층
+- Stormy Skies (Flying): Wingull(0278)/Swablu(0333), 18층
+- Verdant Meadow (Normal): Lechonk(0915)/Tandemaus(0921), 18층
+
+### v1.3.0 마일스톤
+- **전 18타입 × 5개 던전 = 90개 던전** + Destiny Tower = 총 91개 던전!
+- **신규 포켓몬 36종** (Phases 118-135)
+- **169종 스타터** (전체)
+- **240종+ 포켓몬** (진화 포함)
+- **180종+ 기술**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
