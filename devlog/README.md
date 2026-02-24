@@ -478,12 +478,36 @@
 
 ---
 
-## 현재 게임 규모 (v0.80.0)
+## Phase 79: Titanium Mine
+
+### 79. Steel 3차 던전
+- 날짜: 2026-02-24
+- 핵심: Klink/Ferroseed, gearGrind 스킬, Titanium Mine 14층, Overdrive Klinklang 보스
+
+---
+
+## Phase 80: Spectral Woods
+
+### 80. Ghost 3차 던전
+- 날짜: 2026-02-24
+- 핵심: Phantump/Honedge, phantomForce 스킬, Spectral Woods 13층, Ancient Trevenant 보스
+
+---
+
+## Phase 81: Cosmic Rift
+
+### 81. Psychic 3차 던전
+- 날짜: 2026-02-24
+- 핵심: Solosis/Elgyem, futuresight 스킬, Cosmic Rift 14층, Cosmic Reuniclus 보스
+
+---
+
+## 현재 게임 규모 (v0.85.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **60개 던전**: Beach Cave → Valor Arena + Destiny Tower
-- **141종+ 포켓몬** (진화 포함 159종+)
-- **138종+ 기술**
+- **63개 던전**: Beach Cave → Cosmic Rift + Destiny Tower
+- **153종+ 포켓몬** (진화 포함 173종+)
+- **141종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **79종 스타터** (클리어 수로 해금)
-- **114종+ 진화 경로**
+- **85종 스타터** (클리어 수로 해금)
+- **120종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
