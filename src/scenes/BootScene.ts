@@ -32,7 +32,7 @@ export class BootScene extends Phaser.Scene {
       fontSize: "14px", color: hasSave ? "#4ade80" : "#667eea", fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    this.add.text(cx, cy + 60, "v3.9.0 — Theme BGM + Smart Ally", {
+    this.add.text(cx, cy + 60, "v4.0.0 — Gauntlet + Kecleon Shop", {
       fontSize: "9px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 
