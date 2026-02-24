@@ -388,6 +388,12 @@ export class HubScene extends Phaser.Scene {
       { id: "wailmer", name: "Wailmer", unlock: 12 },
       { id: "litwick", name: "Litwick", unlock: 13 },
       { id: "growlithe", name: "Growlithe", unlock: 10 },
+      { id: "joltik", name: "Joltik", unlock: 12 },
+      { id: "tynamo", name: "Tynamo", unlock: 11 },
+      { id: "trubbish", name: "Trubbish", unlock: 11 },
+      { id: "skorupi", name: "Skorupi", unlock: 12 },
+      { id: "mudbray", name: "Mudbray", unlock: 13 },
+      { id: "hippopotas", name: "Hippopotas", unlock: 12 },
     ];
 
     const current = this.meta.starter ?? "mudkip";

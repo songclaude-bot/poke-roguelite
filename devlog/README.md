@@ -430,12 +430,36 @@
 
 ---
 
-## 현재 게임 규모 (v0.70.0)
+## Phase 71: Voltage Spire
+
+### 71. Electric 3차 던전
+- 날짜: 2026-02-24
+- 핵심: Joltik/Tynamo, voltSwitch 스킬, Voltage Spire 13층, Storm Galvantula 보스
+
+---
+
+## Phase 72: Corrosive Sewer
+
+### 72. Poison 3차 던전
+- 날짜: 2026-02-24
+- 핵심: Trubbish/Skorupi, gunkShot 스킬, Corrosive Sewer 13층, Toxic Garbodor 보스
+
+---
+
+## Phase 73: Seismic Fault
+
+### 73. Ground 3차 던전
+- 날짜: 2026-02-24
+- 핵심: Mudbray/Hippopotas, highHorsepower 스킬, Seismic Fault 14층, Quake Mudsdale 보스
+
+---
+
+## 현재 게임 규모 (v0.75.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **53개 던전**: Beach Cave → Inferno Pit + Destiny Tower
-- **123종+ 포켓몬** (진화 포함 141종+)
-- **131종+ 기술**
+- **57개 던전**: Beach Cave → Seismic Fault + Destiny Tower
+- **129종+ 포켓몬** (진화 포함 147종+)
+- **135종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **67종 스타터** (클리어 수로 해금)
-- **102종+ 진화 경로**
+- **73종 스타터** (클리어 수로 해금)
+- **108종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
