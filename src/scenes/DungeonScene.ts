@@ -474,6 +474,13 @@ export class DungeonScene extends Phaser.Scene {
       registeel: "0379", solgaleo: "0791",
       giratina: "0487", lunala: "0792",
       mewtwo: "0150", deoxys: "0386",
+      // Phase 194-196: 11th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+      regice: "0378", kyurem: "0646",
+      yveltal: "0717", hoopa: "0720",
+      xerneas: "0716", magearna: "0801",
+      rayquaza: "0384", dialga: "0483",
+      tornadus: "0641", articuno: "0144",
+      arceus: "0493", regigigas: "0486",
     };
 
     // Load player + all enemy species + ally species for this dungeon

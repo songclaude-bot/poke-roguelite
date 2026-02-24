@@ -529,4 +529,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   lunala: AbilityId.ShieldDust, // Shadow Shield equivalent
   mewtwo: AbilityId.PurePower, // Pressure equivalent
   deoxys: AbilityId.PurePower, // Pressure equivalent
+  // Phase 194-196: 11th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+  regice: AbilityId.Sturdy, // Clear Body equivalent
+  kyurem: AbilityId.PurePower, // Pressure equivalent
+  yveltal: AbilityId.PurePower, // Dark Aura equivalent
+  hoopa: AbilityId.PurePower, // Magician equivalent
+  xerneas: AbilityId.PurePower, // Fairy Aura equivalent
+  magearna: AbilityId.Sturdy, // Soul-Heart equivalent
+  rayquaza: AbilityId.PurePower, // Air Lock equivalent
+  dialga: AbilityId.Sturdy, // Pressure equivalent
+  tornadus: AbilityId.Guts, // Defiant equivalent
+  articuno: AbilityId.ShieldDust, // Pressure equivalent
+  arceus: AbilityId.PurePower, // Multitype equivalent
+  regigigas: AbilityId.Sturdy, // Slow Start equivalent
 };

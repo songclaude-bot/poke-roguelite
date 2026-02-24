@@ -298,6 +298,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     ironSanctuary: [WeatherType.Sandstorm, WeatherType.Hail],
     distortionRift: [WeatherType.Hail],
     genesisChamber: [WeatherType.Rain, WeatherType.Hail],
+    // Phase 194-196: 11th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+    frozenRegolith: [WeatherType.Hail],
+    nihilityAbyss: [WeatherType.Sandstorm, WeatherType.Hail],
+    eternalGarden: [WeatherType.Rain],
+    temporalSpire: [WeatherType.Sandstorm, WeatherType.Hail],
+    stormSovereign: [WeatherType.Rain, WeatherType.Sandstorm],
+    originHall: [WeatherType.Rain, WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

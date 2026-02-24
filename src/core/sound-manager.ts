@@ -310,6 +310,13 @@ const DUNGEON_BGM_MAP: Record<string, string> = {
   ironSanctuary: "dungeon-steel",
   distortionRift: "dungeon-ghost",
   genesisChamber: "dungeon-psychic",
+  // Phase 194-196: 11th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+  frozenRegolith: "dungeon-ice",
+  nihilityAbyss: "dungeon-dark",
+  eternalGarden: "dungeon-fairy",
+  temporalSpire: "dungeon-dragon",
+  stormSovereign: "dungeon-flying",
+  originHall: "dungeon-normal",
   // Destiny Tower
   destinyTower: "destiny",
 };
@@ -1497,6 +1504,42 @@ const _LEGACY_BGM_UNUSED = {
     melody: [330, 392, 440, 523, 587, 523, 440, 392, 349, 440, 494, 587, 659, 587, 494, 440],
     bass: [165, 165, 220, 220, 294, 294, 220, 220, 175, 175, 247, 247, 330, 330, 247, 165],
     tempo: 0.20, melodyType: "sine", bassType: "square",
+  },
+  // Frozen Regolith — icy, crystalline, ancient cold
+  frozenRegolith: {
+    melody: [165, 196, 220, 262, 294, 262, 220, 196, 175, 208, 247, 294, 330, 294, 247, 208],
+    bass: [82, 82, 110, 110, 147, 147, 110, 110, 88, 88, 124, 124, 165, 165, 124, 82],
+    tempo: 0.22, melodyType: "sine", bassType: "triangle",
+  },
+  // Nihility Abyss — dark, ominous, destructive
+  nihilityAbyss: {
+    melody: [139, 165, 196, 233, 262, 233, 196, 165, 147, 175, 208, 247, 277, 247, 208, 175],
+    bass: [69, 69, 98, 98, 131, 131, 98, 98, 73, 73, 104, 104, 139, 139, 104, 69],
+    tempo: 0.21, melodyType: "sawtooth", bassType: "square",
+  },
+  // Eternal Garden — ethereal, magical, life-giving
+  eternalGarden: {
+    melody: [294, 349, 392, 440, 523, 440, 392, 349, 330, 392, 440, 523, 587, 523, 440, 392],
+    bass: [147, 147, 196, 196, 262, 262, 196, 196, 165, 165, 220, 220, 294, 294, 220, 147],
+    tempo: 0.20, melodyType: "sine", bassType: "triangle",
+  },
+  // Temporal Spire — epic, time-warping, draconic
+  temporalSpire: {
+    melody: [196, 233, 277, 330, 392, 330, 277, 233, 220, 262, 311, 370, 440, 370, 311, 262],
+    bass: [98, 98, 139, 139, 196, 196, 139, 139, 110, 110, 156, 156, 220, 220, 156, 98],
+    tempo: 0.19, melodyType: "sawtooth", bassType: "triangle",
+  },
+  // Storm Sovereign — wild, turbulent, powerful winds
+  stormSovereign: {
+    melody: [247, 294, 349, 415, 494, 415, 349, 294, 262, 311, 370, 440, 523, 440, 370, 311],
+    bass: [124, 124, 175, 175, 247, 247, 175, 175, 131, 131, 185, 185, 262, 262, 185, 124],
+    tempo: 0.17, melodyType: "square", bassType: "sawtooth",
+  },
+  // Origin Hall — divine, majestic, creation
+  originHall: {
+    melody: [262, 330, 392, 494, 587, 494, 392, 330, 294, 349, 440, 523, 659, 523, 440, 349],
+    bass: [131, 131, 196, 196, 262, 262, 196, 196, 147, 147, 220, 220, 330, 330, 220, 131],
+    tempo: 0.21, melodyType: "sine", bassType: "square",
   },
   // Hub — peaceful town
   hub: {
