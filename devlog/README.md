@@ -1333,3 +1333,26 @@
 - **해저드 타일**: 6종 환경 위험 + 면역 + 시각 효과
 - **점수 체인**: SSS 랭크 시스템 + 콤보 보너스
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 31: 테마 음악 + 스마트 아군
+
+### 31-1. 던전 테마 음악 (Phase 269)
+- 날짜: 2026-02-24
+- 23종 신디사이저 BGM 패턴 (cave, forest, ocean, volcano, sky, boss, hub + 16 타입별)
+- 던전 ID → 테마 자동 매핑
+- 보스 층 자동 테마 전환 + 원래 테마 복원
+- 8비트 스타일 오실레이터 (sawtooth, triangle, sine)
+
+### 31-2. 아군 고급 스킬 AI (Phase 270)
+- 날짜: 2026-02-24
+- 전술별 스킬 선택: FollowMe(밸런스), GoAfterFoes(공격), StayHere(방어), Scatter(랜덤)
+- HP 40% 이하 시 자동 힐링, 버프 없으면 자동 버프
+- 타입 효과적 공격 우선 선택
+- 스킬 이름 팝업 애니메이션
+
+### v3.9.0 마일스톤
+- **테마 음악**: 23종 던전별 BGM + 보스 테마 전환
+- **스마트 아군**: 전술 기반 스킬 사용 + 자동 힐/버프
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
