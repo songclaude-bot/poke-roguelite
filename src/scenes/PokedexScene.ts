@@ -1,8 +1,10 @@
 import Phaser from "phaser";
 import { GAME_WIDTH, GAME_HEIGHT } from "../config";
 import { loadMeta } from "../core/save-system";
-import { SPECIES, PokemonSpecies } from "../core/pokemon-data";
+import { SPECIES, PokemonSpecies, LEVELUP_SKILLS } from "../core/pokemon-data";
 import { PokemonType } from "../core/type-chart";
+import { SKILL_DB } from "../core/skill";
+import { getEvolutionChain, hasEvolutionChain, EvolutionNode } from "../core/evolution-chain";
 
 /** Color map for Pokemon types */
 const TYPE_COLORS: Record<string, string> = {
@@ -30,6 +32,7 @@ const TYPE_COLORS: Record<string, string> = {
  * PokedexScene — shows all Pokemon species in the game.
  * Displays discovered/undiscovered status based on player encounters.
  * Uses virtual scrolling (object pool) for performance with 460+ species.
+ * Tapping a seen Pokemon opens a detail panel with evolution chain.
  */
 export class PokedexScene extends Phaser.Scene {
   constructor() {
@@ -47,6 +50,10 @@ export class PokedexScene extends Phaser.Scene {
 
     const totalCount = allSpecies.length;
     const seenCount = allSpecies.filter(sp => seenSet.has(sp.id)).length;
+
+    // ── Detail overlay state ──
+    let detailOpen = false;
+    let detailObjects: Phaser.GameObjects.GameObject[] = [];
 
     // ── Background ──
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x0a0a1a);
@@ -99,6 +106,7 @@ export class PokedexScene extends Phaser.Scene {
 
       const mode = tabLabels[i].mode;
       bg.on("pointerdown", () => {
+        if (detailOpen) return;
         filterMode = mode;
         updateTabs();
         renderVisible();
@@ -271,26 +279,57 @@ export class PokedexScene extends Phaser.Scene {
     // Initial render
     renderVisible();
 
-    // ── Scroll handling ──
+    // ── Scroll handling (with tap detection) ──
     let dragStartY = 0;
+    let dragStartX = 0;
     let isDragging = false;
+    let dragDistance = 0;
+    const TAP_THRESHOLD = 6; // pixels — below this is considered a tap
 
     this.input.on("pointerdown", (ptr: Phaser.Input.Pointer) => {
+      if (detailOpen) return;
       if (ptr.y >= scrollTop && ptr.y <= scrollBottom) {
         dragStartY = ptr.y;
+        dragStartX = ptr.x;
         isDragging = true;
+        dragDistance = 0;
       }
     });
 
     this.input.on("pointermove", (ptr: Phaser.Input.Pointer) => {
+      if (detailOpen) return;
       if (!ptr.isDown || !isDragging) return;
       const dy = ptr.y - dragStartY;
+      dragDistance += Math.abs(dy) + Math.abs(ptr.x - dragStartX);
       dragStartY = ptr.y;
+      dragStartX = ptr.x;
       scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset - dy));
       renderVisible();
     });
 
-    this.input.on("pointerup", () => { isDragging = false; });
+    this.input.on("pointerup", (ptr: Phaser.Input.Pointer) => {
+      if (detailOpen) return;
+      if (isDragging && dragDistance < TAP_THRESHOLD) {
+        // This was a tap, not a drag — find which row was tapped
+        handleRowTap(ptr.y);
+      }
+      isDragging = false;
+    });
+
+    // ── Row tap handler ──
+    const handleRowTap = (tapY: number) => {
+      if (tapY < scrollTop || tapY > scrollBottom) return;
+
+      // Calculate which data index was tapped
+      const relY = tapY - scrollTop + scrollOffset - 10;
+      const dataIdx = Math.floor(relY / ITEM_H);
+      if (dataIdx < 0 || dataIdx >= filteredList.length) return;
+
+      const sp = filteredList[dataIdx];
+      if (!seenSet.has(sp.id)) return; // Can't view unseen Pokemon
+
+      openDetailPanel(sp);
+    };
 
     // ── Column header ──
     const headerBg = this.add.rectangle(GAME_WIDTH / 2, scrollTop - 4, 340, 12, 0x0a0a1a);
@@ -311,6 +350,276 @@ export class PokedexScene extends Phaser.Scene {
     const back = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 18, "[Back to Town]", {
       fontSize: "13px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    back.on("pointerdown", () => this.scene.start("HubScene"));
+    back.on("pointerdown", () => {
+      if (detailOpen) return;
+      this.scene.start("HubScene");
+    });
+
+    // ═══════════════════════════════════════════════════════
+    // ── Detail Panel (overlay) ──
+    // ═══════════════════════════════════════════════════════
+
+    const closeDetail = () => {
+      for (const obj of detailObjects) {
+        obj.destroy();
+      }
+      detailObjects = [];
+      detailOpen = false;
+    };
+
+    const openDetailPanel = (sp: PokemonSpecies) => {
+      if (detailOpen) closeDetail();
+      detailOpen = true;
+
+      const panelW = 330;
+      const panelH = 520;
+      const panelX = GAME_WIDTH / 2;
+      const panelY = GAME_HEIGHT / 2;
+
+      // Semi-transparent dark background overlay
+      const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
+        .setInteractive()
+        .setDepth(100);
+      overlay.on("pointerdown", () => closeDetail());
+      detailObjects.push(overlay);
+
+      // Main panel
+      const panelBg = this.add.rectangle(panelX, panelY, panelW, panelH, 0x111122, 0.98)
+        .setStrokeStyle(2, 0x667eea)
+        .setDepth(101)
+        .setInteractive(); // prevent click-through
+      detailObjects.push(panelBg);
+
+      let curY = panelY - panelH / 2 + 20;
+      const leftX = panelX - panelW / 2 + 16;
+      const centerX = panelX;
+
+      // ── Pokemon Name (large) ──
+      const nameText = this.add.text(centerX, curY, sp.name, {
+        fontSize: "18px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(102);
+      detailObjects.push(nameText);
+      curY += 24;
+
+      // ── Types with colors ──
+      const typeStrs: string[] = [];
+      for (const t of sp.types) {
+        typeStrs.push(t);
+      }
+      const typeStr = typeStrs.join(" / ");
+      const primaryColor = TYPE_COLORS[sp.types[0]] ?? "#94a3b8";
+      const typeLabel = this.add.text(centerX, curY, typeStr, {
+        fontSize: "11px", color: primaryColor, fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(102);
+      detailObjects.push(typeLabel);
+      curY += 20;
+
+      // ── Base Stats ──
+      const bs = sp.baseStats;
+      const statsLabel = this.add.text(centerX, curY, `HP: ${bs.hp}  ATK: ${bs.atk}  DEF: ${bs.def}`, {
+        fontSize: "10px", color: "#e0e0e0", fontFamily: "monospace",
+      }).setOrigin(0.5).setDepth(102);
+      detailObjects.push(statsLabel);
+      curY += 14;
+
+      // ── Stat bars ──
+      const barMaxW = 120;
+      const barH = 6;
+      const statEntries: { label: string; value: number; max: number; color: number }[] = [
+        { label: "HP", value: bs.hp, max: 80, color: 0x4ade80 },
+        { label: "ATK", value: bs.atk, max: 30, color: 0xef4444 },
+        { label: "DEF", value: bs.def, max: 20, color: 0x60a5fa },
+      ];
+      for (const stat of statEntries) {
+        const lbl = this.add.text(leftX, curY, stat.label, {
+          fontSize: "8px", color: "#94a3b8", fontFamily: "monospace",
+        }).setDepth(102);
+        detailObjects.push(lbl);
+
+        const barStartX = leftX + 30;
+        const barBg = this.add.rectangle(barStartX + barMaxW / 2, curY + 3, barMaxW, barH, 0x222244)
+          .setDepth(102);
+        detailObjects.push(barBg);
+
+        const ratio = Math.min(1, stat.value / stat.max);
+        if (ratio > 0) {
+          const fillW = barMaxW * ratio;
+          const barFill = this.add.rectangle(barStartX + fillW / 2, curY + 3, fillW, barH, stat.color)
+            .setDepth(102);
+          detailObjects.push(barFill);
+        }
+
+        const valText = this.add.text(barStartX + barMaxW + 6, curY, String(stat.value), {
+          fontSize: "8px", color: "#e0e0e0", fontFamily: "monospace",
+        }).setDepth(102);
+        detailObjects.push(valText);
+        curY += 14;
+      }
+      curY += 4;
+
+      // ── Known Skills ──
+      const sectionLabel1 = this.add.text(leftX, curY, "-- Skills --", {
+        fontSize: "9px", color: "#667eea", fontFamily: "monospace", fontStyle: "bold",
+      }).setDepth(102);
+      detailObjects.push(sectionLabel1);
+      curY += 14;
+
+      // Base skills from species
+      const shownSkills = new Set<string>();
+      for (const skillId of sp.skillIds) {
+        const skillDef = SKILL_DB[skillId];
+        if (!skillDef) continue;
+        shownSkills.add(skillId);
+        const skillColor = TYPE_COLORS[skillDef.type] ?? "#94a3b8";
+        const skillLine = this.add.text(leftX + 4, curY, `${skillDef.name} (${skillDef.type}, Pow:${skillDef.power})`, {
+          fontSize: "8px", color: skillColor, fontFamily: "monospace",
+        }).setDepth(102);
+        detailObjects.push(skillLine);
+        curY += 12;
+      }
+
+      // Levelup skills
+      const levelupMap = LEVELUP_SKILLS[sp.id];
+      if (levelupMap) {
+        for (const [lvl, skillId] of Object.entries(levelupMap)) {
+          if (shownSkills.has(skillId)) continue;
+          shownSkills.add(skillId);
+          const skillDef = SKILL_DB[skillId];
+          if (!skillDef) continue;
+          const skillColor = TYPE_COLORS[skillDef.type] ?? "#94a3b8";
+          const skillLine = this.add.text(leftX + 4, curY, `Lv${lvl}: ${skillDef.name} (${skillDef.type})`, {
+            fontSize: "8px", color: skillColor, fontFamily: "monospace",
+          }).setDepth(102);
+          detailObjects.push(skillLine);
+          curY += 12;
+        }
+      }
+      curY += 6;
+
+      // ── Evolution Chain ──
+      const sectionLabel2 = this.add.text(leftX, curY, "-- Evolution Chain --", {
+        fontSize: "9px", color: "#667eea", fontFamily: "monospace", fontStyle: "bold",
+      }).setDepth(102);
+      detailObjects.push(sectionLabel2);
+      curY += 16;
+
+      if (hasEvolutionChain(sp.id)) {
+        const chain = getEvolutionChain(sp.id);
+        curY = renderEvolutionTree(chain, centerX, curY, 0);
+      } else {
+        const noEvoText = this.add.text(centerX, curY, "Does not evolve", {
+          fontSize: "9px", color: "#555570", fontFamily: "monospace",
+        }).setOrigin(0.5).setDepth(102);
+        detailObjects.push(noEvoText);
+        curY += 14;
+      }
+
+      // ── Close button ──
+      const closeBtnY = panelY + panelH / 2 - 22;
+      const closeBtnBg = this.add.rectangle(centerX, closeBtnY, 100, 22, 0x2a2a4e, 0.95)
+        .setStrokeStyle(1, 0x667eea)
+        .setDepth(102)
+        .setInteractive({ useHandCursor: true });
+      closeBtnBg.on("pointerdown", () => closeDetail());
+      detailObjects.push(closeBtnBg);
+
+      const closeBtnText = this.add.text(centerX, closeBtnY, "[Close]", {
+        fontSize: "11px", color: "#60a5fa", fontFamily: "monospace",
+      }).setOrigin(0.5).setDepth(102);
+      detailObjects.push(closeBtnText);
+    };
+
+    // ── Render evolution tree (recursive) ──
+    const renderEvolutionTree = (node: EvolutionNode, cx: number, startY: number, depth: number): number => {
+      let curY = startY;
+
+      // Determine visibility status
+      const isSeen = seenSet.has(node.speciesId);
+      const isUsed = usedSet.has(node.speciesId);
+
+      // Name color based on status
+      let nameColor = "#555570";  // gray for unseen
+      if (isUsed) {
+        nameColor = "#4ade80"; // green for used
+      } else if (isSeen) {
+        nameColor = "#e0e0e0"; // white for seen
+      }
+
+      // For evolved forms not in SPECIES, check if we've seen them indirectly
+      // (they don't have SPECIES entries, so they won't be in seenSet)
+      // Show them dimmed unless the base form is seen
+      if (!node.inSpecies && !isSeen) {
+        // Check if the base form in this chain is seen
+        const baseInChainSeen = depth === 0 ? false : true; // parent already rendered
+        nameColor = baseInChainSeen ? "#777790" : "#555570";
+      }
+
+      const displayName = isSeen || node.inSpecies ? node.name : "???";
+
+      // Build the line
+      let prefix = "";
+      if (depth > 0) {
+        prefix = "  ".repeat(depth);
+      }
+
+      // Level requirement
+      const lvlStr = node.evolveLevel ? ` (Lv.${node.evolveLevel})` : "";
+
+      // Arrow for evolutions
+      if (depth > 0) {
+        const arrowY = curY - 6;
+        const arrowText = this.add.text(cx, arrowY, `${prefix}-> ${displayName}${lvlStr}`, {
+          fontSize: "9px", color: nameColor, fontFamily: "monospace",
+        }).setOrigin(0.5).setDepth(102);
+        detailObjects.push(arrowText);
+
+        // Status indicator
+        if (isUsed) {
+          const star = this.add.text(cx + arrowText.width / 2 + 6, arrowY, "\u2605", {
+            fontSize: "8px", color: "#fbbf24", fontFamily: "monospace",
+          }).setOrigin(0, 0.5).setDepth(102);
+          detailObjects.push(star);
+        }
+      } else {
+        // Base form (root)
+        const baseText = this.add.text(cx, curY - 6, `${displayName}`, {
+          fontSize: "10px", color: nameColor, fontFamily: "monospace", fontStyle: "bold",
+        }).setOrigin(0.5).setDepth(102);
+        detailObjects.push(baseText);
+
+        if (isUsed) {
+          const star = this.add.text(cx + baseText.width / 2 + 6, curY - 6, "\u2605", {
+            fontSize: "8px", color: "#fbbf24", fontFamily: "monospace",
+          }).setOrigin(0, 0.5).setDepth(102);
+          detailObjects.push(star);
+        }
+      }
+
+      // Type pills for this node (small, below the name)
+      if ((isSeen || node.inSpecies) && node.types.length > 0) {
+        const typeStr = node.types.join("/");
+        const tColor = TYPE_COLORS[node.types[0]] ?? "#94a3b8";
+        const typeSmall = this.add.text(cx, curY + 4, typeStr, {
+          fontSize: "7px", color: tColor, fontFamily: "monospace",
+        }).setOrigin(0.5).setDepth(102);
+        detailObjects.push(typeSmall);
+        curY += 20;
+      } else {
+        curY += 14;
+      }
+
+      // Render children
+      if (node.evolvesTo.length === 1) {
+        // Linear chain — render inline
+        curY = renderEvolutionTree(node.evolvesTo[0], cx, curY, depth + 1);
+      } else if (node.evolvesTo.length > 1) {
+        // Branching — render each branch
+        for (const child of node.evolvesTo) {
+          curY = renderEvolutionTree(child, cx, curY, depth + 1);
+        }
+      }
+
+      return curY;
+    };
   }
 }
