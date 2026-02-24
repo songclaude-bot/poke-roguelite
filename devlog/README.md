@@ -509,12 +509,18 @@
 - 기존 2nd 던전과 이름 충돌 해결 (glacialCavern→frostbiteChasm 등)
 - AbilityId.Intimidate 미존재 → AbilityId.Guts로 대체
 
-## 현재 게임 규모 (v0.90.0)
+## Phase 87-89: Dragon/Flying/Normal 3차 던전 (v0.90.0 → v0.95.0)
+- **Dragon 3rd**: Drake Nest — Goomy(0704), Jangmo-o(0782) + outrage 스킬
+- **Flying 3rd**: Stormy Nest — Noibat(0714), Vullaby(0629) + aerialAce 스킬
+- **Normal 3rd**: Cozy Burrow — Stufful(0759), Furfrou(0676) + workUp 스킬
+- **마일스톤**: 전 18타입 3차 던전 완성!
+
+## 현재 게임 규모 (v0.95.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **66개 던전**: Beach Cave → Pixie Hollow + Destiny Tower
-- **159종+ 포켓몬** (진화 포함 179종+)
-- **144종+ 기술**
+- **69개 던전**: Beach Cave → Cozy Burrow + Destiny Tower (18타입 × 3 + Destiny Tower + etc.)
+- **165종+ 포켓몬** (진화 포함 185종+)
+- **147종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **91종 스타터** (클리어 수로 해금)
-- **126종+ 진화 경로**
+- **97종 스타터** (클리어 수로 해금)
+- **131종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
