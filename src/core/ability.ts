@@ -160,4 +160,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   whismur: AbilityId.ShieldDust,
   oddish: AbilityId.ShieldDust,
   budew: AbilityId.Pickup,
+  vulpix: AbilityId.FlameBody,
+  ponyta: AbilityId.RunAway,
 };

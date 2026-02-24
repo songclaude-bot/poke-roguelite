@@ -887,6 +887,32 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["energyBall", "absorb", "poisonSting"],
     floors: [],
   },
+  vulpix: {
+    id: "vulpix",
+    name: "Vulpix",
+    spriteKey: "vulpix",
+    types: [PokemonType.Fire],
+    attackType: PokemonType.Fire,
+    baseStats: { hp: 26, atk: 11, def: 7 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 5, idleFrames: 4,
+    skillIds: ["ember", "fireSpin", "scratch"],
+    floors: [],
+  },
+  ponyta: {
+    id: "ponyta",
+    name: "Ponyta",
+    spriteKey: "ponyta",
+    types: [PokemonType.Fire],
+    attackType: PokemonType.Fire,
+    baseStats: { hp: 30, atk: 13, def: 7 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["flameWheel", "ember", "tackle"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -968,6 +994,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   whismur: { 7: "hyperVoice", 10: "headbutt" },
   oddish: { 7: "petalDance", 10: "sleepPowder" },
   budew: { 7: "energyBall", 10: "petalDance" },
+  vulpix: { 7: "fireSpin", 12: "flamethrower" },
+  ponyta: { 7: "flameWheel", 12: "fireBlast" },
 };
 
 /** Check if a species learns a new skill at this level */

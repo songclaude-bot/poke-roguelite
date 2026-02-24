@@ -1086,6 +1086,31 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Launches a ball of natural energy.",
   },
+  // ── Phase 44 Fire Skills ──
+  flameWheel: {
+    id: "flameWheel",
+    name: "Flame Wheel",
+    type: PokemonType.Fire,
+    power: 14,
+    pp: 15,
+    range: SkillRange.Front2,
+    accuracy: 95,
+    effect: SkillEffect.Burn,
+    effectChance: 10,
+    description: "Charges forward cloaked in flames.",
+  },
+  fireSpin: {
+    id: "fireSpin",
+    name: "Fire Spin",
+    type: PokemonType.Fire,
+    power: 12,
+    pp: 12,
+    range: SkillRange.Around,
+    accuracy: 85,
+    effect: SkillEffect.Burn,
+    effectChance: 20,
+    description: "Traps foes in a vortex of fire.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
