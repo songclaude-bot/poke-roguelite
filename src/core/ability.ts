@@ -464,4 +464,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   noivern: AbilityId.Levitate, // Infiltrator equivalent
   blissey: AbilityId.Sturdy, // Natural Cure equivalent
   porygonZ: AbilityId.PurePower, // Adaptability equivalent
+  // Phase 178-180: 10th Tier Water/Fire/Grass/Electric/Poison/Ground
+  blastoise: AbilityId.Torrent, // Torrent
+  feraligatr: AbilityId.Guts, // Sheer Force equivalent
+  charizard: AbilityId.FlameBody, // Blaze equivalent
+  delphox: AbilityId.FlameBody, // Blaze equivalent
+  torterra: AbilityId.Sturdy, // Overgrow equivalent
+  serperior: AbilityId.PurePower, // Contrary equivalent
+  electivire: AbilityId.Guts, // Motor Drive equivalent
+  luxray: AbilityId.Guts, // Intimidate equivalent
+  roserade: AbilityId.PurePower, // Technician equivalent
+  vileplume: AbilityId.ShieldDust, // Effect Spore equivalent
+  rhyperior: AbilityId.Sturdy, // Solid Rock equivalent
+  dugtrio: AbilityId.NoGuard, // Arena Trap equivalent
 };

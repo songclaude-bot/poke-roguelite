@@ -439,6 +439,13 @@ export class DungeonScene extends Phaser.Scene {
       haxorus: "0612", goodra: "0706",
       pidgeot: "0018", noivern: "0715",
       blissey: "0242", porygonZ: "0474",
+      // Phase 178-180: 10th Tier Water/Fire/Grass/Electric/Poison/Ground
+      blastoise: "0009", feraligatr: "0160",
+      charizard: "0006", delphox: "0655",
+      torterra: "0389", serperior: "0497",
+      electivire: "0466", luxray: "0405",
+      roserade: "0407", vileplume: "0045",
+      rhyperior: "0464", dugtrio: "0051",
     };
 
     // Load player + all enemy species + ally species for this dungeon

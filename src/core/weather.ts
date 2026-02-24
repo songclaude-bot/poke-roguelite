@@ -263,6 +263,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     dragonsSovereignty: [WeatherType.Sandstorm, WeatherType.Hail],
     zenithStormfront: [WeatherType.Rain, WeatherType.Sandstorm],
     infinityHall: [WeatherType.Rain, WeatherType.Sandstorm],
+    // Phase 178-180: 10th Tier Water/Fire/Grass/Electric/Poison/Ground
+    abyssalMaelstrom: [WeatherType.Rain],
+    primordialInferno: [WeatherType.Sandstorm],
+    yggdrasilRoot: [WeatherType.Rain],
+    voltexPinnacle: [WeatherType.Rain, WeatherType.Sandstorm],
+    miasmaticCore: [WeatherType.Rain, WeatherType.Sandstorm],
+    pangaeaFault: [WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 
