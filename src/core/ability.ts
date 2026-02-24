@@ -172,4 +172,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   diglett: AbilityId.NoGuard,
   paras: AbilityId.ShieldDust,
   venonat: AbilityId.ShieldDust,
+  shieldon: AbilityId.Sturdy,
+  bronzor: AbilityId.Levitate,
 };

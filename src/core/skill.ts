@@ -1177,6 +1177,17 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 95,
     description: "Slashes the foe in an X pattern.",
   },
+  // ── Phase 52 Steel Skills ──
+  gyroBall: {
+    id: "gyroBall",
+    name: "Gyro Ball",
+    type: PokemonType.Steel,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Around,
+    accuracy: 90,
+    description: "Spins rapidly, hitting all nearby foes.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

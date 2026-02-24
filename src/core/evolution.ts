@@ -81,6 +81,8 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "diglett", to: "dugtrio", level: 14, newName: "Dugtrio", hpBonus: 8, atkBonus: 10, defBonus: 3, newSkillId: "earthPower" },
   { from: "paras", to: "parasect", level: 14, newName: "Parasect", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "xScissor" },
   { from: "venonat", to: "venomoth", level: 14, newName: "Venomoth", hpBonus: 10, atkBonus: 8, defBonus: 4, newSkillId: "signalBeam" },
+  { from: "shieldon", to: "bastiodon", level: 14, newName: "Bastiodon", hpBonus: 15, atkBonus: 5, defBonus: 10, newSkillId: "flashCannon" },
+  { from: "bronzor", to: "bronzong", level: 14, newName: "Bronzong", hpBonus: 12, atkBonus: 7, defBonus: 8, newSkillId: "flashCannon" },
 ];
 
 /** Check if a species can evolve at a given level */

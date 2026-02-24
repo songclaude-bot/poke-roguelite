@@ -397,6 +397,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [165, 165, 196, 196, 220, 220, 165, 165, 147, 147, 196, 196, 247, 247, 196, 196],
     tempo: 0.28, melodyType: "triangle", bassType: "sine",
   },
+  // Iron Works — mechanical, rhythmic
+  ironWorks: {
+    melody: [262, 330, 392, 330, 262, 330, 392, 440, 392, 330, 262, 330, 392, 440, 523, 440],
+    bass: [131, 131, 196, 196, 131, 131, 196, 196, 220, 220, 165, 165, 196, 196, 262, 262],
+    tempo: 0.22, melodyType: "square", bassType: "sawtooth",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],
