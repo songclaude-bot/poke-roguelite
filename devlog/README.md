@@ -310,12 +310,36 @@
 
 ---
 
-## 현재 게임 규모 (v0.45.0)
+## Phase 51: Moss Burrow
+
+### 51. Bug 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Paras/Venonat, xScissor 스킬, Moss Burrow 10층, Toxic Venomoth 보스
+
+---
+
+## Phase 52: Iron Works
+
+### 52. Steel 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Shieldon/Bronzor, gyroBall 스킬, Iron Works 13층, Iron Bastiodon 보스
+
+---
+
+## Phase 53: Phantom Crypt
+
+### 53. Ghost 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Misdreavus/Duskull, shadowSneak 스킬, Phantom Crypt 12층, Phantom Mismagius 보스
+
+---
+
+## 현재 게임 규모 (v0.50.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **36개 던전**: Beach Cave → Quake Tunnel + Destiny Tower
-- **86종+ 포켓몬** (진화 포함 100종+)
-- **112종+ 기술**
+- **40개 던전**: Beach Cave → Phantom Crypt + Destiny Tower
+- **96종+ 포켓몬** (진화 포함 112종+)
+- **116종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **38종 스타터** (클리어 수로 해금)
-- **68종+ 진화 경로**
+- **44종 스타터** (클리어 수로 해금)
+- **76종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
