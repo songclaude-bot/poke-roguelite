@@ -555,4 +555,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   poipole: AbilityId.PurePower, // Beast Boost equivalent
   zygarde: AbilityId.Sturdy, // Aura Break equivalent
   excadrill: AbilityId.Guts, // Sand Rush equivalent
+  // Phase 201-203: 12th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+  lycanroc: AbilityId.Guts,
+  gigalith: AbilityId.Sturdy,
+  volcarona: AbilityId.FlameBody,
+  golisopod: AbilityId.Sturdy,
+  urshifu: AbilityId.PurePower,
+  keldeo: AbilityId.Guts,
+  heatran: AbilityId.FlameBody,
+  kartana: AbilityId.PurePower,
+  spectrier: AbilityId.PurePower,
+  polteageist: AbilityId.ShieldDust,
+  mew: AbilityId.ShieldDust,
+  cresselia: AbilityId.Levitate,
 };

@@ -312,6 +312,12 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     thunderGodDomain: [WeatherType.Rain, WeatherType.Sandstorm],
     eternaCore: [WeatherType.Rain, WeatherType.Sandstorm],
     orderSanctum: [WeatherType.Sandstorm],
+    petrifiedApex: [WeatherType.Sandstorm],
+    primordialHive: [WeatherType.None, WeatherType.Rain],
+    martialSummit: [WeatherType.None, WeatherType.Sandstorm],
+    moltenForge: [WeatherType.Sandstorm, WeatherType.Hail],
+    spectralPlains: [WeatherType.Hail, WeatherType.None],
+    genesisTemple: [WeatherType.None, WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

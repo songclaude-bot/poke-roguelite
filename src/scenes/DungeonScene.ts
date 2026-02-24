@@ -488,6 +488,13 @@ export class DungeonScene extends Phaser.Scene {
       thundurus: "0642", zeraora: "0807",
       eternatus: "0890", poipole: "0803",
       zygarde: "0718", excadrill: "0530",
+      // Phase 201-203: 12th Tier (FINAL) Rock/Bug/Fighting/Steel/Ghost/Psychic
+      lycanroc: "0745", gigalith: "0526",
+      volcarona: "0637", golisopod: "0768",
+      urshifu: "0892", keldeo: "0647",
+      heatran: "0485", kartana: "0798",
+      spectrier: "0897", polteageist: "0855",
+      mew: "0151", cresselia: "0488",
     };
 
     // Load player + all enemy species + ally species for this dungeon
