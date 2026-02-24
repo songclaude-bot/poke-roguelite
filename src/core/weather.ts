@@ -87,6 +87,7 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     frostyForest: [WeatherType.Hail],
     magmaCavern: [WeatherType.Sandstorm],
     sinisterWoods: [WeatherType.Rain, WeatherType.Hail],
+    overgrownForest: [WeatherType.Rain],
   };
 
   const pool = pools[dungeonId] ?? [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail];

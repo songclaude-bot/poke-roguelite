@@ -239,6 +239,7 @@ export class DungeonScene extends Phaser.Scene {
       charmander: "0004", eevee: "0133",
       numel: "0322", slugma: "0218", torkoal: "0324",
       murkrow: "0198", sableye: "0302", absol: "0359",
+      chikorita: "0152", bellsprout: "0069", shroomish: "0285",
     };
 
     // Load player + all enemy species + ally species for this dungeon
@@ -1108,6 +1109,15 @@ export class DungeonScene extends Phaser.Scene {
 
     this.updateSkillButtons();
     this.updateMinimap();
+  }
+
+  private openHamburgerMenu() {
+    // Toggle bag/menu — reuse existing bag open/close
+    if (this.bagOpen) {
+      this.closeBag();
+    } else {
+      this.openBag();
+    }
   }
 
   private showLog(msg: string) {

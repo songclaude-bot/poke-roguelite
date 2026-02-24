@@ -119,4 +119,7 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   murkrow: AbilityId.RunAway,
   sableye: AbilityId.Pickup,
   absol: AbilityId.PurePower,
+  chikorita: AbilityId.Torrent, // Overgrow equivalent
+  bellsprout: AbilityId.NoGuard,
+  shroomish: AbilityId.ShieldDust,
 };

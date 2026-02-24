@@ -217,6 +217,33 @@ export const DUNGEONS: Record<string, DungeonDef> = {
     description: "B1F~B14F. Dark and Ghost. The abyss awaits!",
     boss: { speciesId: "absol", name: "Shadow Absol", statMultiplier: 5.5 },
   },
+  overgrownForest: {
+    id: "overgrownForest",
+    name: "Overgrown Forest",
+    tilesetPath: "tilesets/TinyWoods/tileset_0.png",
+    tilesetKey: "tinywoods-tiles",
+    floors: 12,
+    enemySpeciesIds: ["chikorita", "bellsprout", "shroomish", "caterpie", "pidgey"],
+    floorEnemies: {
+      1: ["chikorita"],
+      2: ["chikorita", "bellsprout"],
+      3: ["bellsprout", "caterpie"],
+      4: ["caterpie", "chikorita"],
+      5: ["bellsprout", "shroomish"],
+      6: ["shroomish", "chikorita"],
+      7: ["shroomish", "pidgey", "bellsprout"],
+      8: ["pidgey", "shroomish"],
+      9: ["shroomish", "bellsprout", "chikorita"],
+      10: ["shroomish", "pidgey"],
+      11: ["shroomish", "bellsprout"],
+      12: ["shroomish"],
+    },
+    difficulty: 2.3,
+    itemsPerFloor: 4,
+    unlockClears: 9,
+    description: "B1F~B12F. Grass and Bug. Nature's wrath!",
+    boss: { speciesId: "shroomish", name: "Ancient Breloom", statMultiplier: 5.0 },
+  },
 };
 
 /** Get dungeon by ID */

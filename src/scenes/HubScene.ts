@@ -139,7 +139,7 @@ export class HubScene extends Phaser.Scene {
     );
 
     // Version
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 15, "v0.14.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 15, "v0.16.0", {
       fontSize: "9px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 
@@ -263,6 +263,9 @@ export class HubScene extends Phaser.Scene {
       { id: "snorunt", name: "Snorunt", unlock: 6 },
       { id: "charmander", name: "Charmander", unlock: 2 },
       { id: "eevee", name: "Eevee", unlock: 4 },
+      { id: "chikorita", name: "Chikorita", unlock: 6 },
+      { id: "bellsprout", name: "Bellsprout", unlock: 8 },
+      { id: "shroomish", name: "Shroomish", unlock: 9 },
     ];
 
     const current = this.meta.starter ?? "mudkip";

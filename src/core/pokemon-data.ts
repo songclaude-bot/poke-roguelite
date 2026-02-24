@@ -346,6 +346,46 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["nightSlash", "darkPulse", "quickAttack"],
     floors: [],
   },
+  // ── Overgrown Forest ──
+  chikorita: {
+    id: "chikorita",
+    name: "Chikorita",
+    spriteKey: "chikorita",
+    types: [PokemonType.Grass],
+    attackType: PokemonType.Grass,
+    baseStats: { hp: 45, atk: 10, def: 7 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["vineWhip", "razorLeaf", "tackle"],
+    floors: [],
+  },
+  bellsprout: {
+    id: "bellsprout",
+    name: "Bellsprout",
+    spriteKey: "bellsprout",
+    types: [PokemonType.Grass, PokemonType.Poison],
+    attackType: PokemonType.Grass,
+    baseStats: { hp: 25, atk: 12, def: 3 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 2,
+    skillIds: ["vineWhip", "absorb", "sleepPowder"],
+    floors: [],
+  },
+  shroomish: {
+    id: "shroomish",
+    name: "Shroomish",
+    spriteKey: "shroomish",
+    types: [PokemonType.Grass],
+    attackType: PokemonType.Grass,
+    baseStats: { hp: 30, atk: 9, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 24,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 4, idleFrames: 5,
+    skillIds: ["absorb", "seedBomb", "tackle"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -386,6 +426,9 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   murkrow: { 7: "pursuit", 10: "darkPulse" },
   sableye: { 7: "snarl", 10: "nightSlash" },
   absol: { 7: "nightSlash", 10: "darkPulse" },
+  chikorita: { 7: "vineWhip", 10: "razorLeaf" },
+  bellsprout: { 7: "absorb", 10: "sleepPowder" },
+  shroomish: { 7: "seedBomb", 10: "absorb" },
 };
 
 /** Check if a species learns a new skill at this level */

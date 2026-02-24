@@ -253,6 +253,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [131, 131, 110, 110, 98, 98, 131, 131, 147, 147, 110, 110, 98, 98, 110, 110],
     tempo: 0.30, melodyType: "sawtooth", bassType: "triangle",
   },
+  // Overgrown Forest — lush, verdant
+  overgrownForest: {
+    melody: [330, 392, 440, 523, 494, 440, 392, 349, 330, 294, 330, 392, 440, 494, 440, 392],
+    bass: [165, 165, 220, 220, 247, 247, 196, 196, 165, 165, 175, 175, 220, 220, 196, 196],
+    tempo: 0.28, melodyType: "triangle", bassType: "sine",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],
