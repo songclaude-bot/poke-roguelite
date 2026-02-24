@@ -1349,6 +1349,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["flameWheel", "heatWave", "bite"],
     floors: [],
   },
+
+  // ── Phase 71 Electric 3rd ──
+  joltik: {
+    id: "joltik", name: "Joltik", spriteKey: "joltik",
+    types: [PokemonType.Electric, PokemonType.Bug], attackType: PokemonType.Electric,
+    baseStats: { hp: 22, atk: 12, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 16,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 4, idleFrames: 10,
+    skillIds: ["voltSwitch", "thunderbolt", "signalBeam"],
+    floors: [],
+  },
+  tynamo: {
+    id: "tynamo", name: "Tynamo", spriteKey: "tynamo",
+    types: [PokemonType.Electric], attackType: PokemonType.Electric,
+    baseStats: { hp: 24, atk: 10, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["thunderbolt", "voltSwitch", "tackle"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1469,6 +1491,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   wailmer: { 7: "brine", 10: "dive" },
   litwick: { 7: "heatWave", 10: "shadowBall" },
   growlithe: { 7: "heatWave", 10: "flameWheel" },
+  joltik: { 7: "voltSwitch", 10: "thunderbolt" },
+  tynamo: { 7: "voltSwitch", 10: "thunderbolt" },
 };
 
 /** Check if a species learns a new skill at this level */

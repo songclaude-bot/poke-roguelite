@@ -1343,6 +1343,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 85,
     description: "Blasts searing heat at all surrounding foes.",
   },
+
+  // ── Phase 71 Electric Skills ──
+  voltSwitch: {
+    id: "voltSwitch",
+    name: "Volt Switch",
+    type: PokemonType.Electric,
+    power: 14,
+    pp: 14,
+    range: SkillRange.Front2,
+    accuracy: 95,
+    description: "Zaps the target with an electric jolt.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
