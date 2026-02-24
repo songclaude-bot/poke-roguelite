@@ -1052,6 +1052,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Chills foes in a line.",
   },
+
+  // ── Additional Normal Skills ──
+  hyperVoice: {
+    id: "hyperVoice",
+    name: "Hyper Voice",
+    type: PokemonType.Normal,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Around,
+    accuracy: 90,
+    description: "Loud shout damages all around.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

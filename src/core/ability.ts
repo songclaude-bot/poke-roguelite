@@ -156,4 +156,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   nosepass: AbilityId.Sturdy,
   swinub: AbilityId.Pickup,
   spheal: AbilityId.SwiftSwim,
+  zigzagoon: AbilityId.Pickup,
+  whismur: AbilityId.ShieldDust,
 };

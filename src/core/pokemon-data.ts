@@ -833,6 +833,33 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["icyWind", "waterPulse", "iceBeam"],
     floors: [],
   },
+  // ── Meadow Path ──
+  zigzagoon: {
+    id: "zigzagoon",
+    name: "Zigzagoon",
+    spriteKey: "zigzagoon",
+    types: [PokemonType.Normal],
+    attackType: PokemonType.Normal,
+    baseStats: { hp: 26, atk: 9, def: 6 },
+    walkFrameWidth: 40, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 7, idleFrames: 6,
+    skillIds: ["headbutt", "tackle", "quickAttack"],
+    floors: [],
+  },
+  whismur: {
+    id: "whismur",
+    name: "Whismur",
+    spriteKey: "whismur",
+    types: [PokemonType.Normal],
+    attackType: PokemonType.Normal,
+    baseStats: { hp: 30, atk: 10, def: 5 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 56,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["hyperVoice", "tackle", "headbutt"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -910,6 +937,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   nosepass: { 7: "rockSlide", 10: "stoneEdge" },
   swinub: { 7: "avalanche", 10: "earthPower" },
   spheal: { 7: "icyWind", 10: "iceBeam" },
+  zigzagoon: { 7: "headbutt", 10: "hyperVoice" },
+  whismur: { 7: "hyperVoice", 10: "headbutt" },
 };
 
 /** Check if a species learns a new skill at this level */

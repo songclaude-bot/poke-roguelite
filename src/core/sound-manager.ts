@@ -349,6 +349,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [131, 131, 196, 196, 262, 262, 131, 131, 98, 98, 196, 196, 262, 262, 165, 131],
     tempo: 0.25, melodyType: "square", bassType: "sawtooth",
   },
+  // Meadow Path — cheerful, light
+  meadowPath: {
+    melody: [392, 440, 494, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 523, 587, 523],
+    bass: [196, 196, 247, 247, 262, 262, 196, 196, 165, 165, 196, 196, 247, 247, 294, 294],
+    tempo: 0.28, melodyType: "triangle", bassType: "sine",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],
