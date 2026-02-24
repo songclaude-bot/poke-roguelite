@@ -856,6 +856,28 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 100,
     description: "Strikes with a quick punch of steel.",
   },
+
+  // ── Additional Water Skills ──
+  brine: {
+    id: "brine",
+    name: "Brine",
+    type: PokemonType.Water,
+    power: 14,
+    pp: 15,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Attacks with salty water. 2-tile range.",
+  },
+  aquaJet: {
+    id: "aquaJet",
+    name: "Aqua Jet",
+    type: PokemonType.Water,
+    power: 10,
+    pp: 22,
+    range: SkillRange.Front2,
+    accuracy: 100,
+    description: "Strikes with a jet of water at priority.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

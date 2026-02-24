@@ -93,6 +93,7 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     dragonsLair: [WeatherType.Sandstorm, WeatherType.Hail],
     steelFortress: [WeatherType.Sandstorm, WeatherType.Hail],
     buriedRuins: [WeatherType.Sandstorm],
+    stormySea: [WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

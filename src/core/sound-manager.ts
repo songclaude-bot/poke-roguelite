@@ -289,6 +289,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [131, 131, 147, 147, 131, 131, 110, 110, 131, 131, 165, 165, 131, 131, 110, 110],
     tempo: 0.30, melodyType: "triangle", bassType: "sine",
   },
+  // Stormy Sea — oceanic, turbulent
+  stormySea: {
+    melody: [196, 262, 330, 392, 330, 262, 196, 165, 196, 262, 330, 262, 220, 196, 165, 196],
+    bass: [98, 98, 131, 131, 165, 165, 131, 131, 98, 98, 131, 131, 110, 110, 82, 82],
+    tempo: 0.26, melodyType: "sine", bassType: "triangle",
+  },
   // Destiny Tower — grand, final
   destinyTower: {
     melody: [262, 330, 392, 523, 392, 330, 262, 196, 262, 392, 523, 659, 523, 392, 330, 262],
