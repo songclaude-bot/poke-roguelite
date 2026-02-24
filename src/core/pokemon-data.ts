@@ -1547,6 +1547,69 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["psybeam", "futuresight", "psyshock"],
     floors: [],
   },
+  // ── Phase 83 Ice 3rd ──
+  cryogonal: {
+    id: "cryogonal", name: "Cryogonal", spriteKey: "cryogonal",
+    types: [PokemonType.Ice], attackType: PokemonType.Ice,
+    baseStats: { hp: 22, atk: 14, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 56,
+    idleFrameWidth: 24, idleFrameHeight: 48,
+    walkFrames: 8, idleFrames: 8,
+    skillIds: ["freezeDry", "iceBeam", "auroraBeam"],
+    floors: [],
+  },
+  cubchoo: {
+    id: "cubchoo", name: "Cubchoo", spriteKey: "cubchoo",
+    types: [PokemonType.Ice], attackType: PokemonType.Ice,
+    baseStats: { hp: 28, atk: 10, def: 8 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 11,
+    skillIds: ["icyWind", "freezeDry", "auroraBeam"],
+    floors: [],
+  },
+  // ── Phase 84 Dark 3rd ──
+  sandile: {
+    id: "sandile", name: "Sandile", spriteKey: "sandile",
+    types: [PokemonType.Dark, PokemonType.Ground], attackType: PokemonType.Dark,
+    baseStats: { hp: 26, atk: 12, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["knockOff", "bite", "crunch"],
+    floors: [],
+  },
+  inkay: {
+    id: "inkay", name: "Inkay", spriteKey: "inkay",
+    types: [PokemonType.Dark, PokemonType.Psychic], attackType: PokemonType.Dark,
+    baseStats: { hp: 24, atk: 10, def: 10 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 7,
+    skillIds: ["bite", "knockOff", "psybeam"],
+    floors: [],
+  },
+  // ── Phase 85 Fairy 3rd ──
+  spritzee: {
+    id: "spritzee", name: "Spritzee", spriteKey: "spritzee",
+    types: [PokemonType.Fairy], attackType: PokemonType.Fairy,
+    baseStats: { hp: 28, atk: 8, def: 10 },
+    walkFrameWidth: 24, walkFrameHeight: 48,
+    idleFrameWidth: 24, idleFrameHeight: 48,
+    walkFrames: 6, idleFrames: 10,
+    skillIds: ["moonlight", "dazzlingGleam", "drainingKiss"],
+    floors: [],
+  },
+  swirlix: {
+    id: "swirlix", name: "Swirlix", spriteKey: "swirlix",
+    types: [PokemonType.Fairy], attackType: PokemonType.Fairy,
+    baseStats: { hp: 26, atk: 10, def: 8 },
+    walkFrameWidth: 24, walkFrameHeight: 24,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 4, idleFrames: 5,
+    skillIds: ["drainingKiss", "moonlight", "dazzlingGleam"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1685,6 +1748,12 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   honedge: { 7: "phantomForce", 10: "ironHead" },
   solosis: { 7: "futuresight", 10: "psychic" },
   elgyem: { 7: "futuresight", 10: "psybeam" },
+  cryogonal: { 7: "freezeDry", 10: "iceBeam" },
+  cubchoo: { 7: "freezeDry", 10: "iceBeam" },
+  sandile: { 7: "knockOff", 10: "crunch" },
+  inkay: { 7: "knockOff", 10: "psybeam" },
+  spritzee: { 7: "moonlight", 10: "dazzlingGleam" },
+  swirlix: { 7: "moonlight", 10: "dazzlingGleam" },
 };
 
 /** Check if a species learns a new skill at this level */

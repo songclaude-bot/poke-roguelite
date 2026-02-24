@@ -133,6 +133,9 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     titaniumMine: [WeatherType.Sandstorm, WeatherType.Hail],
     spectralWoods: [WeatherType.Hail],
     cosmicRift: [WeatherType.Rain, WeatherType.Hail],
+    frostbiteChasm: [WeatherType.Hail],
+    midnightAlley: [WeatherType.Sandstorm, WeatherType.Hail],
+    pixieHollow: [WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

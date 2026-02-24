@@ -217,4 +217,10 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   honedge: AbilityId.NoGuard,
   solosis: AbilityId.ShieldDust,
   elgyem: AbilityId.ShieldDust,
+  cryogonal: AbilityId.Levitate,
+  cubchoo: AbilityId.Torrent, // SlushRush equivalent
+  sandile: AbilityId.Guts, // Intimidate equivalent
+  inkay: AbilityId.ShieldDust, // Contrary equivalent
+  spritzee: AbilityId.ShieldDust, // Healer equivalent
+  swirlix: AbilityId.Torrent, // SweetVeil equivalent
 };

@@ -1453,6 +1453,44 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 80,
     description: "Foresees an attack that strikes all in the room.",
   },
+
+  // ── Phase 83 Ice Skills ──
+  freezeDry: {
+    id: "freezeDry",
+    name: "Freeze-Dry",
+    type: PokemonType.Ice,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Super-effective freeze ray, even against Water types.",
+  },
+
+  // ── Phase 84 Dark Skills ──
+  knockOff: {
+    id: "knockOff",
+    name: "Knock Off",
+    type: PokemonType.Dark,
+    power: 12,
+    pp: 14,
+    range: SkillRange.Front1,
+    accuracy: 95,
+    description: "Knocks away the target's held item.",
+  },
+
+  // ── Phase 85 Fairy Skills ──
+  moonlight: {
+    id: "moonlight",
+    name: "Moonlight",
+    type: PokemonType.Fairy,
+    power: 0,
+    pp: 8,
+    range: SkillRange.Self,
+    accuracy: 100,
+    effect: SkillEffect.Heal,
+    effectChance: 100,
+    description: "Restores HP by bathing in moonlight.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

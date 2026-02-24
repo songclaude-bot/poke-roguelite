@@ -126,6 +126,11 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "honedge", to: "doublade", level: 14, newName: "Doublade", hpBonus: 10, atkBonus: 12, defBonus: 8, newSkillId: "shadowBall" },
   { from: "solosis", to: "duosion", level: 14, newName: "Duosion", hpBonus: 12, atkBonus: 10, defBonus: 4, newSkillId: "futuresight" },
   { from: "elgyem", to: "beheeyem", level: 14, newName: "Beheeyem", hpBonus: 14, atkBonus: 8, defBonus: 8, newSkillId: "futuresight" },
+  { from: "cubchoo", to: "beartic", level: 14, newName: "Beartic", hpBonus: 16, atkBonus: 10, defBonus: 6, newSkillId: "iceBeam" },
+  { from: "sandile", to: "krokorok", level: 14, newName: "Krokorok", hpBonus: 12, atkBonus: 10, defBonus: 8, newSkillId: "crunch" },
+  { from: "inkay", to: "malamar", level: 14, newName: "Malamar", hpBonus: 12, atkBonus: 8, defBonus: 10, newSkillId: "knockOff" },
+  { from: "spritzee", to: "aromatisse", level: 14, newName: "Aromatisse", hpBonus: 14, atkBonus: 6, defBonus: 10, newSkillId: "dazzlingGleam" },
+  { from: "swirlix", to: "slurpuff", level: 14, newName: "Slurpuff", hpBonus: 12, atkBonus: 10, defBonus: 8, newSkillId: "dazzlingGleam" },
 ];
 
 /** Check if a species can evolve at a given level */
