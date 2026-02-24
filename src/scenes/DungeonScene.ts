@@ -31,6 +31,9 @@ import {
   goldFromRun, loadMeta, saveMeta,
 } from "../core/save-system";
 import { TrapDef, TrapType, rollTrap, trapsPerFloor, FloorTrap, TRAPS, generateTraps } from "../core/trap";
+import {
+  HazardType, FloorHazard, isImmuneToHazard, generateHazards,
+} from "../core/hazard-tiles";
 import { AbilityId, SPECIES_ABILITIES, ABILITIES } from "../core/ability";
 import {
   getAbilityLevel, getTorrentValues, getSturdyHp,
@@ -195,6 +198,11 @@ export class DungeonScene extends Phaser.Scene {
   // Trap state
   private floorTraps: FloorTrap[] = [];
   private trapGraphics: Phaser.GameObjects.Graphics[] = [];
+
+  // Hazard tile state
+  private floorHazards: FloorHazard[] = [];
+  private hazardGraphics: Phaser.GameObjects.Graphics[] = [];
+  private hazardTweens: Phaser.Tweens.Tween[] = [];
 
   // Belly (hunger) state
   private belly = 100;
@@ -442,6 +450,9 @@ export class DungeonScene extends Phaser.Scene {
     this.persistentAllies = data?.allies ?? null;
     this.floorTraps = [];
     this.trapGraphics = [];
+    this.floorHazards = [];
+    this.hazardGraphics = [];
+    this.hazardTweens = [];
     const bellyBonus = getUpgradeBonus(meta, "bellyMax") * 20;
     this.maxBelly = 100 + bellyBonus;
     this.belly = data?.belly ?? this.maxBelly;
@@ -1313,6 +1324,22 @@ export class DungeonScene extends Phaser.Scene {
       TerrainType.GROUND as unknown as number,
     );
 
+    // ── Spawn hazard tiles (visible terrain dangers) ──
+    // Add trap positions to occupied set so hazards don't overlap
+    const hazardOccupied = new Set<string>(occupiedPositions);
+    for (const ft of this.floorTraps) hazardOccupied.add(`${ft.x},${ft.y}`);
+    this.floorHazards = generateHazards(
+      width, height, terrain as unknown as number[][],
+      this.currentFloor,
+      this.dungeonDef.id,
+      stairsPos.x, stairsPos.y,
+      playerStart.x, playerStart.y,
+      hazardOccupied,
+      TerrainType.GROUND as unknown as number,
+    );
+    // Render hazard tiles and start visual effect tweens
+    this.renderHazardTiles();
+
     // ── Kecleon Shop (20% chance, not on boss floors) ──
     const isBossFloor = (this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors) || this.isBossRush;
     if (!isBossFloor && shouldSpawnShop() && rooms.length > 2) {
@@ -2181,6 +2208,14 @@ export class DungeonScene extends Phaser.Scene {
       if (tr.revealed) {
         gfx.fillStyle(tr.trap.hexColor, 1);
         gfx.fillRect(mx + tr.x * t, my + tr.y * t, t, t);
+      }
+    }
+
+    // ── Hazard tiles (visible in explored areas) ──
+    for (const hz of this.floorHazards) {
+      if (this.visited[hz.y]?.[hz.x]) {
+        gfx.fillStyle(hz.def.color, 0.8);
+        gfx.fillRect(mx + hz.x * t, my + hz.y * t, t, t);
       }
     }
 
@@ -4071,6 +4106,270 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
+  // ── Hazard Tiles ──
+
+  /** Render all hazard tiles as colored semi-transparent rectangles with visual effects */
+  private renderHazardTiles() {
+    // Clean up any prior hazard graphics/tweens
+    for (const gfx of this.hazardGraphics) gfx.destroy();
+    for (const tw of this.hazardTweens) tw.destroy();
+    this.hazardGraphics = [];
+    this.hazardTweens = [];
+
+    for (const hazard of this.floorHazards) {
+      const gfx = this.add.graphics();
+      const px = hazard.x * TILE_DISPLAY;
+      const py = hazard.y * TILE_DISPLAY;
+
+      gfx.fillStyle(hazard.def.color, 0.4);
+      gfx.fillRect(px, py, TILE_DISPLAY, TILE_DISPLAY);
+      gfx.setDepth(2); // Above floor theme overlay (1), below traps (3)
+      this.hazardGraphics.push(gfx);
+
+      // Per-hazard visual effect tweens
+      switch (hazard.type) {
+        case HazardType.Lava: {
+          // Subtle pulsing orange glow
+          const lavaT = this.tweens.add({
+            targets: gfx,
+            alpha: { from: 0.6, to: 1.0 },
+            duration: 800 + Math.random() * 400,
+            yoyo: true,
+            repeat: -1,
+            ease: "Sine.easeInOut",
+          });
+          this.hazardTweens.push(lavaT);
+          break;
+        }
+        case HazardType.Water: {
+          // Gentle blue shimmer
+          const waterT = this.tweens.add({
+            targets: gfx,
+            alpha: { from: 0.5, to: 0.85 },
+            duration: 1200 + Math.random() * 600,
+            yoyo: true,
+            repeat: -1,
+            ease: "Sine.easeInOut",
+          });
+          this.hazardTweens.push(waterT);
+          break;
+        }
+        case HazardType.ToxicSwamp: {
+          // Bubbling animation: scale tween
+          const swampT = this.tweens.add({
+            targets: gfx,
+            scaleX: { from: 1.0, to: 1.04 },
+            scaleY: { from: 1.0, to: 1.04 },
+            alpha: { from: 0.5, to: 0.8 },
+            duration: 1000 + Math.random() * 800,
+            yoyo: true,
+            repeat: -1,
+            ease: "Sine.easeInOut",
+            delay: Math.random() * 1000,
+          });
+          this.hazardTweens.push(swampT);
+          break;
+        }
+        case HazardType.IcePatch: {
+          // Static light blue with slight sparkle (gentle alpha oscillation)
+          const iceT = this.tweens.add({
+            targets: gfx,
+            alpha: { from: 0.55, to: 0.75 },
+            duration: 2000 + Math.random() * 1000,
+            yoyo: true,
+            repeat: -1,
+            ease: "Sine.easeInOut",
+          });
+          this.hazardTweens.push(iceT);
+          break;
+        }
+        case HazardType.Quicksand: {
+          // Slow rotation-like effect (gentle alpha pulse to suggest movement)
+          const qsT = this.tweens.add({
+            targets: gfx,
+            alpha: { from: 0.5, to: 0.8 },
+            duration: 1500 + Math.random() * 500,
+            yoyo: true,
+            repeat: -1,
+            ease: "Quad.easeInOut",
+          });
+          this.hazardTweens.push(qsT);
+          break;
+        }
+        case HazardType.ElectricFloor: {
+          // Rapid flicker (random alpha changes)
+          const elecT = this.tweens.add({
+            targets: gfx,
+            alpha: { from: 0.3, to: 0.9 },
+            duration: 200 + Math.random() * 200,
+            yoyo: true,
+            repeat: -1,
+            ease: "Stepped",
+          });
+          this.hazardTweens.push(elecT);
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if the player is standing on a hazard tile and apply its effects.
+   * Called after player movement.
+   */
+  private checkPlayerHazard() {
+    this.checkEntityHazard(this.player, true);
+  }
+
+  /**
+   * Check if an entity is standing on a hazard tile and apply effects.
+   * @param entity The entity to check
+   * @param isPlayer Whether this is the player (for log messaging)
+   */
+  private checkEntityHazard(entity: Entity, isPlayer: boolean) {
+    if (!entity.alive) return;
+
+    const hazard = this.floorHazards.find(
+      h => h.x === entity.tileX && h.y === entity.tileY
+    );
+    if (!hazard) return;
+
+    const entityTypes = entity.types as PokemonType[];
+
+    // Check immunity
+    if (isImmuneToHazard(hazard.type, entityTypes)) {
+      if (isPlayer) {
+        this.showLog(`${entity.name} is immune to ${hazard.def.name}!`);
+      }
+      return;
+    }
+
+    // Show step message
+    if (isPlayer) {
+      this.showLog(`Stepped on ${hazard.def.name}!`);
+    } else if (this.currentlyVisible[entity.tileY]?.[entity.tileX]) {
+      this.showLog(`${entity.name} stepped on ${hazard.def.name}!`);
+    }
+
+    // Apply damage
+    if (hazard.def.damage > 0) {
+      entity.stats.hp = Math.max(1, entity.stats.hp - hazard.def.damage);
+      if (entity.sprite) {
+        this.showDamagePopup(entity.sprite.x, entity.sprite.y, hazard.def.damage, 1.0);
+      }
+      // Visual flash on the entity
+      if (entity.sprite) {
+        entity.sprite.setTint(hazard.def.color);
+        this.time.delayedCall(300, () => {
+          if (entity.sprite) entity.sprite.clearTint();
+        });
+      }
+    }
+
+    // Apply special effect
+    const effectRoll = Math.random();
+    if (effectRoll < hazard.def.effectChance) {
+      switch (hazard.def.effect) {
+        case "slow": {
+          // Skip next turn: apply paralyze-like status for 1 turn
+          if (!entity.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
+            entity.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 1 });
+            if (isPlayer) this.showLog("Slowed by water!");
+          }
+          break;
+        }
+        case "slide": {
+          // Slide in movement direction until hitting wall/entity
+          const dx = DIR_DX[entity.facing];
+          const dy = DIR_DY[entity.facing];
+          let slideX = entity.tileX;
+          let slideY = entity.tileY;
+          const { terrain, width, height } = this.dungeon;
+
+          for (let step = 0; step < 5; step++) {
+            const nx = slideX + dx;
+            const ny = slideY + dy;
+            if (nx < 0 || nx >= width || ny < 0 || ny >= height) break;
+            if (terrain[ny][nx] !== TerrainType.GROUND) break;
+            // Check entity collision
+            if (this.allEntities.some(e => e !== entity && e.alive && e.tileX === nx && e.tileY === ny)) break;
+            slideX = nx;
+            slideY = ny;
+          }
+
+          if (slideX !== entity.tileX || slideY !== entity.tileY) {
+            entity.tileX = slideX;
+            entity.tileY = slideY;
+            if (entity.sprite) {
+              entity.sprite.setPosition(
+                this.tileToPixelX(slideX),
+                this.tileToPixelY(slideY)
+              );
+            }
+            if (isPlayer) {
+              this.showLog("Slid on the ice!");
+              this.cameras.main.flash(150, 170, 220, 255);
+            }
+          }
+          break;
+        }
+        case "trap": {
+          // Trapped — skip next turn
+          if (!entity.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
+            entity.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 1 });
+            if (isPlayer) this.showLog("Trapped in quicksand!");
+          }
+          break;
+        }
+        case "poison": {
+          // Chance of burn (poison-like) status
+          if (!entity.statusEffects.some(s => s.type === SkillEffect.Burn)) {
+            entity.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
+            if (isPlayer) {
+              this.showLog("Poisoned by toxic swamp!");
+            } else if (this.currentlyVisible[entity.tileY]?.[entity.tileX]) {
+              this.showLog(`${entity.name} was poisoned!`);
+            }
+            if (entity.sprite) {
+              entity.sprite.setTint(0xa855f7);
+              this.time.delayedCall(300, () => {
+                if (entity.sprite) entity.sprite.clearTint();
+              });
+            }
+          }
+          break;
+        }
+        case "paralyze": {
+          // Chance to inflict paralysis
+          if (!entity.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
+            entity.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 3 });
+            if (isPlayer) {
+              this.showLog("Paralyzed by electric floor!");
+            } else if (this.currentlyVisible[entity.tileY]?.[entity.tileX]) {
+              this.showLog(`${entity.name} was paralyzed!`);
+            }
+            if (entity.sprite) {
+              entity.sprite.setTint(0xffee44);
+              this.time.delayedCall(300, () => {
+                if (entity.sprite) entity.sprite.clearTint();
+              });
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    // Check death
+    if (isPlayer) {
+      this.checkPlayerDeath();
+    } else if (entity.stats.hp <= 0) {
+      entity.alive = false;
+    }
+
+    this.updateHUD();
+  }
+
   // ── Belly (Hunger) ──
 
   private tickBelly() {
@@ -5573,6 +5872,7 @@ export class DungeonScene extends Phaser.Scene {
       }
 
       this.checkTraps();
+      this.checkPlayerHazard();
       this.revealNearbyTraps();
       this.checkStairs();
       this.checkShop();
@@ -6750,6 +7050,8 @@ export class DungeonScene extends Phaser.Scene {
 
           if (moveDir !== null && this.canEntityMove(enemy, moveDir)) {
             await this.moveEntity(enemy, moveDir);
+            // Check hazard tiles for enemies after movement
+            this.checkEntityHazard(enemy, false);
           }
         };
       });
@@ -6791,6 +7093,8 @@ export class DungeonScene extends Phaser.Scene {
           } else if (moveDir !== null && this.canEntityMove(ally, moveDir)) {
             await this.moveEntity(ally, moveDir);
             this.recoverPP(ally);
+            // Check hazard tiles for allies after movement
+            this.checkEntityHazard(ally, false);
           }
         };
       });
@@ -7039,8 +7343,9 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
 
-    // Traps, stairs, shop, monster house checks
+    // Traps, hazards, stairs, shop, monster house checks
     this.checkTraps();
+    this.checkPlayerHazard();
     this.revealNearbyTraps();
     // Don't call checkStairs — that would auto-advance the floor. Let the stop condition handle it.
     this.checkShop();
