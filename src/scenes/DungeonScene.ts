@@ -80,6 +80,12 @@ import {
   BossWave, GauntletConfig, GauntletReward,
   shouldTriggerGauntlet, generateGauntlet, getGauntletReward,
 } from "../core/boss-gauntlet";
+import {
+  PuzzleType, PuzzleRoom, PuzzleReward,
+  shouldSpawnPuzzle, generatePuzzle, getPuzzleReward,
+  generatePuzzleTiles, getPuzzleTileCount,
+  SWITCH_COLORS, SWITCH_LABELS,
+} from "../core/puzzle-rooms";
 
 interface AllyData {
   speciesId: string;
@@ -252,6 +258,28 @@ export class DungeonScene extends Phaser.Scene {
   private eventUI: Phaser.GameObjects.GameObject[] = [];
   private currentEvent: DungeonEvent | null = null;
   private eventMarker: Phaser.GameObjects.Text | null = null;
+
+  // Puzzle Room
+  private puzzleRoom: { x: number; y: number; w: number; h: number } | null = null;
+  private puzzleData: PuzzleRoom | null = null;
+  private puzzleTriggered = false;           // player has entered the room
+  private puzzleActive = false;              // puzzle interaction is in progress
+  private puzzleSolved = false;              // puzzle is completed
+  private puzzleFailed = false;              // puzzle has failed
+  private puzzleTiles: { x: number; y: number }[] = [];          // generated positions
+  private puzzleTileGraphics: Phaser.GameObjects.Graphics[] = [];
+  private puzzleTileTweens: Phaser.Tweens.Tween[] = [];
+  private puzzleSequence: number[] = [];     // correct order (indices into puzzleTiles)
+  private puzzlePlayerStep = 0;              // how many tiles player has stepped on correctly
+  private puzzleWrongAttempts = 0;           // for MemoryMatch tolerance
+  private puzzleTurnsUsed = 0;              // for EnemyRush timer
+  private puzzleEnemies: Entity[] = [];     // enemies spawned for EnemyRush
+  private puzzleMarker: Phaser.GameObjects.Text | null = null;
+  private puzzleCarpet: Phaser.GameObjects.Graphics | null = null;
+  private puzzleHudText: Phaser.GameObjects.Text | null = null;
+  private puzzleHudBg: Phaser.GameObjects.Graphics | null = null;
+  private puzzleUI: Phaser.GameObjects.GameObject[] = [];
+  private puzzleShowingSequence = false;     // sequence animation in progress (block input)
 
   // NG+ prestige system
   private ngPlusLevel = 0;
@@ -541,6 +569,27 @@ export class DungeonScene extends Phaser.Scene {
     this.eventUI = [];
     this.currentEvent = null;
     this.eventMarker = null;
+    // Reset puzzle room state
+    this.puzzleRoom = null;
+    this.puzzleData = null;
+    this.puzzleTriggered = false;
+    this.puzzleActive = false;
+    this.puzzleSolved = false;
+    this.puzzleFailed = false;
+    this.puzzleTiles = [];
+    this.puzzleTileGraphics = [];
+    this.puzzleTileTweens = [];
+    this.puzzleSequence = [];
+    this.puzzlePlayerStep = 0;
+    this.puzzleWrongAttempts = 0;
+    this.puzzleTurnsUsed = 0;
+    this.puzzleEnemies = [];
+    this.puzzleMarker = null;
+    this.puzzleCarpet = null;
+    this.puzzleHudText = null;
+    this.puzzleHudBg = null;
+    this.puzzleUI = [];
+    this.puzzleShowingSequence = false;
     this.autoExploring = false;
     this.autoExploreTimer = null;
     this.autoExploreText = null;
@@ -1584,6 +1633,102 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Puzzle Room (10% chance on floor 2+, not boss/first/last) ──
+    if (!isBossFloor && shouldSpawnPuzzle(this.currentFloor, this.dungeonDef.floors) && rooms.length > 2) {
+      const puzzleCandidates = rooms.filter(r =>
+        // Not the player's room
+        !(playerStart.x >= r.x && playerStart.x < r.x + r.w &&
+          playerStart.y >= r.y && playerStart.y < r.y + r.h) &&
+        // Not the stairs room
+        !(stairsPos.x >= r.x && stairsPos.x < r.x + r.w &&
+          stairsPos.y >= r.y && stairsPos.y < r.y + r.h) &&
+        // Not shop, monster house, or event room
+        r !== this.shopRoom &&
+        r !== this.monsterHouseRoom &&
+        r !== this.eventRoom &&
+        // Needs enough space (at least 3x3 interior)
+        r.w >= 4 && r.h >= 4
+      );
+      if (puzzleCandidates.length > 0) {
+        const pzRoom = puzzleCandidates[Math.floor(Math.random() * puzzleCandidates.length)];
+        this.puzzleRoom = pzRoom;
+        this.puzzleData = generatePuzzle(this.currentFloor, this.dungeonDef.difficulty);
+
+        // Draw teal carpet on puzzle room
+        this.puzzleCarpet = this.add.graphics().setDepth(3);
+        this.puzzleCarpet.fillStyle(0x22d3ee, 0.12);
+        this.puzzleCarpet.fillRect(
+          (pzRoom.x + 1) * TILE_DISPLAY,
+          (pzRoom.y + 1) * TILE_DISPLAY,
+          (pzRoom.w - 2) * TILE_DISPLAY,
+          (pzRoom.h - 2) * TILE_DISPLAY,
+        );
+        this.puzzleCarpet.lineStyle(1, 0x22d3ee, 0.4);
+        this.puzzleCarpet.strokeRect(
+          (pzRoom.x + 1) * TILE_DISPLAY,
+          (pzRoom.y + 1) * TILE_DISPLAY,
+          (pzRoom.w - 2) * TILE_DISPLAY,
+          (pzRoom.h - 2) * TILE_DISPLAY,
+        );
+
+        // Place "?" marker at center of puzzle room
+        const pzMarkerX = Math.floor(pzRoom.x + pzRoom.w / 2);
+        const pzMarkerY = Math.floor(pzRoom.y + pzRoom.h / 2);
+        this.puzzleMarker = this.add.text(
+          pzMarkerX * TILE_DISPLAY + TILE_DISPLAY / 2,
+          pzMarkerY * TILE_DISPLAY + TILE_DISPLAY / 2 - 8,
+          "?", { fontSize: "18px", color: "#22d3ee", fontFamily: "monospace", fontStyle: "bold",
+            stroke: "#000000", strokeThickness: 3 }
+        ).setOrigin(0.5).setDepth(8);
+
+        // Pulse animation on the marker
+        this.tweens.add({
+          targets: this.puzzleMarker,
+          scaleX: { from: 1, to: 1.3 },
+          scaleY: { from: 1, to: 1.3 },
+          alpha: { from: 1, to: 0.6 },
+          duration: 800,
+          yoyo: true,
+          repeat: -1,
+          ease: "Sine.easeInOut",
+        });
+
+        // Generate puzzle tiles for the room
+        const pzType = this.puzzleData.type;
+        const tileCount = getPuzzleTileCount(pzType, this.puzzleData.difficulty);
+        if (pzType !== PuzzleType.EnemyRush) {
+          this.puzzleTiles = generatePuzzleTiles(pzRoom.x, pzRoom.y, pzRoom.w, pzRoom.h, tileCount);
+          // Build random sequence
+          this.puzzleSequence = this.puzzleTiles.map((_, i) => i);
+          // Shuffle for tile sequence / memory match / switch order
+          for (let si = this.puzzleSequence.length - 1; si > 0; si--) {
+            const sj = Math.floor(Math.random() * (si + 1));
+            [this.puzzleSequence[si], this.puzzleSequence[sj]] = [this.puzzleSequence[sj], this.puzzleSequence[si]];
+          }
+
+          // Draw puzzle tile indicators on the world (initially hidden, shown when puzzle activates)
+          for (let ti = 0; ti < this.puzzleTiles.length; ti++) {
+            const pt = this.puzzleTiles[ti];
+            const gfx = this.add.graphics().setDepth(4);
+            // Determine tile color based on puzzle type
+            let tileColor = 0x22d3ee; // default teal
+            if (pzType === PuzzleType.SwitchOrder && ti < SWITCH_COLORS.length) {
+              tileColor = SWITCH_COLORS[ti];
+            }
+            gfx.fillStyle(tileColor, 0.0); // initially invisible
+            gfx.fillRect(
+              pt.x * TILE_DISPLAY + 4, pt.y * TILE_DISPLAY + 4,
+              TILE_DISPLAY - 8, TILE_DISPLAY - 8,
+            );
+            gfx.setVisible(false);
+            this.puzzleTileGraphics.push(gfx);
+          }
+        }
+
+        this.showLog("There's a Puzzle Room on this floor!");
+      }
+    }
+
     // ── Fog of War ──
     this.visited = Array.from({ length: height }, () => new Array(width).fill(false));
     this.currentlyVisible = Array.from({ length: height }, () => new Array(width).fill(false));
@@ -2299,6 +2444,34 @@ export class DungeonScene extends Phaser.Scene {
         gfx.strokeRect(
           mx + er.x * t - 1, my + er.y * t - 1,
           er.w * t + 2, er.h * t + 2
+        );
+      }
+    }
+
+    // ── Puzzle room outline (teal fill + border) ──
+    if (this.puzzleRoom && !this.puzzleSolved && !this.puzzleFailed) {
+      const pr = this.puzzleRoom;
+      let puzzleVisible = false;
+      for (let py = pr.y; py < pr.y + pr.h && !puzzleVisible; py++) {
+        for (let px = pr.x; px < pr.x + pr.w && !puzzleVisible; px++) {
+          if (this.visited[py]?.[px]) puzzleVisible = true;
+        }
+      }
+      if (puzzleVisible) {
+        // Teal tint on room tiles
+        gfx.fillStyle(0x22d3ee, 0.25);
+        for (let py = pr.y; py < pr.y + pr.h; py++) {
+          for (let px = pr.x; px < pr.x + pr.w; px++) {
+            if (this.visited[py]?.[px] && this.dungeon.terrain[py]?.[px] === TerrainType.GROUND) {
+              gfx.fillRect(mx + px * t, my + py * t, t, t);
+            }
+          }
+        }
+        // Teal border
+        gfx.lineStyle(expanded ? 2 : 1, 0x22d3ee, 0.9);
+        gfx.strokeRect(
+          mx + pr.x * t - 1, my + pr.y * t - 1,
+          pr.w * t + 2, pr.h * t + 2
         );
       }
     }
@@ -6092,6 +6265,726 @@ export class DungeonScene extends Phaser.Scene {
     this.seenSpecies.add(sp.spriteKey);
   }
 
+  // ══════════════════════════════════════════════════════════
+  // ── Puzzle Room System ─────────────────────────────────
+  // ══════════════════════════════════════════════════════════
+
+  /** Check if player entered the puzzle room */
+  private checkPuzzleRoom() {
+    if (!this.puzzleRoom || !this.puzzleData || this.puzzleSolved || this.puzzleFailed) return;
+    if (this.puzzleTriggered && this.puzzleActive) {
+      // Already active — handle step-on-tile logic
+      this.handlePuzzleStep();
+      return;
+    }
+    const r = this.puzzleRoom;
+    const px = this.player.tileX;
+    const py = this.player.tileY;
+    if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h) {
+      if (!this.puzzleTriggered) {
+        this.puzzleTriggered = true;
+        this.stopAutoExplore();
+        // Remove the "?" marker
+        if (this.puzzleMarker) {
+          this.puzzleMarker.destroy();
+          this.puzzleMarker = null;
+        }
+        // Show puzzle description overlay, then activate
+        this.showPuzzleIntro();
+      }
+    }
+  }
+
+  /** Show the initial puzzle description overlay */
+  private showPuzzleIntro() {
+    if (!this.puzzleData) return;
+
+    // Dim overlay
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
+      .setScrollFactor(0).setDepth(200).setInteractive();
+    this.puzzleUI.push(overlay);
+
+    // Title
+    const title = this.add.text(GAME_WIDTH / 2, 100, "Puzzle Room", {
+      fontSize: "16px", color: "#22d3ee", fontFamily: "monospace", fontStyle: "bold",
+      stroke: "#000000", strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    this.puzzleUI.push(title);
+
+    // Type label
+    const typeLabels: Record<PuzzleType, string> = {
+      [PuzzleType.TileSequence]: "Tile Sequence",
+      [PuzzleType.SwitchOrder]: "Switch Order",
+      [PuzzleType.MemoryMatch]: "Memory Match",
+      [PuzzleType.EnemyRush]: "Enemy Rush",
+      [PuzzleType.ItemSacrifice]: "Item Sacrifice",
+    };
+    const typeName = this.add.text(GAME_WIDTH / 2, 130, typeLabels[this.puzzleData.type], {
+      fontSize: "12px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    this.puzzleUI.push(typeName);
+
+    // Description
+    const desc = this.add.text(GAME_WIDTH / 2, 170, this.puzzleData.description, {
+      fontSize: "10px", color: "#c0c8e0", fontFamily: "monospace",
+      wordWrap: { width: 280 }, align: "center", lineSpacing: 4,
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
+    this.puzzleUI.push(desc);
+
+    // Reward preview
+    const reward = this.puzzleData.reward;
+    const rewardItems = reward.items.map(id => ITEM_DB[id]?.name ?? id).join(", ");
+    const rewardText = this.add.text(GAME_WIDTH / 2, 220, `Reward: ${reward.gold}G, ${reward.exp} EXP\n${rewardItems}`, {
+      fontSize: "9px", color: "#4ade80", fontFamily: "monospace",
+      wordWrap: { width: 280 }, align: "center",
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
+    this.puzzleUI.push(rewardText);
+
+    // Start button
+    const btnBg = this.add.rectangle(GAME_WIDTH / 2, 310, 160, 40, 0x1a1a2e, 0.95)
+      .setScrollFactor(0).setDepth(201).setInteractive()
+      .setStrokeStyle(1, 0x22d3ee, 0.8);
+    this.puzzleUI.push(btnBg);
+
+    const btnText = this.add.text(GAME_WIDTH / 2, 310, "Begin!", {
+      fontSize: "14px", color: "#22d3ee", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+    this.puzzleUI.push(btnText);
+
+    btnBg.on("pointerover", () => {
+      btnBg.setStrokeStyle(2, 0xfbbf24, 1);
+      btnText.setColor("#fbbf24");
+    });
+    btnBg.on("pointerout", () => {
+      btnBg.setStrokeStyle(1, 0x22d3ee, 0.8);
+      btnText.setColor("#22d3ee");
+    });
+    btnBg.on("pointerdown", () => {
+      this.closePuzzleUI();
+      this.activatePuzzle();
+    });
+
+    // Skip button
+    const skipBg = this.add.rectangle(GAME_WIDTH / 2, 365, 160, 30, 0x1a1a2e, 0.7)
+      .setScrollFactor(0).setDepth(201).setInteractive()
+      .setStrokeStyle(1, 0x666680, 0.5);
+    this.puzzleUI.push(skipBg);
+
+    const skipText = this.add.text(GAME_WIDTH / 2, 365, "Skip", {
+      fontSize: "10px", color: "#666680", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+    this.puzzleUI.push(skipText);
+
+    skipBg.on("pointerdown", () => {
+      this.closePuzzleUI();
+      this.puzzleFailed = true;
+      this.showLog("You skipped the puzzle.");
+    });
+  }
+
+  /** Close the puzzle intro/result UI */
+  private closePuzzleUI() {
+    for (const obj of this.puzzleUI) obj.destroy();
+    this.puzzleUI = [];
+  }
+
+  /** Activate the puzzle (show tiles, start timer etc.) */
+  private activatePuzzle() {
+    if (!this.puzzleData || !this.puzzleRoom) return;
+    this.puzzleActive = true;
+    this.puzzlePlayerStep = 0;
+    this.puzzleWrongAttempts = 0;
+    this.puzzleTurnsUsed = 0;
+
+    const pzType = this.puzzleData.type;
+
+    // Show puzzle HUD
+    this.showPuzzleHud();
+
+    switch (pzType) {
+      case PuzzleType.TileSequence:
+        this.showPuzzleTileSequence();
+        break;
+      case PuzzleType.SwitchOrder:
+        this.showPuzzleSwitchOrder();
+        break;
+      case PuzzleType.MemoryMatch:
+        this.showPuzzleMemoryMatch();
+        break;
+      case PuzzleType.EnemyRush:
+        this.spawnPuzzleEnemies();
+        break;
+      case PuzzleType.ItemSacrifice:
+        this.showPuzzleAltar();
+        break;
+    }
+  }
+
+  /** Show the puzzle HUD text (instructions + progress) */
+  private showPuzzleHud() {
+    this.hidePuzzleHud();
+    if (!this.puzzleData) return;
+
+    const pzType = this.puzzleData.type;
+    let instructions = "";
+    switch (pzType) {
+      case PuzzleType.TileSequence:
+        instructions = "Step on tiles in order!";
+        break;
+      case PuzzleType.SwitchOrder:
+        instructions = "Step on switches in order!";
+        break;
+      case PuzzleType.MemoryMatch:
+        instructions = "Memorize the pattern!";
+        break;
+      case PuzzleType.EnemyRush:
+        instructions = `Defeat all enemies! (${this.puzzleData.timeLimit ?? 15} turns)`;
+        break;
+      case PuzzleType.ItemSacrifice:
+        instructions = "Drop any item on the altar!";
+        break;
+    }
+
+    this.puzzleHudBg = this.add.graphics().setScrollFactor(0).setDepth(110);
+    this.puzzleHudBg.fillStyle(0x0a1520, 0.85);
+    this.puzzleHudBg.fillRoundedRect(GAME_WIDTH / 2 - 130, 58, 260, 22, 4);
+    this.puzzleHudBg.lineStyle(1, 0x22d3ee, 0.5);
+    this.puzzleHudBg.strokeRoundedRect(GAME_WIDTH / 2 - 130, 58, 260, 22, 4);
+
+    this.puzzleHudText = this.add.text(GAME_WIDTH / 2, 69, instructions, {
+      fontSize: "9px", color: "#22d3ee", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(111);
+  }
+
+  /** Update puzzle HUD with progress */
+  private updatePuzzleHud() {
+    if (!this.puzzleHudText || !this.puzzleData) return;
+
+    const pzType = this.puzzleData.type;
+    let text = "";
+    switch (pzType) {
+      case PuzzleType.TileSequence:
+        text = `Step on tiles in order! (${this.puzzlePlayerStep}/${this.puzzleTiles.length})`;
+        break;
+      case PuzzleType.SwitchOrder:
+        text = `Switch order! (${this.puzzlePlayerStep}/${this.puzzleTiles.length})`;
+        break;
+      case PuzzleType.MemoryMatch: {
+        const maxWrong = 2;
+        text = `Reproduce pattern! (${this.puzzlePlayerStep}/${this.puzzleTiles.length}) Tries: ${maxWrong - this.puzzleWrongAttempts}`;
+        break;
+      }
+      case PuzzleType.EnemyRush: {
+        const alive = this.puzzleEnemies.filter(e => e.alive).length;
+        const limit = this.puzzleData.timeLimit ?? 15;
+        text = `Enemies: ${alive} left | Turn ${this.puzzleTurnsUsed}/${limit}`;
+        break;
+      }
+      case PuzzleType.ItemSacrifice:
+        text = "Drop any item on the glowing altar!";
+        break;
+    }
+    this.puzzleHudText.setText(text);
+  }
+
+  /** Hide puzzle HUD */
+  private hidePuzzleHud() {
+    if (this.puzzleHudText) { this.puzzleHudText.destroy(); this.puzzleHudText = null; }
+    if (this.puzzleHudBg) { this.puzzleHudBg.destroy(); this.puzzleHudBg = null; }
+  }
+
+  // ── Tile Sequence Puzzle ──
+
+  /** Flash tiles in sequence, then let player step on them */
+  private showPuzzleTileSequence() {
+    this.puzzleShowingSequence = true;
+
+    // Make all puzzle tile graphics visible first
+    for (const gfx of this.puzzleTileGraphics) {
+      gfx.setVisible(true);
+      gfx.setAlpha(0.3);
+    }
+
+    // Flash tiles one by one in sequence order
+    let delay = 500;
+    for (let i = 0; i < this.puzzleSequence.length; i++) {
+      const tileIdx = this.puzzleSequence[i];
+      const pt = this.puzzleTiles[tileIdx];
+      this.time.delayedCall(delay, () => {
+        this.flashPuzzleTile(pt.x, pt.y, 0x44ff44, 800);
+      });
+      delay += 1200;
+    }
+
+    // After sequence finishes, allow player input
+    this.time.delayedCall(delay + 200, () => {
+      this.puzzleShowingSequence = false;
+      this.showLog("Now step on the tiles in that order!");
+      this.updatePuzzleHud();
+    });
+  }
+
+  // ── Switch Order Puzzle ──
+
+  /** Flash 3 colored switches in order */
+  private showPuzzleSwitchOrder() {
+    this.puzzleShowingSequence = true;
+
+    // Show all switch tiles with their colors
+    for (let i = 0; i < this.puzzleTileGraphics.length; i++) {
+      const gfx = this.puzzleTileGraphics[i];
+      gfx.setVisible(true);
+      gfx.clear();
+      const color = SWITCH_COLORS[i % SWITCH_COLORS.length];
+      const pt = this.puzzleTiles[i];
+      gfx.fillStyle(color, 0.5);
+      gfx.fillRect(pt.x * TILE_DISPLAY + 4, pt.y * TILE_DISPLAY + 4, TILE_DISPLAY - 8, TILE_DISPLAY - 8);
+    }
+
+    // Flash them in sequence order with a brief display
+    let delay = 500;
+    for (let i = 0; i < this.puzzleSequence.length; i++) {
+      const tileIdx = this.puzzleSequence[i];
+      const pt = this.puzzleTiles[tileIdx];
+      const color = SWITCH_COLORS[tileIdx % SWITCH_COLORS.length];
+      this.time.delayedCall(delay, () => {
+        this.flashPuzzleTile(pt.x, pt.y, color, 600);
+        const label = SWITCH_LABELS[tileIdx % SWITCH_LABELS.length];
+        this.showLog(`${label}!`);
+      });
+      delay += 900;
+    }
+
+    this.time.delayedCall(delay + 200, () => {
+      this.puzzleShowingSequence = false;
+      this.showLog("Step on the switches in that order!");
+      this.updatePuzzleHud();
+    });
+  }
+
+  // ── Memory Match Puzzle ──
+
+  /** Flash tiles in a pattern for memorization */
+  private showPuzzleMemoryMatch() {
+    this.puzzleShowingSequence = true;
+
+    // Make tiles visible but dim
+    for (const gfx of this.puzzleTileGraphics) {
+      gfx.setVisible(true);
+      gfx.setAlpha(0.2);
+    }
+
+    // Flash the pattern
+    let delay = 500;
+    for (let i = 0; i < this.puzzleSequence.length; i++) {
+      const tileIdx = this.puzzleSequence[i];
+      const pt = this.puzzleTiles[tileIdx];
+      this.time.delayedCall(delay, () => {
+        this.flashPuzzleTile(pt.x, pt.y, 0xffffff, 600);
+      });
+      delay += 900;
+    }
+
+    this.time.delayedCall(delay + 200, () => {
+      this.puzzleShowingSequence = false;
+      this.showLog("Now reproduce the pattern!");
+      this.updatePuzzleHud();
+    });
+  }
+
+  // ── Enemy Rush Puzzle ──
+
+  /** Spawn puzzle enemies */
+  private spawnPuzzleEnemies() {
+    if (!this.puzzleRoom || !this.puzzleData) return;
+    const r = this.puzzleRoom;
+    const count = getPuzzleTileCount(PuzzleType.EnemyRush, this.puzzleData.difficulty);
+
+    const floorSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
+      ? this.getEndlessEnemies(this.currentFloor)
+      : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
+    const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
+    if (floorSpecies.length === 0) return;
+
+    for (let i = 0; i < count; i++) {
+      const ex = r.x + 1 + Math.floor(Math.random() * Math.max(1, r.w - 2));
+      const ey = r.y + 1 + Math.floor(Math.random() * Math.max(1, r.h - 2));
+      if (this.dungeon.terrain[ey]?.[ex] !== TerrainType.GROUND) continue;
+      if (this.allEntities.some(e => e.alive && e.tileX === ex && e.tileY === ey)) continue;
+
+      const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
+      const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
+
+      if (this.difficultyMods.enemyHpMult !== 1) {
+        enemyStats.hp = Math.floor(enemyStats.hp * this.difficultyMods.enemyHpMult);
+        enemyStats.maxHp = Math.floor(enemyStats.maxHp * this.difficultyMods.enemyHpMult);
+      }
+      if (this.difficultyMods.enemyAtkMult !== 1) {
+        enemyStats.atk = Math.floor(enemyStats.atk * this.difficultyMods.enemyAtkMult);
+      }
+
+      const enemy: Entity = {
+        tileX: ex, tileY: ey,
+        facing: Direction.Down,
+        stats: { ...enemyStats },
+        alive: true,
+        spriteKey: sp.spriteKey,
+        name: sp.name,
+        types: sp.types,
+        attackType: sp.attackType,
+        skills: createSpeciesSkills(sp),
+        statusEffects: [],
+        speciesId: sp.spriteKey,
+        ability: SPECIES_ABILITIES[sp.spriteKey],
+      };
+      const eTex = `${sp.spriteKey}-idle`;
+      if (this.textures.exists(eTex)) {
+        enemy.sprite = this.add.sprite(
+          this.tileToPixelX(ex), this.tileToPixelY(ey), eTex
+        );
+        enemy.sprite.setScale(TILE_SCALE).setDepth(9);
+        const eAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+        if (this.anims.exists(eAnim)) enemy.sprite.play(eAnim);
+      }
+      this.enemies.push(enemy);
+      this.allEntities.push(enemy);
+      this.puzzleEnemies.push(enemy);
+      this.seenSpecies.add(sp.spriteKey);
+    }
+
+    this.showLog(`${count} enemies appeared! Defeat them all!`);
+    this.updatePuzzleHud();
+  }
+
+  // ── Item Sacrifice Puzzle ──
+
+  /** Show the altar tile for item sacrifice */
+  private showPuzzleAltar() {
+    if (this.puzzleTiles.length === 0) return;
+    const pt = this.puzzleTiles[0];
+
+    // Draw a glowing altar tile
+    if (this.puzzleTileGraphics.length > 0) {
+      const gfx = this.puzzleTileGraphics[0];
+      gfx.setVisible(true);
+      gfx.clear();
+      gfx.fillStyle(0xfbbf24, 0.5);
+      gfx.fillRect(pt.x * TILE_DISPLAY + 2, pt.y * TILE_DISPLAY + 2, TILE_DISPLAY - 4, TILE_DISPLAY - 4);
+      gfx.lineStyle(2, 0xfbbf24, 0.8);
+      gfx.strokeRect(pt.x * TILE_DISPLAY + 2, pt.y * TILE_DISPLAY + 2, TILE_DISPLAY - 4, TILE_DISPLAY - 4);
+    }
+
+    // Pulsing altar tween
+    const tween = this.tweens.add({
+      targets: this.puzzleTileGraphics[0],
+      alpha: { from: 0.5, to: 1.0 },
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+    this.puzzleTileTweens.push(tween);
+
+    // Place altar icon on the tile
+    const altarIcon = this.add.text(
+      pt.x * TILE_DISPLAY + TILE_DISPLAY / 2,
+      pt.y * TILE_DISPLAY + TILE_DISPLAY / 2,
+      "🔥", { fontSize: "16px", fontFamily: "monospace" }
+    ).setOrigin(0.5).setDepth(7);
+    this.puzzleUI.push(altarIcon);
+
+    this.showLog("Step on the altar with an item in your bag!");
+    this.updatePuzzleHud();
+  }
+
+  // ── Puzzle Tile Flash ──
+
+  /** Flash a tile at (x,y) with a color for a given duration */
+  private flashPuzzleTile(x: number, y: number, color: number, duration: number) {
+    const flash = this.add.graphics().setDepth(5);
+    flash.fillStyle(color, 0.7);
+    flash.fillRect(x * TILE_DISPLAY + 2, y * TILE_DISPLAY + 2, TILE_DISPLAY - 4, TILE_DISPLAY - 4);
+
+    this.tweens.add({
+      targets: flash,
+      alpha: { from: 0.7, to: 0 },
+      duration,
+      ease: "Quad.easeOut",
+      onComplete: () => flash.destroy(),
+    });
+  }
+
+  // ── Puzzle Step-On Logic ──
+
+  /** Called each turn when puzzle is active and player moves */
+  private handlePuzzleStep() {
+    if (!this.puzzleData || this.puzzleSolved || this.puzzleFailed) return;
+    if (this.puzzleShowingSequence) return; // block input during sequence show
+
+    const pzType = this.puzzleData.type;
+    const px = this.player.tileX;
+    const py = this.player.tileY;
+
+    switch (pzType) {
+      case PuzzleType.TileSequence:
+      case PuzzleType.SwitchOrder:
+      case PuzzleType.MemoryMatch:
+        this.handleStepOnPuzzleTile(px, py);
+        break;
+      case PuzzleType.EnemyRush:
+        this.handleEnemyRushTurn();
+        break;
+      case PuzzleType.ItemSacrifice:
+        this.handleItemSacrificeTile(px, py);
+        break;
+    }
+  }
+
+  /** Handle stepping on a puzzle tile (TileSequence/SwitchOrder/MemoryMatch) */
+  private handleStepOnPuzzleTile(px: number, py: number) {
+    // Find which tile the player is on
+    const tileIdx = this.puzzleTiles.findIndex(t => t.x === px && t.y === py);
+    if (tileIdx === -1) return; // not on a puzzle tile
+
+    const expectedIdx = this.puzzleSequence[this.puzzlePlayerStep];
+
+    if (tileIdx === expectedIdx) {
+      // Correct!
+      this.puzzlePlayerStep++;
+      this.flashPuzzleTile(px, py, 0x44ff44, 400); // green flash
+      sfxPickup();
+
+      this.updatePuzzleHud();
+
+      // Check if all tiles are done
+      if (this.puzzlePlayerStep >= this.puzzleSequence.length) {
+        this.solvePuzzle();
+      }
+    } else {
+      // Wrong tile
+      this.flashPuzzleTile(px, py, 0xff4444, 400); // red flash
+      sfxHit();
+
+      if (this.puzzleData?.type === PuzzleType.MemoryMatch) {
+        this.puzzleWrongAttempts++;
+        if (this.puzzleWrongAttempts >= 2) {
+          this.failPuzzle();
+          return;
+        }
+        this.showLog(`Wrong! ${2 - this.puzzleWrongAttempts} tries left.`);
+      } else {
+        this.showLog("Wrong order! Resetting...");
+      }
+
+      // Reset progress
+      this.puzzlePlayerStep = 0;
+      this.updatePuzzleHud();
+    }
+  }
+
+  /** Handle Enemy Rush turn tick */
+  private handleEnemyRushTurn() {
+    this.puzzleTurnsUsed++;
+    this.updatePuzzleHud();
+
+    // Check if all puzzle enemies are dead
+    const allDead = this.puzzleEnemies.every(e => !e.alive);
+    if (allDead) {
+      this.solvePuzzle();
+      return;
+    }
+
+    // Check turn limit
+    const limit = this.puzzleData?.timeLimit ?? 15;
+    if (this.puzzleTurnsUsed >= limit) {
+      this.failPuzzle();
+    }
+  }
+
+  /** Handle item sacrifice: player steps on altar */
+  private handleItemSacrificeTile(px: number, py: number) {
+    if (this.puzzleTiles.length === 0) return;
+    const altar = this.puzzleTiles[0];
+    if (px !== altar.x || py !== altar.y) return;
+
+    // Check if player has any item to sacrifice
+    if (this.inventory.length === 0) {
+      this.showLog("You need an item to sacrifice!");
+      return;
+    }
+
+    // Consume the first item in inventory
+    const stack = this.inventory[0];
+    const itemName = stack.item.name;
+    stack.count--;
+    if (stack.count <= 0) this.inventory.splice(0, 1);
+
+    this.showLog(`Sacrificed ${itemName} on the altar!`);
+    sfxSkill();
+    this.solvePuzzle();
+  }
+
+  // ── Puzzle Resolution ──
+
+  /** Called when puzzle is solved successfully */
+  private solvePuzzle() {
+    if (!this.puzzleData) return;
+    this.puzzleSolved = true;
+    this.puzzleActive = false;
+
+    const reward = getPuzzleReward(this.puzzleData);
+
+    // Grant gold
+    this.gold += reward.gold;
+
+    // Grant EXP
+    const levelResult = processLevelUp(this.player.stats, reward.exp, this.totalExp);
+    this.totalExp = levelResult.totalExp;
+    for (const r of levelResult.results) {
+      sfxLevelUp();
+      this.showLog(`Level up! Lv.${r.newLevel}! HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
+    }
+
+    // Grant items
+    for (const itemId of reward.items) {
+      const itemDef = ITEM_DB[itemId];
+      if (!itemDef) continue;
+      if (this.inventory.length >= MAX_INVENTORY) {
+        this.showLog(`Bag full! Couldn't get ${itemDef.name}.`);
+        continue;
+      }
+      const existing = this.inventory.find(s => s.item.id === itemDef.id && itemDef.stackable);
+      if (existing) existing.count++;
+      else this.inventory.push({ item: itemDef, count: 1 });
+    }
+
+    // Score chain bonus (treat puzzle solve like a monster house clear)
+    const chainBonus = addChainAction(this.scoreChain, "monsterHouseClear");
+    if (chainBonus > 0) this.showLog(`Puzzle Chain +${chainBonus} pts!`);
+
+    // Green success flash on puzzle room
+    this.puzzleSuccessEffect();
+
+    // Show result overlay
+    const itemNames = reward.items.map(id => ITEM_DB[id]?.name ?? id).join(", ");
+    this.showPuzzleResult(
+      "Puzzle Solved!",
+      `+${reward.gold}G, +${reward.exp} EXP\n${itemNames}`,
+      "#4ade80"
+    );
+
+    // Clean up puzzle visuals
+    this.cleanupPuzzleTiles();
+    this.hidePuzzleHud();
+    sfxVictory();
+  }
+
+  /** Called when puzzle fails */
+  private failPuzzle() {
+    if (!this.puzzleData) return;
+    this.puzzleFailed = true;
+    this.puzzleActive = false;
+
+    // Red failure flash
+    this.puzzleFailEffect();
+
+    this.showPuzzleResult("Puzzle Failed", "Better luck next time...", "#ef4444");
+
+    // Clean up puzzle visuals
+    this.cleanupPuzzleTiles();
+    this.hidePuzzleHud();
+    sfxGameOver();
+  }
+
+  /** Show puzzle result overlay */
+  private showPuzzleResult(title: string, message: string, color: string) {
+    // Brief overlay with result
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6)
+      .setScrollFactor(0).setDepth(200).setInteractive();
+
+    const titleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, title, {
+      fontSize: "18px", color, fontFamily: "monospace", fontStyle: "bold",
+      stroke: "#000000", strokeThickness: 3,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    const msgText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10, message, {
+      fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace",
+      wordWrap: { width: 280 }, align: "center",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    // Auto-dismiss after 2 seconds
+    this.time.delayedCall(2000, () => {
+      overlay.destroy();
+      titleText.destroy();
+      msgText.destroy();
+    });
+  }
+
+  /** Green flash + particles on puzzle success */
+  private puzzleSuccessEffect() {
+    if (!this.puzzleRoom) return;
+    const r = this.puzzleRoom;
+    const cx = (r.x + r.w / 2) * TILE_DISPLAY;
+    const cy = (r.y + r.h / 2) * TILE_DISPLAY;
+
+    // Green flash overlay on puzzle room
+    const flash = this.add.graphics().setDepth(15);
+    flash.fillStyle(0x44ff44, 0.3);
+    flash.fillRect(r.x * TILE_DISPLAY, r.y * TILE_DISPLAY, r.w * TILE_DISPLAY, r.h * TILE_DISPLAY);
+    this.tweens.add({
+      targets: flash, alpha: { from: 0.3, to: 0 }, duration: 1000,
+      ease: "Quad.easeOut", onComplete: () => flash.destroy(),
+    });
+
+    // Simple celebration particles (floating dots)
+    for (let i = 0; i < 8; i++) {
+      const p = this.add.graphics().setDepth(16);
+      p.fillStyle(0x44ff44, 1);
+      p.fillCircle(0, 0, 3);
+      p.setPosition(cx + (Math.random() - 0.5) * r.w * TILE_DISPLAY, cy);
+      this.tweens.add({
+        targets: p,
+        y: p.y - 40 - Math.random() * 40,
+        x: p.x + (Math.random() - 0.5) * 30,
+        alpha: { from: 1, to: 0 },
+        duration: 800 + Math.random() * 400,
+        ease: "Quad.easeOut",
+        onComplete: () => p.destroy(),
+      });
+    }
+  }
+
+  /** Red flash on puzzle failure */
+  private puzzleFailEffect() {
+    if (!this.puzzleRoom) return;
+    const r = this.puzzleRoom;
+
+    const flash = this.add.graphics().setDepth(15);
+    flash.fillStyle(0xff4444, 0.3);
+    flash.fillRect(r.x * TILE_DISPLAY, r.y * TILE_DISPLAY, r.w * TILE_DISPLAY, r.h * TILE_DISPLAY);
+    this.tweens.add({
+      targets: flash, alpha: { from: 0.3, to: 0 }, duration: 1000,
+      ease: "Quad.easeOut", onComplete: () => flash.destroy(),
+    });
+  }
+
+  /** Clean up puzzle tile visuals and tweens */
+  private cleanupPuzzleTiles() {
+    for (const tween of this.puzzleTileTweens) {
+      if (tween.isPlaying()) tween.stop();
+    }
+    this.puzzleTileTweens = [];
+    for (const gfx of this.puzzleTileGraphics) {
+      gfx.destroy();
+    }
+    this.puzzleTileGraphics = [];
+    // Also destroy carpet
+    if (this.puzzleCarpet) {
+      this.puzzleCarpet.destroy();
+      this.puzzleCarpet = null;
+    }
+  }
+
   /** Get random enemy species for endless dungeon based on current floor */
   private getEndlessEnemies(floor: number): string[] {
     const allSpecies = Object.keys(SPECIES);
@@ -6614,6 +7507,7 @@ export class DungeonScene extends Phaser.Scene {
       this.checkShop();
       this.checkMonsterHouse();
       this.checkEventRoom();
+      this.checkPuzzleRoom();
     }
 
     // Belly drain per turn (movement or attack)
@@ -7728,6 +8622,13 @@ export class DungeonScene extends Phaser.Scene {
           this.checkGauntletWaveCleared();
         });
       }
+
+      // ── Puzzle EnemyRush clear check ──
+      if (this.puzzleActive && this.puzzleData?.type === PuzzleType.EnemyRush) {
+        this.time.delayedCall(350, () => {
+          this.handleEnemyRushTurn();
+        });
+      }
     }
   }
 
@@ -8539,6 +9440,7 @@ export class DungeonScene extends Phaser.Scene {
     this.checkShop();
     this.checkMonsterHouse();
     this.checkEventRoom();
+    this.checkPuzzleRoom();
 
     // Belly drain, weather, status
     this.tickBelly();
