@@ -63,6 +63,7 @@ import {
   getBgmVolume, getSfxVolume, setBgmVolume, setSfxVolume,
 } from "../core/sound-manager";
 import { DungeonEvent, EventChoice, rollDungeonEvent } from "../core/dungeon-events";
+import { FloorTheme, getDepthAdjustedTheme } from "../core/floor-themes";
 
 interface AllyData {
   speciesId: string;
@@ -276,6 +277,10 @@ export class DungeonScene extends Phaser.Scene {
   private comboDoubleDamage = false;      // next skill does 2x damage
   private comboCritGuarantee = false;     // next attack is guaranteed crit
   private comboSpeedBoost = false;        // get 2 actions next turn
+
+  // Floor Theme state
+  private currentTheme!: FloorTheme;
+  private themeOverlay: Phaser.GameObjects.Graphics | null = null;
 
   constructor() {
     super({ key: "DungeonScene" });
@@ -771,6 +776,20 @@ export class DungeonScene extends Phaser.Scene {
     this.dungeon = generateDungeon();
     const { width, height, terrain, playerStart, stairsPos } = this.dungeon;
 
+    // ── Floor Theme ──
+    this.currentTheme = getDepthAdjustedTheme(this.dungeonDef.id, this.currentFloor);
+    const rooms = this.dungeon.rooms;
+
+    // Build a set of room tiles for corridor vs room distinction
+    const isRoomTile = new Set<string>();
+    for (const room of rooms) {
+      for (let ry = room.y; ry < room.y + room.h; ry++) {
+        for (let rx = room.x; rx < room.x + room.w; rx++) {
+          isRoomTile.add(`${rx},${ry}`);
+        }
+      }
+    }
+
     // ── Tilemap ──
     const tileData: number[][] = [];
     for (let y = 0; y < height; y++) {
@@ -785,7 +804,47 @@ export class DungeonScene extends Phaser.Scene {
     const tileset = map.addTilesetImage(this.dungeonDef.tilesetKey);
     if (tileset) {
       const layer = map.createLayer(0, tileset, 0, 0);
-      if (layer) layer.setScale(TILE_SCALE);
+      if (layer) {
+        layer.setScale(TILE_SCALE);
+        // Apply ambient tint from the floor theme to the tilemap layer
+        layer.setTint(this.currentTheme.ambientTint);
+      }
+    }
+
+    // ── Theme Color Overlay ──
+    // Draw a subtle colored overlay on top of the tilemap to unify the look
+    this.themeOverlay = this.add.graphics().setDepth(1);
+    const themeAlpha = 0.18; // subtle enough to not hide tileset art
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const t = terrain[y][x];
+        let color: number;
+        let alpha = themeAlpha;
+
+        if (t === TerrainType.WALL) {
+          color = this.currentTheme.wallColor;
+          alpha = 0.25; // walls get a stronger tint
+        } else if (t === TerrainType.GROUND) {
+          const inRoom = isRoomTile.has(`${x},${y}`);
+          if (inRoom) {
+            // Checkerboard pattern for room floor tiles
+            color = (x + y) % 2 === 0 ? this.currentTheme.floorColor : this.currentTheme.floorAltColor;
+          } else {
+            // Corridor tiles
+            color = this.currentTheme.corridorColor;
+          }
+        } else {
+          // Water or other terrain
+          color = this.currentTheme.floorColor;
+          alpha = 0.12;
+        }
+
+        this.themeOverlay.fillStyle(color, alpha);
+        this.themeOverlay.fillRect(
+          x * TILE_DISPLAY, y * TILE_DISPLAY,
+          TILE_DISPLAY, TILE_DISPLAY
+        );
+      }
     }
 
     // Stairs marker
@@ -908,7 +967,6 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     // ── Spawn enemies (dungeon + floor specific) — skip for Boss Rush (boss only) ──
-    const rooms = this.dungeon.rooms;
     if (!this.isBossRush) {
       const floorSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
         ? this.getEndlessEnemies(this.currentFloor)
@@ -1921,9 +1979,9 @@ export class DungeonScene extends Phaser.Scene {
     // Reveal area around player each update
     this.revealArea(this.player.tileX, this.player.tileY, 4);
 
-    // ── Background ──
+    // ── Background (themed) ──
     this.minimapBg.clear();
-    this.minimapBg.fillStyle(0x0a0a1a, expanded ? 0.88 : 0.75);
+    this.minimapBg.fillStyle(this.currentTheme.fogColor, expanded ? 0.88 : 0.75);
     this.minimapBg.fillRoundedRect(mx - pad, my - pad, totalW + pad * 2, totalH + pad * 2, 4);
 
     // ── Border ──
@@ -1931,15 +1989,17 @@ export class DungeonScene extends Phaser.Scene {
     this.minimapBorder.lineStyle(1, expanded ? 0x5566aa : 0x334466, expanded ? 0.9 : 0.6);
     this.minimapBorder.strokeRoundedRect(mx - pad, my - pad, totalW + pad * 2, totalH + pad * 2, 4);
 
-    // ── Terrain ──
+    // ── Terrain (themed minimap colors) ──
     this.minimapGfx.clear();
+    const minimapFloorColor = this.currentTheme.floorColor;
+    const minimapFogColor = this.currentTheme.fogColor;
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         if (terrain[y][x] === TerrainType.GROUND) {
           if (this.visited[y][x]) {
-            this.minimapGfx.fillStyle(0x334455, 1);
+            this.minimapGfx.fillStyle(minimapFloorColor, 0.8);
           } else {
-            this.minimapGfx.fillStyle(0x1a1a2e, 0.5);
+            this.minimapGfx.fillStyle(minimapFogColor, 0.5);
           }
           this.minimapGfx.fillRect(mx + x * t, my + y * t, t, t);
         }
