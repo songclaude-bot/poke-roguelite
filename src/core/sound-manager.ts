@@ -589,6 +589,22 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [131, 131, 165, 165, 175, 175, 131, 131, 110, 110, 131, 131, 165, 165, 196, 196],
     tempo: 0.34, melodyType: "triangle", bassType: "sine",
   },
+  // Phase 106-108: Steel/Ghost/Psychic 4th
+  forgeMountain: {
+    melody: [330, 392, 440, 523, 587, 523, 440, 392, 330, 294, 262, 294, 330, 392, 523, 440],
+    bass: [165, 165, 220, 220, 294, 294, 220, 220, 165, 165, 131, 131, 165, 165, 262, 220],
+    tempo: 0.26, melodyType: "sawtooth", bassType: "square",
+  },
+  hauntedManor: {
+    melody: [196, 185, 175, 165, 156, 165, 175, 196, 220, 208, 196, 175, 165, 156, 147, 165],
+    bass: [98, 98, 88, 88, 78, 78, 88, 88, 110, 110, 98, 98, 88, 88, 74, 74],
+    tempo: 0.38, melodyType: "sine", bassType: "triangle",
+  },
+  dreamTemple: {
+    melody: [523, 494, 440, 392, 440, 494, 523, 587, 659, 587, 523, 494, 440, 392, 349, 392],
+    bass: [262, 262, 220, 220, 196, 196, 262, 262, 330, 330, 262, 262, 220, 220, 175, 175],
+    tempo: 0.32, melodyType: "sine", bassType: "sine",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

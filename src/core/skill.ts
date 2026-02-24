@@ -1645,6 +1645,38 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 85,
     description: "An uppercut thrown with such force it hits airborne foes.",
   },
+  // Phase 106-108: Steel/Ghost/Psychic 4th
+  autotomize: {
+    id: "autotomize",
+    name: "Autotomize",
+    type: PokemonType.Steel,
+    power: 0,
+    pp: 14,
+    range: SkillRange.Self,
+    accuracy: 100,
+    effect: SkillEffect.AtkUp,
+    description: "Sheds heavy body parts to sharply boost Attack.",
+  },
+  shadowPunch: {
+    id: "shadowPunch",
+    name: "Shadow Punch",
+    type: PokemonType.Ghost,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front2,
+    accuracy: 100,
+    description: "A ghostly punch that never misses.",
+  },
+  expandingForce: {
+    id: "expandingForce",
+    name: "Expanding Force",
+    type: PokemonType.Psychic,
+    power: 10,
+    pp: 10,
+    range: SkillRange.Room,
+    accuracy: 90,
+    description: "Psychic power expands to hit all foes in the room.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

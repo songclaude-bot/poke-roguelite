@@ -148,6 +148,9 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     crystalCavern: [WeatherType.Sandstorm, WeatherType.Hail],
     silkWeb: [WeatherType.Rain],
     championDojo: [WeatherType.Sandstorm],
+    forgeMountain: [WeatherType.Sandstorm, WeatherType.Hail],
+    hauntedManor: [WeatherType.Hail],
+    dreamTemple: [WeatherType.Rain, WeatherType.Hail],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

@@ -247,4 +247,10 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   sizzlipede: AbilityId.FlameBody,
   pancham: AbilityId.Guts, // Iron Fist equivalent
   hawlucha: AbilityId.PurePower, // Unburden equivalent
+  durant: AbilityId.Sturdy, // Hustle equivalent
+  togedemaru: AbilityId.Static, // Iron Barbs equivalent
+  drifloon: AbilityId.Levitate, // Aftermath equivalent
+  golett: AbilityId.Sturdy, // Iron Fist equivalent
+  hatenna: AbilityId.ShieldDust, // Magic Bounce equivalent
+  indeedee: AbilityId.PurePower, // Inner Focus equivalent
 };

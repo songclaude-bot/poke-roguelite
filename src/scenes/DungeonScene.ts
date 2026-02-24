@@ -301,6 +301,10 @@ export class DungeonScene extends Phaser.Scene {
       carbink: "0703", minior: "0774",
       dewpider: "0751", sizzlipede: "0850",
       pancham: "0674", hawlucha: "0701",
+      // Phase 106-108: Steel/Ghost/Psychic 4th
+      durant: "0632", togedemaru: "0777",
+      drifloon: "0425", golett: "0622",
+      hatenna: "0856", indeedee: "0876",
     };
 
     // Load player + all enemy species + ally species for this dungeon

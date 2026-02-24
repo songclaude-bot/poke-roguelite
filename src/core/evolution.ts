@@ -151,6 +151,10 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "dewpider", to: "araquanid", level: 14, newName: "Araquanid", hpBonus: 14, atkBonus: 8, defBonus: 10, newSkillId: "lunge" },
   { from: "sizzlipede", to: "centiskorch", level: 14, newName: "Centiskorch", hpBonus: 12, atkBonus: 12, defBonus: 6, newSkillId: "fireWhip" },
   { from: "pancham", to: "pangoro", level: 14, newName: "Pangoro", hpBonus: 14, atkBonus: 12, defBonus: 4, newSkillId: "skyUppercut" },
+  // Phase 106-108: Steel/Ghost/Psychic 4th
+  { from: "drifloon", to: "drifblim", level: 14, newName: "Drifblim", hpBonus: 18, atkBonus: 6, defBonus: 4, newSkillId: "shadowBall" },
+  { from: "golett", to: "golurk", level: 16, newName: "Golurk", hpBonus: 16, atkBonus: 10, defBonus: 8, newSkillId: "phantomForce" },
+  { from: "hatenna", to: "hattrem", level: 14, newName: "Hattrem", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "expandingForce" },
 ];
 
 /** Check if a species can evolve at a given level */
