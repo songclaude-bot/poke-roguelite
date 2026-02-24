@@ -7,7 +7,7 @@ import {
 } from "../core/save-system";
 import { getHeldItem } from "../core/held-items";
 import { DUNGEONS, DungeonDef, getUnlockedDungeons, CHALLENGE_MODES } from "../core/dungeon-data";
-import { initAudio, startBgm, stopBgm } from "../core/sound-manager";
+import { initAudio, startBgm } from "../core/sound-manager";
 import { getDailyConfig, hasDailyAttempt, loadDailyScores } from "../core/daily-dungeon";
 import { getStorageItemCount, addToStorage } from "../core/crafting";
 import { SPECIES_ABILITIES, ABILITIES } from "../core/ability";
@@ -526,17 +526,9 @@ export class HubScene extends Phaser.Scene {
   }
 
   private enterDungeon(dungeonId: string) {
-    stopBgm();
-    clearDungeonSave();
-    this.meta.totalRuns++;
-    saveMeta(this.meta);
-
-    this.cameras.main.fadeOut(400, 0, 0, 0);
-    this.time.delayedCall(450, () => {
-      this.scene.start("DungeonScene", {
-        floor: 1, fromHub: true, dungeonId,
-        starter: this.meta.starter ?? "mudkip",
-      });
+    this.scene.start("DungeonPreviewScene", {
+      dungeonId,
+      meta: this.meta,
     });
   }
 
@@ -550,18 +542,10 @@ export class HubScene extends Phaser.Scene {
   }
 
   private enterDungeonWithChallenge(dungeonId: string, challengeMode: string) {
-    stopBgm();
-    clearDungeonSave();
-    this.meta.totalRuns++;
-    saveMeta(this.meta);
-
-    this.cameras.main.fadeOut(400, 0, 0, 0);
-    this.time.delayedCall(450, () => {
-      this.scene.start("DungeonScene", {
-        floor: 1, fromHub: true, dungeonId,
-        starter: this.meta.starter ?? "mudkip",
-        challengeMode,
-      });
+    this.scene.start("DungeonPreviewScene", {
+      dungeonId,
+      meta: this.meta,
+      challengeMode,
     });
   }
 

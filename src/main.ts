@@ -10,6 +10,7 @@ import { HeldItemScene } from "./scenes/HeldItemScene";
 import { CraftingScene } from "./scenes/CraftingScene";
 import { HelpScene } from "./scenes/HelpScene";
 import { AbilityUpgradeScene } from "./scenes/AbilityUpgradeScene";
+import { DungeonPreviewScene } from "./scenes/DungeonPreviewScene";
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from "./config";
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -26,7 +27,7 @@ const config: Phaser.Types.Core.GameConfig = {
   render: {
     preserveDrawingBuffer: true,
   },
-  scene: [BootScene, HubScene, DungeonScene, UpgradeScene, AchievementScene, PokedexScene, MoveTutorScene, HeldItemScene, CraftingScene, HelpScene, AbilityUpgradeScene],
+  scene: [BootScene, HubScene, DungeonPreviewScene, DungeonScene, UpgradeScene, AchievementScene, PokedexScene, MoveTutorScene, HeldItemScene, CraftingScene, HelpScene, AbilityUpgradeScene],
 };
 
 const game = new Phaser.Game(config);
