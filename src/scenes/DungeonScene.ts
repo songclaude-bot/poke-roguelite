@@ -64,7 +64,7 @@ import {
   getBgmVolume, getSfxVolume, setBgmVolume, setSfxVolume,
 } from "../core/sound-manager";
 import { DungeonEvent, EventChoice, rollDungeonEvent } from "../core/dungeon-events";
-import { FloorTheme, getDepthAdjustedTheme } from "../core/floor-themes";
+import { FloorTheme, getDepthAdjustedTheme, darkenColor } from "../core/floor-themes";
 import { addToStorage } from "../core/crafting";
 
 interface AllyData {
@@ -139,11 +139,26 @@ export class DungeonScene extends Phaser.Scene {
   private minimapHitZone!: Phaser.GameObjects.Zone;
   private minimapLegendTexts: Phaser.GameObjects.Text[] = [];
   private visited!: boolean[][];
+  private currentlyVisible!: boolean[][]; // tiles currently in player's sight
   private readonly MINIMAP_TILE_SMALL = 3; // px per tile (small mode)
   private readonly MINIMAP_TILE_LARGE = 7; // px per tile (large mode)
+  private readonly MINIMAP_TILE_FULLMAP = 4; // px per tile (full map overlay)
   private readonly MINIMAP_X_SMALL = GAME_WIDTH - 80; // top-right
   private readonly MINIMAP_Y_SMALL = 4;
   // Large mode positions computed dynamically (centered)
+
+  // Exploration percentage
+  private explorationText!: Phaser.GameObjects.Text;
+
+  // Full map overlay
+  private fullMapOpen = false;
+  private fullMapOverlayBg: Phaser.GameObjects.Graphics | null = null;
+  private fullMapGfx: Phaser.GameObjects.Graphics | null = null;
+  private fullMapCloseZone: Phaser.GameObjects.Zone | null = null;
+  private fullMapUI: Phaser.GameObjects.GameObject[] = [];
+
+  // MAP button (near minimap)
+  private mapButton!: Phaser.GameObjects.Text;
 
   // HP Bar graphics
   private hpBarBg!: Phaser.GameObjects.Graphics;
@@ -452,6 +467,11 @@ export class DungeonScene extends Phaser.Scene {
     this.autoExploreTimer = null;
     this.autoExploreText = null;
     this.autoExploreTween = null;
+    this.fullMapOpen = false;
+    this.fullMapOverlayBg = null;
+    this.fullMapGfx = null;
+    this.fullMapCloseZone = null;
+    this.fullMapUI = [];
     // Speed run timer: carry over elapsed time from previous floors, or start fresh
     this.runElapsedSeconds = data?.runElapsedTime ?? 0;
     this.timerEvent = null;
@@ -1434,6 +1454,7 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Fog of War ──
     this.visited = Array.from({ length: height }, () => new Array(width).fill(false));
+    this.currentlyVisible = Array.from({ length: height }, () => new Array(width).fill(false));
     this.revealArea(playerStart.x, playerStart.y, 4);
 
     // ── Camera ──
@@ -1502,7 +1523,7 @@ export class DungeonScene extends Phaser.Scene {
       callback: () => {
         // Don't count time when game is over or menus/overlays are open
         if (this.gameOver) return;
-        if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.teamPanelOpen) return;
+        if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.teamPanelOpen || this.fullMapOpen) return;
         this.runElapsedSeconds++;
         this.timerText.setText(this.formatTime(this.runElapsedSeconds));
       },
@@ -1631,6 +1652,22 @@ export class DungeonScene extends Phaser.Scene {
       this.updateMinimap();
     });
 
+    // ── MAP button (top-right, near minimap) ──
+    this.fullMapOpen = false;
+    this.fullMapUI = [];
+    this.mapButton = this.add.text(
+      this.MINIMAP_X_SMALL - 2, this.MINIMAP_Y_SMALL + height * this.MINIMAP_TILE_SMALL + 10,
+      "MAP",
+      {
+        fontSize: "8px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
+        backgroundColor: "#1a1a2ecc", padding: { x: 4, y: 2 },
+      }
+    ).setScrollFactor(0).setDepth(110).setInteractive();
+    this.mapButton.on("pointerdown", () => {
+      if (this.fullMapOpen) return;
+      this.openFullMap();
+    });
+
     // ── Skill Buttons ──
     // ── Virtual D-Pad (bottom-left) ──
     this.createDPad();
@@ -1650,7 +1687,7 @@ export class DungeonScene extends Phaser.Scene {
     this.add.text(menuCX + 22, menuCY - 5, "⏳", iconStyle)
       .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
       .on("pointerdown", () => {
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.fullMapOpen) return;
         this.turnManager.executeTurn(
           () => Promise.resolve(),
           [...this.getAllyActions(), ...this.getEnemyActions()]
@@ -1797,7 +1834,7 @@ export class DungeonScene extends Phaser.Scene {
 
       btn.on("pointerdown", () => {
         if (this.autoExploring) { this.stopAutoExplore("Stopped."); return; }
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen) return;
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen) return;
         txt.setColor("#fbbf24");
         this.time.delayedCall(150, () => txt.setColor("#8899bb"));
         this.handlePlayerAction(d.dir);
@@ -1815,7 +1852,7 @@ export class DungeonScene extends Phaser.Scene {
 
     waitBtn.on("pointerdown", () => {
       if (this.autoExploring) { this.stopAutoExplore("Stopped."); return; }
-      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen) return;
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen) return;
       waitTxt.setAlpha(0.5);
       this.time.delayedCall(150, () => waitTxt.setAlpha(1));
       this.turnManager.executeTurn(
@@ -1879,7 +1916,7 @@ export class DungeonScene extends Phaser.Scene {
       }).setScrollFactor(0).setDepth(110).setInteractive();
 
       btn.on("pointerdown", () => {
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.fullMapOpen) return;
         if (!skill || skill.currentPp <= 0) {
           this.showLog("No PP left!");
           return;
@@ -1984,12 +2021,33 @@ export class DungeonScene extends Phaser.Scene {
   /** Reveal tiles around a point (Chebyshev distance) */
   private revealArea(cx: number, cy: number, radius: number) {
     const { width, height } = this.dungeon;
+    // Reset currentlyVisible for fresh computation
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        this.currentlyVisible[y][x] = false;
+      }
+    }
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
         const nx = cx + dx;
         const ny = cy + dy;
         if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
           this.visited[ny][nx] = true;
+          this.currentlyVisible[ny][nx] = true;
+        }
+      }
+    }
+    // Also mark tiles around allies as currently visible
+    for (const a of this.allies) {
+      if (!a.alive) continue;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const nx = a.tileX + dx;
+          const ny = a.tileY + dy;
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+            this.currentlyVisible[ny][nx] = true;
+            this.visited[ny][nx] = true;
+          }
         }
       }
     }
@@ -2025,39 +2083,31 @@ export class DungeonScene extends Phaser.Scene {
     this.updateMinimap();
   }
 
-  private updateMinimap() {
-    if (!this.minimapVisible) return;
+  /** Draw minimap terrain and entities onto a graphics object at given position/scale */
+  private drawMinimapContent(
+    gfx: Phaser.GameObjects.Graphics,
+    t: number, mx: number, my: number,
+    expanded: boolean
+  ) {
     const { width, height, terrain } = this.dungeon;
-    const { t, mx, my, totalW, totalH } = this.getMinimapParams();
-    const expanded = this.minimapExpanded;
-    const pad = 4; // padding around minimap
-
-    // Reveal area around player each update
-    this.revealArea(this.player.tileX, this.player.tileY, 4);
-
-    // ── Background (themed) ──
-    this.minimapBg.clear();
-    this.minimapBg.fillStyle(this.currentTheme.fogColor, expanded ? 0.88 : 0.75);
-    this.minimapBg.fillRoundedRect(mx - pad, my - pad, totalW + pad * 2, totalH + pad * 2, 4);
-
-    // ── Border ──
-    this.minimapBorder.clear();
-    this.minimapBorder.lineStyle(1, expanded ? 0x5566aa : 0x334466, expanded ? 0.9 : 0.6);
-    this.minimapBorder.strokeRoundedRect(mx - pad, my - pad, totalW + pad * 2, totalH + pad * 2, 4);
-
-    // ── Terrain (themed minimap colors) ──
-    this.minimapGfx.clear();
     const minimapFloorColor = this.currentTheme.floorColor;
-    const minimapFogColor = this.currentTheme.fogColor;
+    const dimFloorColor = darkenColor(minimapFloorColor, 0.35);
+
+    // ── Terrain with fog of war ──
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         if (terrain[y][x] === TerrainType.GROUND) {
-          if (this.visited[y][x]) {
-            this.minimapGfx.fillStyle(minimapFloorColor, 0.8);
+          if (this.currentlyVisible[y][x]) {
+            // Currently in player's sight — full brightness
+            gfx.fillStyle(minimapFloorColor, 0.9);
+          } else if (this.visited[y][x]) {
+            // Previously explored but out of sight — dim/dark gray
+            gfx.fillStyle(dimFloorColor, 0.6);
           } else {
-            this.minimapGfx.fillStyle(minimapFogColor, 0.5);
+            // Unexplored — completely dark (skip drawing, bg is already black)
+            continue;
           }
-          this.minimapGfx.fillRect(mx + x * t, my + y * t, t, t);
+          gfx.fillRect(mx + x * t, my + y * t, t, t);
         }
       }
     }
@@ -2065,7 +2115,6 @@ export class DungeonScene extends Phaser.Scene {
     // ── Shop room outline (gold border) ──
     if (this.shopRoom) {
       const sr = this.shopRoom;
-      // Only show if any tile in the shop room has been visited
       let shopVisible = false;
       for (let sy = sr.y; sy < sr.y + sr.h && !shopVisible; sy++) {
         for (let sx = sr.x; sx < sr.x + sr.w && !shopVisible; sx++) {
@@ -2073,15 +2122,15 @@ export class DungeonScene extends Phaser.Scene {
         }
       }
       if (shopVisible) {
-        this.minimapGfx.lineStyle(expanded ? 2 : 1, 0xfbbf24, 0.8);
-        this.minimapGfx.strokeRect(
+        gfx.lineStyle(expanded ? 2 : 1, 0xfbbf24, 0.8);
+        gfx.strokeRect(
           mx + sr.x * t - 1, my + sr.y * t - 1,
           sr.w * t + 2, sr.h * t + 2
         );
       }
     }
 
-    // ── Event room outline (cyan border with "!" indicator) ──
+    // ── Event room outline (cyan border) ──
     if (this.eventRoom && !this.eventTriggered) {
       const er = this.eventRoom;
       let eventVisible = false;
@@ -2091,72 +2140,155 @@ export class DungeonScene extends Phaser.Scene {
         }
       }
       if (eventVisible) {
-        this.minimapGfx.lineStyle(expanded ? 2 : 1, 0x22d3ee, 0.8);
-        this.minimapGfx.strokeRect(
+        gfx.lineStyle(expanded ? 2 : 1, 0x22d3ee, 0.8);
+        gfx.strokeRect(
           mx + er.x * t - 1, my + er.y * t - 1,
           er.w * t + 2, er.h * t + 2
         );
       }
     }
 
-    // ── Stairs (gold, only if visited) ──
+    // ── Stairs (blue dot, only if visited) ──
     const { stairsPos } = this.dungeon;
     if (this.visited[stairsPos.y]?.[stairsPos.x]) {
-      this.minimapGfx.fillStyle(0xfbbf24, 1);
+      gfx.fillStyle(0x60a5fa, 1);
       const sp = expanded ? 1 : 0;
-      this.minimapGfx.fillRect(
+      gfx.fillRect(
         mx + stairsPos.x * t - sp, my + stairsPos.y * t - sp,
         t + sp * 2, t + sp * 2
       );
     }
 
     // ── Floor items (yellow dots, only in visited tiles) ──
-    this.minimapGfx.fillStyle(0xfde047, 1);
+    gfx.fillStyle(0xfde047, 1);
     for (const fi of this.floorItems) {
       if (this.visited[fi.y]?.[fi.x]) {
-        this.minimapGfx.fillRect(mx + fi.x * t, my + fi.y * t, t, t);
+        gfx.fillRect(mx + fi.x * t, my + fi.y * t, t, t);
       }
     }
 
-    // ── Revealed traps (colored dots based on trap type) ──
+    // ── Revealed traps ──
     for (const tr of this.floorTraps) {
       if (tr.revealed) {
-        this.minimapGfx.fillStyle(tr.trap.hexColor, 1);
-        this.minimapGfx.fillRect(mx + tr.x * t, my + tr.y * t, t, t);
+        gfx.fillStyle(tr.trap.hexColor, 1);
+        gfx.fillRect(mx + tr.x * t, my + tr.y * t, t, t);
       }
     }
 
-    // ── Enemies (red dots, boss = larger, only in visited tiles) ──
+    // ── Enemies (red dots, only currently visible) ──
     for (const e of this.enemies) {
-      if (e.alive && this.visited[e.tileY]?.[e.tileX]) {
+      if (e.alive && this.currentlyVisible[e.tileY]?.[e.tileX]) {
         if (e.isBoss) {
-          this.minimapGfx.fillStyle(0xff2222, 1);
-          this.minimapGfx.fillRect(mx + e.tileX * t - 1, my + e.tileY * t - 1, t + 2, t + 2);
+          gfx.fillStyle(0xff2222, 1);
+          gfx.fillRect(mx + e.tileX * t - 1, my + e.tileY * t - 1, t + 2, t + 2);
         } else {
-          this.minimapGfx.fillStyle(0xef4444, 1);
-          this.minimapGfx.fillRect(mx + e.tileX * t, my + e.tileY * t, t, t);
+          gfx.fillStyle(0xef4444, 1);
+          gfx.fillRect(mx + e.tileX * t, my + e.tileY * t, t, t);
         }
       }
     }
 
     // ── Allies (green dots) ──
-    this.minimapGfx.fillStyle(0x4ade80, 1);
+    gfx.fillStyle(0x4ade80, 1);
     for (const a of this.allies) {
       if (a.alive) {
-        this.minimapGfx.fillRect(mx + a.tileX * t, my + a.tileY * t, t, t);
+        gfx.fillRect(mx + a.tileX * t, my + a.tileY * t, t, t);
       }
     }
 
-    // ── Player (blue dot, slightly larger) ──
-    this.minimapGfx.fillStyle(0x60a5fa, 1);
-    this.minimapGfx.fillRect(
+    // ── Player (green dot, slightly larger) ──
+    gfx.fillStyle(0x4ade80, 1);
+    gfx.fillRect(
       mx + this.player.tileX * t - 1,
       my + this.player.tileY * t - 1,
       t + 2, t + 2
     );
+  }
 
-    // ── Legend (only in expanded mode) ──
+  /** Calculate exploration percentage */
+  private getExplorationPercent(): number {
+    const { width, height, terrain } = this.dungeon;
+    let totalWalkable = 0;
+    let explored = 0;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (terrain[y][x] === TerrainType.GROUND) {
+          totalWalkable++;
+          if (this.visited[y][x]) explored++;
+        }
+      }
+    }
+    return totalWalkable > 0 ? Math.floor((explored / totalWalkable) * 100) : 0;
+  }
+
+  private updateMinimap() {
+    if (!this.minimapVisible) return;
+    const { width, height } = this.dungeon;
+    const { t, mx, my, totalW, totalH } = this.getMinimapParams();
+    const expanded = this.minimapExpanded;
+    const pad = 4;
+
+    // Reveal area around player each update
+    this.revealArea(this.player.tileX, this.player.tileY, 4);
+
+    // ── Background (themed) ──
+    this.minimapBg.clear();
+    this.minimapBg.fillStyle(0x000000, expanded ? 0.92 : 0.85);
+    this.minimapBg.fillRoundedRect(mx - pad, my - pad, totalW + pad * 2, totalH + pad * 2, 4);
+
+    // ── Border ──
+    this.minimapBorder.clear();
+    this.minimapBorder.lineStyle(1, expanded ? 0x5566aa : 0x334466, expanded ? 0.9 : 0.6);
+    this.minimapBorder.strokeRoundedRect(mx - pad, my - pad, totalW + pad * 2, totalH + pad * 2, 4);
+
+    // ── Draw minimap content ──
+    this.minimapGfx.clear();
+    this.drawMinimapContent(this.minimapGfx, t, mx, my, expanded);
+
+    // ── Legend + Exploration % ──
     this.updateMinimapLegend(expanded, mx, my, totalW, totalH, pad);
+
+    // ── Exploration percentage text ──
+    this.updateExplorationText(mx, my, totalW, totalH, pad);
+
+    // ── Update full map overlay if open ──
+    if (this.fullMapOpen) {
+      this.drawFullMapOverlay();
+    }
+  }
+
+  /** Update exploration percentage text below minimap */
+  private updateExplorationText(
+    mx: number, my: number,
+    totalW: number, totalH: number, pad: number
+  ) {
+    const pct = this.getExplorationPercent();
+    const expanded = this.minimapExpanded;
+
+    // Position below minimap (or below legend if expanded)
+    let textY = my + totalH + pad + 2;
+    if (expanded) {
+      // Legend takes extra space in expanded mode
+      textY += 30;
+    }
+
+    if (!this.explorationText || !this.explorationText.scene) {
+      this.explorationText = this.add.text(0, 0, "", {
+        fontSize: "7px", fontFamily: "monospace", color: "#aab0c8",
+      }).setScrollFactor(0).setDepth(102);
+    }
+
+    if (pct >= 100) {
+      this.explorationText.setText("FULLY EXPLORED");
+      this.explorationText.setColor("#fbbf24");
+    } else {
+      this.explorationText.setText(`Explored: ${pct}%`);
+      this.explorationText.setColor("#aab0c8");
+    }
+
+    this.explorationText.setPosition(mx + totalW / 2, textY);
+    this.explorationText.setOrigin(0.5, 0);
+    this.explorationText.setVisible(!expanded); // only show in compact mode; expanded has its own
   }
 
   private updateMinimapLegend(
@@ -2167,47 +2299,201 @@ export class DungeonScene extends Phaser.Scene {
     for (const lt of this.minimapLegendTexts) lt.destroy();
     this.minimapLegendTexts = [];
 
-    if (!show) return;
+    if (show) {
+      // ── Expanded mode: full legend below the map ──
+      const legendY = my + totalH + pad + 4;
+      const legendStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+        fontSize: "8px", fontFamily: "monospace", color: "#aab0c8",
+      };
+      const entries: { color: string; label: string }[] = [
+        { color: "#4ade80", label: "You" },
+        { color: "#4ade80", label: "Ally" },
+        { color: "#ef4444", label: "Foe" },
+        { color: "#fde047", label: "Item" },
+        { color: "#60a5fa", label: "Stairs" },
+        { color: "#a855f7", label: "Trap" },
+      ];
 
-    const legendY = my + totalH + pad + 4;
-    const legendStyle: Phaser.Types.GameObjects.Text.TextStyle = {
-      fontSize: "8px", fontFamily: "monospace", color: "#aab0c8",
-    };
-    const entries: { color: string; label: string }[] = [
-      { color: "#60a5fa", label: "You" },
-      { color: "#4ade80", label: "Ally" },
-      { color: "#ef4444", label: "Foe" },
-      { color: "#fde047", label: "Item" },
-      { color: "#fbbf24", label: "Stairs" },
-      { color: "#a855f7", label: "Trap" },
-    ];
+      const entryWidth = 42;
+      const cols = 3;
+      const rows = Math.ceil(entries.length / cols);
+      const gridW = cols * entryWidth;
+      const startX = mx + Math.floor((totalW - gridW) / 2);
 
-    // Lay out entries horizontally centered under the minimap
-    const entryWidth = 42;
-    const cols = 3;
-    const rows = Math.ceil(entries.length / cols);
-    const gridW = cols * entryWidth;
-    const startX = mx + Math.floor((totalW - gridW) / 2);
+      for (let i = 0; i < entries.length; i++) {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const ex = startX + col * entryWidth;
+        const ey = legendY + row * 12;
+        const { color, label } = entries[i];
+        const txt = this.add.text(ex, ey, `\u25CF ${label}`, {
+          ...legendStyle, color,
+        }).setScrollFactor(0).setDepth(102);
+        this.minimapLegendTexts.push(txt);
+      }
 
-    for (let i = 0; i < entries.length; i++) {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const ex = startX + col * entryWidth;
-      const ey = legendY + row * 12;
-      const { color, label } = entries[i];
-      const txt = this.add.text(ex, ey, `\u25CF ${label}`, {
-        ...legendStyle, color,
-      }).setScrollFactor(0).setDepth(102);
-      this.minimapLegendTexts.push(txt);
+      // Exploration % in expanded mode
+      const pct = this.getExplorationPercent();
+      const pctColor = pct >= 100 ? "#fbbf24" : "#aab0c8";
+      const pctLabel = pct >= 100 ? "FULLY EXPLORED" : `Explored: ${pct}%`;
+      const pctTxt = this.add.text(
+        mx + totalW / 2, legendY + rows * 12 + 2,
+        pctLabel,
+        { fontSize: "8px", fontFamily: "monospace", color: pctColor, fontStyle: pct >= 100 ? "bold" : "normal" }
+      ).setOrigin(0.5, 0).setScrollFactor(0).setDepth(102);
+      this.minimapLegendTexts.push(pctTxt);
+
+      // "Tap to close" hint
+      const hintTxt = this.add.text(
+        mx + totalW / 2, legendY + rows * 12 + 14,
+        "tap map to close",
+        { fontSize: "7px", fontFamily: "monospace", color: "#555570" }
+      ).setOrigin(0.5, 0).setScrollFactor(0).setDepth(102);
+      this.minimapLegendTexts.push(hintTxt);
+    } else {
+      // ── Compact mode: small colored dots in minimap corner as legend ──
+      const dotEntries: { color: number; }[] = [
+        { color: 0x4ade80 },  // Player/Ally (green)
+        { color: 0xef4444 },  // Enemy (red)
+        { color: 0xfde047 },  // Item (yellow)
+        { color: 0x60a5fa },  // Stairs (blue)
+      ];
+      const dotSize = 3;
+      const dotGap = 5;
+      const dotStartX = mx + totalW - (dotEntries.length * dotGap) + 1;
+      const dotY = my + totalH + pad + 1;
+
+      // Use a small text as container for legend dots
+      for (let i = 0; i < dotEntries.length; i++) {
+        const dx = dotStartX + i * dotGap;
+        const colorHex = "#" + dotEntries[i].color.toString(16).padStart(6, "0");
+        const dot = this.add.text(dx, dotY, "\u25CF", {
+          fontSize: "5px", fontFamily: "monospace", color: colorHex,
+        }).setScrollFactor(0).setDepth(102);
+        this.minimapLegendTexts.push(dot);
+      }
     }
+  }
+
+  /** Open the full-screen map overlay */
+  private openFullMap() {
+    if (this.fullMapOpen) return;
+    this.fullMapOpen = true;
+
+    // Turns are paused via fullMapOpen guard checks on all input handlers
+
+    const overlayDepth = 500;
+
+    // Semi-transparent dark background
+    this.fullMapOverlayBg = this.add.graphics().setScrollFactor(0).setDepth(overlayDepth);
+    this.fullMapOverlayBg.fillStyle(0x000000, 0.85);
+    this.fullMapOverlayBg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+    // Full map graphics
+    this.fullMapGfx = this.add.graphics().setScrollFactor(0).setDepth(overlayDepth + 1);
+
+    // Draw the full map
+    this.drawFullMapOverlay();
+
+    // Title
+    const titleTxt = this.add.text(
+      GAME_WIDTH / 2, 12, `${this.dungeonDef.name} B${this.currentFloor}F`,
+      { fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold" }
+    ).setOrigin(0.5).setScrollFactor(0).setDepth(overlayDepth + 2);
+    this.fullMapUI.push(titleTxt);
+
+    // Legend at the bottom
+    const legendY = GAME_HEIGHT - 40;
+    const legendEntries: { color: string; label: string }[] = [
+      { color: "#4ade80", label: "Player" },
+      { color: "#ef4444", label: "Enemy" },
+      { color: "#fde047", label: "Item" },
+      { color: "#60a5fa", label: "Stairs" },
+    ];
+    const legendStartX = GAME_WIDTH / 2 - (legendEntries.length * 45) / 2;
+    for (let i = 0; i < legendEntries.length; i++) {
+      const { color, label } = legendEntries[i];
+      const lt = this.add.text(
+        legendStartX + i * 45, legendY,
+        `\u25CF ${label}`,
+        { fontSize: "8px", fontFamily: "monospace", color }
+      ).setScrollFactor(0).setDepth(overlayDepth + 2);
+      this.fullMapUI.push(lt);
+    }
+
+    // Exploration %
+    const pct = this.getExplorationPercent();
+    const pctColor = pct >= 100 ? "#fbbf24" : "#aab0c8";
+    const pctLabel = pct >= 100 ? "FULLY EXPLORED" : `Explored: ${pct}%`;
+    const pctTxt = this.add.text(
+      GAME_WIDTH / 2, legendY + 14, pctLabel,
+      { fontSize: "8px", fontFamily: "monospace", color: pctColor, fontStyle: pct >= 100 ? "bold" : "normal" }
+    ).setOrigin(0.5, 0).setScrollFactor(0).setDepth(overlayDepth + 2);
+    this.fullMapUI.push(pctTxt);
 
     // "Tap to close" hint
     const hintTxt = this.add.text(
-      mx + totalW / 2, legendY + rows * 12 + 2,
-      "tap map to close",
+      GAME_WIDTH / 2, GAME_HEIGHT - 10,
+      "tap anywhere to close",
       { fontSize: "7px", fontFamily: "monospace", color: "#555570" }
-    ).setOrigin(0.5, 0).setScrollFactor(0).setDepth(102);
-    this.minimapLegendTexts.push(hintTxt);
+    ).setOrigin(0.5).setScrollFactor(0).setDepth(overlayDepth + 2);
+    this.fullMapUI.push(hintTxt);
+
+    // Close zone (covers full screen)
+    this.fullMapCloseZone = this.add.zone(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT
+    ).setScrollFactor(0).setDepth(overlayDepth + 3).setInteractive();
+    this.fullMapCloseZone.on("pointerdown", () => {
+      this.closeFullMap();
+    });
+  }
+
+  /** Draw the full map overlay content */
+  private drawFullMapOverlay() {
+    if (!this.fullMapGfx) return;
+    this.fullMapGfx.clear();
+
+    const { width, height } = this.dungeon;
+    const t = this.MINIMAP_TILE_FULLMAP; // 4px per tile
+    const totalW = width * t;
+    const totalH = height * t;
+    const mx = Math.floor((GAME_WIDTH - totalW) / 2);
+    const my = Math.floor((GAME_HEIGHT - totalH) / 2);
+
+    // Dark background for the map area
+    this.fullMapGfx.fillStyle(0x111122, 0.9);
+    this.fullMapGfx.fillRoundedRect(mx - 4, my - 4, totalW + 8, totalH + 8, 4);
+    this.fullMapGfx.lineStyle(1, 0x5566aa, 0.8);
+    this.fullMapGfx.strokeRoundedRect(mx - 4, my - 4, totalW + 8, totalH + 8, 4);
+
+    // Draw content using shared method
+    this.drawMinimapContent(this.fullMapGfx, t, mx, my, true);
+  }
+
+  /** Close the full-screen map overlay */
+  private closeFullMap() {
+    if (!this.fullMapOpen) return;
+    this.fullMapOpen = false;
+
+    // Turns resume automatically since fullMapOpen guard is cleared
+
+    // Destroy overlay elements
+    if (this.fullMapOverlayBg) {
+      this.fullMapOverlayBg.destroy();
+      this.fullMapOverlayBg = null;
+    }
+    if (this.fullMapGfx) {
+      this.fullMapGfx.destroy();
+      this.fullMapGfx = null;
+    }
+    if (this.fullMapCloseZone) {
+      this.fullMapCloseZone.destroy();
+      this.fullMapCloseZone = null;
+    }
+    for (const obj of this.fullMapUI) {
+      if (obj && (obj as any).destroy) (obj as any).destroy();
+    }
+    this.fullMapUI = [];
   }
 
   private updateHUD() {
@@ -2295,7 +2581,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeMenu();
       return;
     }
-    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen) return;
+    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen) return;
 
     sfxMenuOpen();
     this.menuOpen = true;
@@ -2357,7 +2643,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeTeamPanel();
       return;
     }
-    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.gameOver) return;
+    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.gameOver || this.fullMapOpen) return;
 
     const liveAllies = this.allies.filter(a => a.alive);
     if (liveAllies.length === 0) {
@@ -2915,7 +3201,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private openBag() {
-    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen) return;
+    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen) return;
     sfxMenuOpen();
     this.bagOpen = true;
 
@@ -4575,6 +4861,7 @@ export class DungeonScene extends Phaser.Scene {
         for (let fy = 0; fy < height; fy++) {
           for (let fx = 0; fx < width; fx++) {
             this.visited[fy][fx] = true;
+            this.currentlyVisible[fy][fx] = true;
           }
         }
         // Reveal all traps too
@@ -6581,7 +6868,7 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (this.turnManager.isBusy || !this.player.alive || this.gameOver ||
-        this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen) return;
+        this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen) return;
 
     // Check stop conditions before even starting
     const preCheck = this.checkAutoExploreStop();
