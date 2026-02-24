@@ -259,6 +259,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [165, 165, 220, 220, 247, 247, 196, 196, 165, 165, 175, 175, 220, 220, 196, 196],
     tempo: 0.28, melodyType: "triangle", bassType: "sine",
   },
+  // Toxic Swamp — murky, unsettling
+  toxicSwamp: {
+    melody: [220, 247, 262, 220, 196, 220, 247, 294, 262, 220, 196, 175, 196, 220, 247, 220],
+    bass: [110, 110, 131, 131, 98, 98, 123, 123, 131, 131, 110, 110, 98, 98, 110, 110],
+    tempo: 0.28, melodyType: "sawtooth", bassType: "triangle",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

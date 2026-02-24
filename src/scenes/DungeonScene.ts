@@ -240,6 +240,7 @@ export class DungeonScene extends Phaser.Scene {
       numel: "0322", slugma: "0218", torkoal: "0324",
       murkrow: "0198", sableye: "0302", absol: "0359",
       chikorita: "0152", bellsprout: "0069", shroomish: "0285",
+      grimer: "0088", nidoranM: "0032", tentacool: "0072",
     };
 
     // Load player + all enemy species + ally species for this dungeon

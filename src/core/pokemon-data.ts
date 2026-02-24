@@ -386,6 +386,45 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["absorb", "seedBomb", "tackle"],
     floors: [],
   },
+  grimer: {
+    id: "grimer",
+    name: "Grimer",
+    spriteKey: "grimer",
+    types: [PokemonType.Poison],
+    attackType: PokemonType.Poison,
+    baseStats: { hp: 35, atk: 10, def: 6 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 6, idleFrames: 4,
+    skillIds: ["poisonSting", "sludgeBomb", "tackle"],
+    floors: [],
+  },
+  nidoranM: {
+    id: "nidoranM",
+    name: "Nidoran♂",
+    spriteKey: "nidoranM",
+    types: [PokemonType.Poison],
+    attackType: PokemonType.Poison,
+    baseStats: { hp: 28, atk: 12, def: 5 },
+    walkFrameWidth: 40, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 6, idleFrames: 5,
+    skillIds: ["poisonSting", "acidSpray", "tackle"],
+    floors: [],
+  },
+  tentacool: {
+    id: "tentacool",
+    name: "Tentacool",
+    spriteKey: "tentacool",
+    types: [PokemonType.Water, PokemonType.Poison],
+    attackType: PokemonType.Poison,
+    baseStats: { hp: 30, atk: 11, def: 5 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 7,
+    skillIds: ["poisonSting", "waterPulse", "acidSpray"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -429,6 +468,9 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   chikorita: { 7: "vineWhip", 10: "razorLeaf" },
   bellsprout: { 7: "absorb", 10: "sleepPowder" },
   shroomish: { 7: "seedBomb", 10: "absorb" },
+  grimer: { 7: "sludgeBomb", 10: "toxicSpikes" },
+  nidoranM: { 7: "acidSpray", 10: "venoshock" },
+  tentacool: { 7: "acidSpray", 10: "sludgeBomb" },
 };
 
 /** Check if a species learns a new skill at this level */

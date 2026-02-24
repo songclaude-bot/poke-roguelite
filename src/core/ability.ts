@@ -122,4 +122,7 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   chikorita: AbilityId.Torrent, // Overgrow equivalent
   bellsprout: AbilityId.NoGuard,
   shroomish: AbilityId.ShieldDust,
+  grimer: AbilityId.Guts,
+  nidoranM: AbilityId.PurePower,
+  tentacool: AbilityId.SwiftSwim,
 };
