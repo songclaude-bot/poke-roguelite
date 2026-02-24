@@ -1167,3 +1167,28 @@
 - **New Game Plus**: 5단계 프레스티지 + 누적 보너스
 - **스킬 콤보**: 10종 콤보 + 5종 효과
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 24: 동료 전술 + 이벤트 룸
+
+### 24-1. 동료 명령 시스템 (Phase 248)
+- 날짜: 2026-02-24
+- 4종 전술: FollowMe, GoAfterFoes, StayHere, Scatter
+- Team 패널: 동료별 HP바 + 전술 버튼
+- GoAfterFoes: BFS 8타일 적 추적
+- StayHere: 위치 고정, 인접만 공격
+- Scatter: 랜덤 탐색 이동
+
+### 24-2. 던전 이벤트 룸 (Phase 249)
+- 날짜: 2026-02-24
+- 8종 이벤트: Wishing Well, Abandoned Stash, Mysterious Statue 등
+- 20% 층 확률, 가중치 희귀도, 최소 층수 요구
+- 선택지 UI 오버레이 + 효과 설명
+- 효과: 힐, 버프, 아이템, EXP, 동료 소환, 미니맵 공개
+- 미니맵 청록 테두리, 펄싱 "!" 마커
+
+### v3.2.0 마일스톤
+- **동료 전술**: 4종 명령 + Team 패널
+- **이벤트 룸**: 8종 랜덤 이벤트 + 선택지 시스템
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
