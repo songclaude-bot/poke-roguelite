@@ -174,7 +174,7 @@ export class HubScene extends Phaser.Scene {
     const currentStarter = this.meta.starter ?? "mudkip";
     const starterName = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
 
-    const fixedY = GAME_HEIGHT - 152;
+    const fixedY = GAME_HEIGHT - 186;
     // Solid background behind fixed buttons — covers from scroll end to bottom
     const fixedBgTop = fixedY - 30;
     const fixedBgH = GAME_HEIGHT - fixedBgTop;
@@ -190,12 +190,16 @@ export class HubScene extends Phaser.Scene {
       "Upgrade Shop", `Gold: ${this.meta.gold}`, "#fbbf24",
       () => this.scene.start("UpgradeScene")
     );
-    const seenCount = (this.meta.pokemonSeen ?? []).length;
     this.createFixedButton(GAME_WIDTH / 2, fixedY + 68, btnW, 30,
+      "Move Tutor", "Teach new skills!", "#a855f7",
+      () => this.scene.start("MoveTutorScene")
+    );
+    const seenCount = (this.meta.pokemonSeen ?? []).length;
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + 102, btnW, 30,
       "Pokedex", `Seen: ${seenCount} Pokemon`, "#e879f9",
       () => this.scene.start("PokedexScene")
     );
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + 102, btnW, 30,
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + 136, btnW, 30,
       "Records", `Clears: ${this.meta.totalClears}  Best: B${this.meta.bestFloor}F`, "#60a5fa",
       () => this.scene.start("AchievementScene")
     );

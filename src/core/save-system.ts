@@ -60,6 +60,8 @@ export interface MetaSaveData {
   // Pokedex tracking
   pokemonSeen: string[];   // species IDs the player has seen (fought or used)
   pokemonUsed: string[];   // species IDs the player has used as starter
+  // Move Tutor: custom skill loadouts per starter
+  customSkills?: Record<string, string[]>; // starterId -> [skillId, skillId, ...]
 }
 
 const SAVE_VERSION = 1;
@@ -130,6 +132,7 @@ export function loadMeta(): MetaSaveData {
     if (data.startersUsed === undefined) data.startersUsed = [];
     if (data.pokemonSeen === undefined) data.pokemonSeen = [];
     if (data.pokemonUsed === undefined) data.pokemonUsed = [];
+    if (data.customSkills === undefined) data.customSkills = {};
     return data;
   } catch {
     return defaultMeta();

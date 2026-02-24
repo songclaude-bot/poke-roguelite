@@ -664,7 +664,20 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Player entity ──
     const playerSp = SPECIES[this.starterId] ?? SPECIES.mudkip;
-    const playerSkills = this.persistentSkills ?? createSpeciesSkills(playerSp);
+    // Use tutor-taught custom skills if available, otherwise default species skills
+    let playerSkills = this.persistentSkills;
+    if (!playerSkills) {
+      const meta = loadMeta();
+      const customIds = meta.customSkills?.[this.starterId];
+      if (customIds && customIds.length > 0) {
+        playerSkills = customIds
+          .filter(id => SKILL_DB[id])
+          .map(id => createSkill(SKILL_DB[id]));
+      }
+      if (!playerSkills || playerSkills.length === 0) {
+        playerSkills = createSpeciesSkills(playerSp);
+      }
+    }
     this.player = {
       tileX: playerStart.x,
       tileY: playerStart.y,
