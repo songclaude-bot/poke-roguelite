@@ -305,6 +305,10 @@ export class DungeonScene extends Phaser.Scene {
       durant: "0632", togedemaru: "0777",
       drifloon: "0425", golett: "0622",
       hatenna: "0856", indeedee: "0876",
+      // Phase 109-111: Ice/Dark/Fairy 4th
+      vanillite: "0582", snom: "0872",
+      nickit: "0827", impidimp: "0859",
+      milcery: "0868", comfey: "0764",
     };
 
     // Load player + all enemy species + ally species for this dungeon

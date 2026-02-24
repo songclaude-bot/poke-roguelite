@@ -605,6 +605,22 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [262, 262, 220, 220, 196, 196, 262, 262, 330, 330, 262, 262, 220, 220, 175, 175],
     tempo: 0.32, melodyType: "sine", bassType: "sine",
   },
+  // Phase 109-111: Ice/Dark/Fairy 4th
+  permafrostPeak: {
+    melody: [523, 494, 440, 392, 349, 392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330],
+    bass: [262, 262, 220, 220, 175, 175, 220, 220, 262, 262, 294, 294, 262, 262, 175, 175],
+    tempo: 0.30, melodyType: "sine", bassType: "triangle",
+  },
+  thiefsDen: {
+    melody: [196, 233, 262, 294, 262, 233, 196, 175, 165, 175, 196, 233, 262, 294, 330, 294],
+    bass: [98, 98, 131, 131, 147, 147, 98, 98, 82, 82, 98, 98, 131, 131, 165, 165],
+    tempo: 0.28, melodyType: "sawtooth", bassType: "square",
+  },
+  sugarGarden: {
+    melody: [523, 587, 659, 698, 659, 587, 523, 494, 440, 494, 523, 587, 659, 698, 784, 698],
+    bass: [262, 262, 330, 330, 349, 349, 262, 262, 220, 220, 262, 262, 330, 330, 392, 392],
+    tempo: 0.34, melodyType: "triangle", bassType: "sine",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

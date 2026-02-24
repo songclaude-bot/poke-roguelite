@@ -151,6 +151,9 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     forgeMountain: [WeatherType.Sandstorm, WeatherType.Hail],
     hauntedManor: [WeatherType.Hail],
     dreamTemple: [WeatherType.Rain, WeatherType.Hail],
+    permafrostPeak: [WeatherType.Hail],
+    thiefsDen: [WeatherType.Sandstorm, WeatherType.Hail],
+    sugarGarden: [WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

@@ -155,6 +155,12 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "drifloon", to: "drifblim", level: 14, newName: "Drifblim", hpBonus: 18, atkBonus: 6, defBonus: 4, newSkillId: "shadowBall" },
   { from: "golett", to: "golurk", level: 16, newName: "Golurk", hpBonus: 16, atkBonus: 10, defBonus: 8, newSkillId: "phantomForce" },
   { from: "hatenna", to: "hattrem", level: 14, newName: "Hattrem", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "expandingForce" },
+  // Phase 109-111: Ice/Dark/Fairy 4th
+  { from: "vanillite", to: "vanillish", level: 14, newName: "Vanillish", hpBonus: 12, atkBonus: 8, defBonus: 4, newSkillId: "iceBeam" },
+  { from: "snom", to: "frosmoth", level: 14, newName: "Frosmoth", hpBonus: 14, atkBonus: 10, defBonus: 6, newSkillId: "auroraBeam" },
+  { from: "nickit", to: "thievul", level: 14, newName: "Thievul", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "throatChop" },
+  { from: "impidimp", to: "morgrem", level: 14, newName: "Morgrem", hpBonus: 12, atkBonus: 10, defBonus: 4, newSkillId: "throatChop" },
+  { from: "milcery", to: "alcremie", level: 14, newName: "Alcremie", hpBonus: 14, atkBonus: 8, defBonus: 8, newSkillId: "playRough" },
 ];
 
 /** Check if a species can evolve at a given level */

@@ -253,4 +253,10 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   golett: AbilityId.Sturdy, // Iron Fist equivalent
   hatenna: AbilityId.ShieldDust, // Magic Bounce equivalent
   indeedee: AbilityId.PurePower, // Inner Focus equivalent
+  vanillite: AbilityId.ShieldDust, // Ice Body equivalent
+  snom: AbilityId.ShieldDust, // Ice Scales equivalent
+  nickit: AbilityId.Pickup, // Run Away equivalent
+  impidimp: AbilityId.Guts, // Prankster equivalent
+  milcery: AbilityId.ShieldDust, // Sweet Veil equivalent
+  comfey: AbilityId.ShieldDust, // Triage equivalent
 };

@@ -1677,6 +1677,28 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Psychic power expands to hit all foes in the room.",
   },
+  // Phase 109-111: Ice/Dark/Fairy 4th
+  throatChop: {
+    id: "throatChop",
+    name: "Throat Chop",
+    type: PokemonType.Dark,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Front1,
+    accuracy: 90,
+    description: "A chop to the throat that silences the foe.",
+  },
+  sweetKiss: {
+    id: "sweetKiss",
+    name: "Sweet Kiss",
+    type: PokemonType.Fairy,
+    power: 0,
+    pp: 14,
+    range: SkillRange.Around,
+    accuracy: 85,
+    effect: SkillEffect.Paralyze,
+    description: "Blows kisses that confuse and paralyze nearby foes.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
