@@ -305,6 +305,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     temporalSpire: [WeatherType.Sandstorm, WeatherType.Hail],
     stormSovereign: [WeatherType.Rain, WeatherType.Sandstorm],
     originHall: [WeatherType.Rain, WeatherType.Sandstorm],
+    // Phase 198-200: 12th Tier (FINAL) Water/Fire/Grass/Electric/Poison/Ground
+    primordialSea: [WeatherType.Rain],
+    truthPyre: [WeatherType.Sandstorm],
+    eternalMeadow: [WeatherType.Rain],
+    thunderGodDomain: [WeatherType.Rain, WeatherType.Sandstorm],
+    eternaCore: [WeatherType.Rain, WeatherType.Sandstorm],
+    orderSanctum: [WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

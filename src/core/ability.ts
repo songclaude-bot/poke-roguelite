@@ -542,4 +542,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   articuno: AbilityId.ShieldDust, // Pressure equivalent
   arceus: AbilityId.PurePower, // Multitype equivalent
   regigigas: AbilityId.Sturdy, // Slow Start equivalent
+  // Phase 198-200: 12th Tier (FINAL) Water/Fire/Grass/Electric/Poison/Ground
+  kyogre: AbilityId.SwiftSwim, // Drizzle equivalent
+  palkia: AbilityId.PurePower, // Pressure equivalent
+  reshiram: AbilityId.FlameBody, // Turboblaze equivalent
+  victini: AbilityId.PurePower, // Victory Star equivalent
+  shaymin: AbilityId.ShieldDust, // Natural Cure equivalent
+  tapuBulu: AbilityId.PurePower, // Grassy Surge equivalent
+  thundurus: AbilityId.Static, // Prankster equivalent
+  zeraora: AbilityId.PurePower, // Volt Absorb equivalent
+  eternatus: AbilityId.Sturdy, // Pressure equivalent
+  poipole: AbilityId.PurePower, // Beast Boost equivalent
+  zygarde: AbilityId.Sturdy, // Aura Break equivalent
+  excadrill: AbilityId.Guts, // Sand Rush equivalent
 };

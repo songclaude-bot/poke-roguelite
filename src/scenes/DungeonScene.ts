@@ -481,6 +481,13 @@ export class DungeonScene extends Phaser.Scene {
       rayquaza: "0384", dialga: "0483",
       tornadus: "0641", articuno: "0144",
       arceus: "0493", regigigas: "0486",
+      // Phase 198-200: 12th Tier (FINAL) Water/Fire/Grass/Electric/Poison/Ground
+      kyogre: "0382", palkia: "0484",
+      reshiram: "0643", victini: "0494",
+      shaymin: "0492", tapuBulu: "0787",
+      thundurus: "0642", zeraora: "0807",
+      eternatus: "0890", poipole: "0803",
+      zygarde: "0718", excadrill: "0530",
     };
 
     // Load player + all enemy species + ally species for this dungeon

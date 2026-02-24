@@ -317,6 +317,13 @@ const DUNGEON_BGM_MAP: Record<string, string> = {
   temporalSpire: "dungeon-dragon",
   stormSovereign: "dungeon-flying",
   originHall: "dungeon-normal",
+  // Phase 198-200: 12th Tier (FINAL) Water/Fire/Grass/Electric/Poison/Ground
+  primordialSea: "dungeon-water",
+  truthPyre: "dungeon-fire",
+  eternalMeadow: "dungeon-grass",
+  thunderGodDomain: "dungeon-electric",
+  eternaCore: "dungeon-poison",
+  orderSanctum: "dungeon-ground",
   // Destiny Tower
   destinyTower: "destiny",
 };
