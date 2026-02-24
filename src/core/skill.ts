@@ -1529,6 +1529,44 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     effectChance: 100,
     description: "Raises Attack by getting pumped up.",
   },
+
+  // ── Phase 96 Water 4th Skills ──
+  waterfall: {
+    id: "waterfall",
+    name: "Waterfall",
+    type: PokemonType.Water,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Charges at the foe with a wall of water.",
+  },
+
+  // ── Phase 97 Fire 4th Skills ──
+  fireWhip: {
+    id: "fireWhip",
+    name: "Fire Whip",
+    type: PokemonType.Fire,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    effect: SkillEffect.Burn,
+    effectChance: 20,
+    description: "Lashes the foe with a flaming whip.",
+  },
+
+  // ── Phase 98 Grass 4th Skills ──
+  leafStorm: {
+    id: "leafStorm",
+    name: "Leaf Storm",
+    type: PokemonType.Grass,
+    power: 20,
+    pp: 6,
+    range: SkillRange.Room,
+    accuracy: 80,
+    description: "Whips up a storm of sharp leaves.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

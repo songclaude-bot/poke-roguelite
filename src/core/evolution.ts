@@ -136,6 +136,12 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "noibat", to: "noivern", level: 14, newName: "Noivern", hpBonus: 10, atkBonus: 12, defBonus: 6, newSkillId: "airSlash" },
   { from: "vullaby", to: "mandibuzz", level: 14, newName: "Mandibuzz", hpBonus: 16, atkBonus: 4, defBonus: 10, newSkillId: "aerialAce" },
   { from: "stufful", to: "bewear", level: 14, newName: "Bewear", hpBonus: 16, atkBonus: 10, defBonus: 6, newSkillId: "bodySlam" },
+  { from: "wimpod", to: "golisopod", level: 14, newName: "Golisopod", hpBonus: 14, atkBonus: 12, defBonus: 8, newSkillId: "waterfall" },
+  { from: "tympole", to: "palpitoad", level: 14, newName: "Palpitoad", hpBonus: 14, atkBonus: 8, defBonus: 8, newSkillId: "surf" },
+  { from: "salandit", to: "salazzle", level: 14, newName: "Salazzle", hpBonus: 10, atkBonus: 14, defBonus: 4, newSkillId: "fireWhip" },
+  { from: "larvesta", to: "volcarona", level: 14, newName: "Volcarona", hpBonus: 12, atkBonus: 12, defBonus: 6, newSkillId: "heatWave" },
+  { from: "fomantis", to: "lurantis", level: 14, newName: "Lurantis", hpBonus: 12, atkBonus: 12, defBonus: 6, newSkillId: "leafBlade" },
+  { from: "morelull", to: "shiinotic", level: 14, newName: "Shiinotic", hpBonus: 14, atkBonus: 6, defBonus: 10, newSkillId: "leafStorm" },
 ];
 
 /** Check if a species can evolve at a given level */

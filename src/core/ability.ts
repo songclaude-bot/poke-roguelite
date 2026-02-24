@@ -229,4 +229,10 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   vullaby: AbilityId.Sturdy, // Overcoat equivalent
   stufful: AbilityId.Guts, // Fluffy equivalent
   furfrou: AbilityId.ShieldDust, // FurCoat equivalent
+  wimpod: AbilityId.SwiftSwim, // WimpOut equivalent
+  tympole: AbilityId.SwiftSwim,
+  salandit: AbilityId.FlameBody, // Corrosion equivalent
+  larvesta: AbilityId.FlameBody,
+  fomantis: AbilityId.Torrent, // Contrary equivalent
+  morelull: AbilityId.ShieldDust, // Effect Spore equivalent
 };

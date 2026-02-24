@@ -1673,6 +1673,69 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["headbutt", "workUp", "hyperVoice"],
     floors: [],
   },
+  // ── Phase 96 Water 4th ──
+  wimpod: {
+    id: "wimpod", name: "Wimpod", spriteKey: "wimpod",
+    types: [PokemonType.Water, PokemonType.Bug], attackType: PokemonType.Water,
+    baseStats: { hp: 22, atk: 8, def: 14 },
+    walkFrameWidth: 40, walkFrameHeight: 32,
+    idleFrameWidth: 40, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["waterfall", "waterPulse", "xScissor"],
+    floors: [],
+  },
+  tympole: {
+    id: "tympole", name: "Tympole", spriteKey: "tympole",
+    types: [PokemonType.Water], attackType: PokemonType.Water,
+    baseStats: { hp: 26, atk: 10, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 6, idleFrames: 4,
+    skillIds: ["waterGun", "waterfall", "mudShot"],
+    floors: [],
+  },
+  // ── Phase 97 Fire 4th ──
+  salandit: {
+    id: "salandit", name: "Salandit", spriteKey: "salandit",
+    types: [PokemonType.Fire, PokemonType.Poison], attackType: PokemonType.Fire,
+    baseStats: { hp: 22, atk: 14, def: 6 },
+    walkFrameWidth: 40, walkFrameHeight: 40,
+    idleFrameWidth: 40, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 2,
+    skillIds: ["fireWhip", "venoshock", "ember"],
+    floors: [],
+  },
+  larvesta: {
+    id: "larvesta", name: "Larvesta", spriteKey: "larvesta",
+    types: [PokemonType.Fire, PokemonType.Bug], attackType: PokemonType.Fire,
+    baseStats: { hp: 26, atk: 12, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 3, idleFrames: 10,
+    skillIds: ["ember", "fireWhip", "xScissor"],
+    floors: [],
+  },
+  // ── Phase 98 Grass 4th ──
+  fomantis: {
+    id: "fomantis", name: "Fomantis", spriteKey: "fomantis",
+    types: [PokemonType.Grass], attackType: PokemonType.Grass,
+    baseStats: { hp: 24, atk: 12, def: 8 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 5,
+    skillIds: ["leafStorm", "leafBlade", "razorLeaf"],
+    floors: [],
+  },
+  morelull: {
+    id: "morelull", name: "Morelull", spriteKey: "morelull",
+    types: [PokemonType.Grass, PokemonType.Fairy], attackType: PokemonType.Grass,
+    baseStats: { hp: 28, atk: 8, def: 10 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 24, idleFrameHeight: 56,
+    walkFrames: 5, idleFrames: 8,
+    skillIds: ["energyBall", "leafStorm", "drainingKiss"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1823,6 +1886,12 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   vullaby: { 7: "aerialAce", 10: "airSlash" },
   stufful: { 7: "workUp", 10: "bodySlam" },
   furfrou: { 7: "workUp", 10: "hyperVoice" },
+  wimpod: { 7: "waterfall", 10: "waterPulse" },
+  tympole: { 7: "waterfall", 10: "surf" },
+  salandit: { 7: "fireWhip", 10: "venoshock" },
+  larvesta: { 7: "fireWhip", 10: "flameWheel" },
+  fomantis: { 7: "leafStorm", 10: "leafBlade" },
+  morelull: { 7: "leafStorm", 10: "energyBall" },
 };
 
 /** Check if a species learns a new skill at this level */

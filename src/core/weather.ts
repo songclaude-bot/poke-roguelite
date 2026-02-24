@@ -139,6 +139,9 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     drakeNest: [WeatherType.Sandstorm, WeatherType.Hail],
     stormyNest: [WeatherType.Rain, WeatherType.Sandstorm],
     cozyBurrow: [WeatherType.Rain],
+    tidalGrotto: [WeatherType.Rain],
+    blazingCaldera: [WeatherType.Sandstorm],
+    verdantCanopy: [WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 
