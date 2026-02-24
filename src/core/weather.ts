@@ -154,6 +154,9 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     permafrostPeak: [WeatherType.Hail],
     thiefsDen: [WeatherType.Sandstorm, WeatherType.Hail],
     sugarGarden: [WeatherType.Rain],
+    draconicSpire: [WeatherType.Sandstorm, WeatherType.Hail],
+    skyHighNest: [WeatherType.Rain, WeatherType.Sandstorm],
+    pastoralPlains: [WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

@@ -259,4 +259,10 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   impidimp: AbilityId.Guts, // Prankster equivalent
   milcery: AbilityId.ShieldDust, // Sweet Veil equivalent
   comfey: AbilityId.ShieldDust, // Triage equivalent
+  turtonator: AbilityId.Sturdy, // Shell Armor equivalent
+  drampa: AbilityId.Guts, // Berserk equivalent
+  rookidee: AbilityId.Guts, // Big Pecks equivalent
+  archen: AbilityId.Guts, // Defeatist equivalent
+  wooloo: AbilityId.Pickup, // Fluffy equivalent
+  skwovet: AbilityId.Pickup, // Cheek Pouch equivalent
 };

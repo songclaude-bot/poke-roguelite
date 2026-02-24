@@ -1699,6 +1699,38 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     effect: SkillEffect.Paralyze,
     description: "Blows kisses that confuse and paralyze nearby foes.",
   },
+  // Phase 112-114: Dragon/Flying/Normal 4th
+  dragonDance: {
+    id: "dragonDance",
+    name: "Dragon Dance",
+    type: PokemonType.Dragon,
+    power: 0,
+    pp: 12,
+    range: SkillRange.Self,
+    accuracy: 100,
+    effect: SkillEffect.AtkUp,
+    description: "A mystical dance that raises Attack sharply.",
+  },
+  pluck: {
+    id: "pluck",
+    name: "Pluck",
+    type: PokemonType.Flying,
+    power: 13,
+    pp: 14,
+    range: SkillRange.Front1,
+    accuracy: 95,
+    description: "Pecks the target with a sharp beak.",
+  },
+  facade: {
+    id: "facade",
+    name: "Facade",
+    type: PokemonType.Normal,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front1,
+    accuracy: 95,
+    description: "Doubles in power when burned or paralyzed.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

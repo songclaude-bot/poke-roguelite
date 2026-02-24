@@ -309,6 +309,10 @@ export class DungeonScene extends Phaser.Scene {
       vanillite: "0582", snom: "0872",
       nickit: "0827", impidimp: "0859",
       milcery: "0868", comfey: "0764",
+      // Phase 112-114: Dragon/Flying/Normal 4th
+      turtonator: "0776", drampa: "0780",
+      rookidee: "0821", archen: "0566",
+      wooloo: "0831", skwovet: "0819",
     };
 
     // Load player + all enemy species + ally species for this dungeon

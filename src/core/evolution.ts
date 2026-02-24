@@ -161,6 +161,11 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "nickit", to: "thievul", level: 14, newName: "Thievul", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "throatChop" },
   { from: "impidimp", to: "morgrem", level: 14, newName: "Morgrem", hpBonus: 12, atkBonus: 10, defBonus: 4, newSkillId: "throatChop" },
   { from: "milcery", to: "alcremie", level: 14, newName: "Alcremie", hpBonus: 14, atkBonus: 8, defBonus: 8, newSkillId: "playRough" },
+  // Phase 112-114: Dragon/Flying/Normal 4th
+  { from: "rookidee", to: "corvisquire", level: 14, newName: "Corvisquire", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "braveBird" },
+  { from: "archen", to: "archeops", level: 16, newName: "Archeops", hpBonus: 14, atkBonus: 12, defBonus: 4, newSkillId: "rockSlide" },
+  { from: "wooloo", to: "dubwool", level: 14, newName: "Dubwool", hpBonus: 14, atkBonus: 6, defBonus: 10, newSkillId: "facade" },
+  { from: "skwovet", to: "greedent", level: 14, newName: "Greedent", hpBonus: 16, atkBonus: 8, defBonus: 8, newSkillId: "facade" },
 ];
 
 /** Check if a species can evolve at a given level */
