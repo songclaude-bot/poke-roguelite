@@ -67,6 +67,8 @@ export interface MetaSaveData {
   equippedHeldItem?: string;    // currently equipped held item ID
   // Ability upgrade levels (AbilityId → level 1-5)
   abilityLevels?: Record<string, number>;
+  // New Game Plus prestige level (0 = normal, 1 = NG+1, etc.)
+  ngPlusLevel?: number;
 }
 
 const SAVE_VERSION = 1;
@@ -141,6 +143,7 @@ export function loadMeta(): MetaSaveData {
     if (data.ownedHeldItems === undefined) data.ownedHeldItems = [];
     if (data.equippedHeldItem === undefined) data.equippedHeldItem = undefined;
     if (data.abilityLevels === undefined) data.abilityLevels = {};
+    if (data.ngPlusLevel === undefined) data.ngPlusLevel = 0;
     return data;
   } catch {
     return defaultMeta();

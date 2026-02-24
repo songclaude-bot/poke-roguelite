@@ -49,6 +49,9 @@ import {
   DifficultyLevel, DifficultyModifiers, getDifficultyModifiers, loadDifficulty, isNonNormalDifficulty,
 } from "../core/difficulty-settings";
 import {
+  getNGPlusLevel, getNGPlusBonusEffects, NGPlusBonusEffects,
+} from "../core/new-game-plus";
+import {
   initAudio, startBgm, stopBgm,
   sfxHit, sfxSuperEffective, sfxNotEffective, sfxMove, sfxPickup,
   sfxLevelUp, sfxRecruit, sfxStairs, sfxDeath, sfxBossDefeat,
@@ -194,8 +197,10 @@ export class DungeonScene extends Phaser.Scene {
   private monsterHouseCleared = false;
   private monsterHouseEnemies: Entity[] = []; // track enemies spawned in monster house
 
-  // NG+ difficulty scaling
+  // NG+ prestige system
   private ngPlusLevel = 0;
+  private ngPlusBonuses: NGPlusBonusEffects = getNGPlusBonusEffects(0);
+  private ngPlusBadgeText: Phaser.GameObjects.Text | null = null;
 
   // Weather
   private currentWeather = WeatherType.None;
@@ -274,6 +279,11 @@ export class DungeonScene extends Phaser.Scene {
     const atkBonus = getUpgradeBonus(meta, "atk");
     const defBonus = getUpgradeBonus(meta, "def");
 
+    // Load NG+ prestige bonuses
+    this.ngPlusLevel = getNGPlusLevel(meta);
+    this.ngPlusBonuses = getNGPlusBonusEffects(this.ngPlusLevel);
+    this.ngPlusBadgeText = null;
+
     // Load held item effect
     const equippedId = meta.equippedHeldItem;
     const heldItem = equippedId ? getHeldItem(equippedId) : undefined;
@@ -315,13 +325,21 @@ export class DungeonScene extends Phaser.Scene {
       this.dungeonDef = { ...this.dungeonDef };
     }
 
-    this.persistentHp = data?.hp ?? (50 + hpBonus + heldHpBonus);
-    this.persistentMaxHp = data?.maxHp ?? (50 + hpBonus + heldHpBonus);
+    // NG+ stat multipliers: hpPercent + allStatsPercent, atkPercent + allStatsPercent
+    const ngHpMult = 1 + (this.ngPlusBonuses.hpPercent + this.ngPlusBonuses.allStatsPercent) / 100;
+    const ngAtkMult = 1 + (this.ngPlusBonuses.atkPercent + this.ngPlusBonuses.allStatsPercent) / 100;
+    const ngDefMult = 1 + this.ngPlusBonuses.allStatsPercent / 100;
+    const baseHp = Math.floor((50 + hpBonus + heldHpBonus) * ngHpMult);
+    const baseAtk = Math.floor((12 + atkBonus + heldAtkBonus) * ngAtkMult);
+    const baseDef = Math.floor((6 + defBonus + heldDefBonus) * ngDefMult);
+
+    this.persistentHp = data?.hp ?? baseHp;
+    this.persistentMaxHp = data?.maxHp ?? baseHp;
     this.persistentSkills = data?.skills ?? null;
     this.persistentInventory = data?.inventory ?? null;
     this.persistentLevel = data?.level ?? 5;
-    this.persistentAtk = data?.atk ?? (12 + atkBonus + heldAtkBonus);
-    this.persistentDef = data?.def ?? (6 + defBonus + heldDefBonus);
+    this.persistentAtk = data?.atk ?? baseAtk;
+    this.persistentDef = data?.def ?? baseDef;
     this.totalExp = data?.exp ?? 0;
     this.enemies = [];
     this.allies = [];
@@ -363,8 +381,11 @@ export class DungeonScene extends Phaser.Scene {
     this.autoExploreTimer = null;
     this.autoExploreText = null;
     this.autoExploreTween = null;
-    this.ngPlusLevel = Math.min(10, meta.totalClears); // Cap at NG+10
-    this.gold = meta.gold;
+    // NG+ starting gold bonus: add percentage of carried gold as bonus on new runs
+    const ngGoldStartBonus = isNewRun && this.ngPlusBonuses.startingGoldPercent > 0
+      ? Math.floor(meta.gold * this.ngPlusBonuses.startingGoldPercent / 100)
+      : 0;
+    this.gold = meta.gold + ngGoldStartBonus;
 
     // ── Challenge Mode ──
     this.challengeMode = data?.challengeMode ?? null;
@@ -770,6 +791,13 @@ export class DungeonScene extends Phaser.Scene {
         playerSkills = createSpeciesSkills(playerSp);
       }
     }
+    // NG+ bonus PP: add extra PP to all player skills
+    if (this.ngPlusBonuses.bonusPP > 0) {
+      for (const sk of playerSkills) {
+        sk.pp += this.ngPlusBonuses.bonusPP;
+        sk.currentPp += this.ngPlusBonuses.bonusPP;
+      }
+    }
     this.player = {
       tileX: playerStart.x,
       tileY: playerStart.y,
@@ -1086,7 +1114,16 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Spawn floor items ──
     this.inventory = this.persistentInventory ?? [];
-    const itemCount = Math.max(1, Math.floor(this.dungeonDef.itemsPerFloor * this.difficultyMods.itemDropMult));
+
+    // NG+ bonus: start with a random item on new runs (floor 1, no persisted inventory)
+    if (this.ngPlusBonuses.startWithItem && this.currentFloor === 1 && !this.persistentInventory) {
+      const startItem = rollFloorItem();
+      const existing = this.inventory.find(s => s.item.id === startItem.id && startItem.stackable);
+      if (existing) existing.count++;
+      else this.inventory.push({ item: startItem, count: 1 });
+    }
+    const ngItemDropMult = 1 + this.ngPlusBonuses.itemDropPercent / 100;
+    const itemCount = Math.max(1, Math.floor(this.dungeonDef.itemsPerFloor * this.difficultyMods.itemDropMult * ngItemDropMult));
     for (let i = 0; i < itemCount; i++) {
       const room = rooms[Math.floor(Math.random() * rooms.length)];
       const ix = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
@@ -1330,6 +1367,15 @@ export class DungeonScene extends Phaser.Scene {
           this.showLog("Solo challenge! No allies, +30% stats!");
         }
       }
+    }
+
+    // ── NG+ Badge ──
+    if (this.ngPlusLevel > 0) {
+      const ngBadgeY = this.challengeMode ? 48 : 36;
+      this.ngPlusBadgeText = this.add.text(GAME_WIDTH - 8, ngBadgeY, `NG+${this.ngPlusLevel}`, {
+        fontSize: "8px", color: "#a855f7", fontFamily: "monospace", fontStyle: "bold",
+        backgroundColor: "#00000088", padding: { x: 3, y: 1 },
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(103);
     }
 
     // ── Dungeon Modifier Badges ──
@@ -2498,7 +2544,8 @@ export class DungeonScene extends Phaser.Scene {
         this.gameOver = true;
         clearDungeonSave();
         const heldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
-        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult * this.difficultyMods.goldMult);
+        const ngEscGoldMult = 1 + this.ngPlusBonuses.goldPercent / 100;
+        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult * this.difficultyMods.goldMult * ngEscGoldMult);
         this.cameras.main.fadeOut(500);
         this.time.delayedCall(600, () => {
           this.scene.start("HubScene", {
@@ -3158,8 +3205,9 @@ export class DungeonScene extends Phaser.Scene {
 
   private tickBelly() {
     if (this.belly > 0) {
-      // Difficulty-based drain: higher difficulty = faster hunger
-      const drainRate = (0.5 + this.dungeonDef.difficulty * 0.1) * this.difficultyMods.bellyDrainMult;
+      // Difficulty-based drain: higher difficulty = faster hunger, NG+ reduces drain
+      const ngBellyMult = 1 - this.ngPlusBonuses.bellyDrainReduction / 100;
+      const drainRate = (0.5 + this.dungeonDef.difficulty * 0.1) * this.difficultyMods.bellyDrainMult * ngBellyMult;
       const prevBelly = this.belly;
       this.belly = Math.max(0, this.belly - drainRate);
 
@@ -3535,7 +3583,8 @@ export class DungeonScene extends Phaser.Scene {
         // 2 item drops + EXP bonus
         this.spawnMonsterHouseRewardItems(r, 2);
         const heldExpMult = 1 + (this.heldItemEffect.expBonus ?? 0) / 100;
-        const expBonus = Math.floor((15 + this.currentFloor * 8) * this.modifierEffects.expMult * heldExpMult);
+        const ngExpMultAmb = 1 + this.ngPlusBonuses.expPercent / 100;
+        const expBonus = Math.floor((15 + this.currentFloor * 8) * this.modifierEffects.expMult * heldExpMult * ngExpMultAmb);
         this.totalExp += expBonus;
         // Process potential level ups from bonus EXP
         const levelResult = processLevelUp(this.player.stats, 0, this.totalExp);
@@ -3747,7 +3796,7 @@ export class DungeonScene extends Phaser.Scene {
 
     // Boss bonus: +50% gold if dungeon has a boss; Boss Rush always counts as boss dungeon
     const baseGold = goldFromRun(this.currentFloor, this.enemiesDefeated, true);
-    const ngGoldBonus = 1 + this.ngPlusLevel * 0.15; // +15% gold per NG+ level
+    const ngGoldBonus = 1 + this.ngPlusBonuses.goldPercent / 100; // NG+ gold bonus
     const challengeGoldMultiplier = this.challengeMode === "speedrun" ? 2 : 1; // Speed Run = 2x gold
     const modGoldMult = this.modifierEffects.goldMult; // Dungeon modifier gold multiplier
     const clearHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
@@ -3874,7 +3923,8 @@ export class DungeonScene extends Phaser.Scene {
     clearDungeonSave();
 
     const goHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
-    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult);
+    const ngGoGoldMult = 1 + this.ngPlusBonuses.goldPercent / 100;
+    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult * ngGoGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -4661,7 +4711,8 @@ export class DungeonScene extends Phaser.Scene {
       // Grant EXP (boss gives 5x, apply modifier expMult)
       const baseExp = expFromEnemy(entity.stats.level, this.currentFloor);
       const heldExpMult = 1 + (this.heldItemEffect.expBonus ?? 0) / 100;
-      const expGain = Math.floor((isBossKill ? baseExp * 5 : baseExp) * this.modifierEffects.expMult * heldExpMult * this.difficultyMods.expMult);
+      const ngExpMult = 1 + this.ngPlusBonuses.expPercent / 100;
+      const expGain = Math.floor((isBossKill ? baseExp * 5 : baseExp) * this.modifierEffects.expMult * heldExpMult * this.difficultyMods.expMult * ngExpMult);
       this.totalExp += expGain;
 
       if (isBossKill) {

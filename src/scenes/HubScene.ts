@@ -13,6 +13,10 @@ import { getStorageItemCount, addToStorage } from "../core/crafting";
 import { SPECIES_ABILITIES, ABILITIES } from "../core/ability";
 import { getAbilityLevel } from "../core/ability-upgrade";
 import { STARTER_LIST } from "../core/starter-data";
+import {
+  getNGPlusLevel, canActivateNGPlus, activateNGPlus,
+  getCurrentBonuses, getNextNGPlusRequirement,
+} from "../core/new-game-plus";
 
 /**
  * HubScene — the town between dungeon runs.
@@ -250,6 +254,31 @@ export class HubScene extends Phaser.Scene {
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v3.0.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
+
+    // ── NG+ Indicator ──
+    const currentNGLevel = getNGPlusLevel(this.meta);
+    const ngCanActivate = canActivateNGPlus(this.meta);
+
+    if (ngCanActivate || currentNGLevel > 0) {
+      const ngLabel = ngCanActivate
+        ? "NG+ Available!"
+        : `NG+${currentNGLevel}`;
+      const ngColor = ngCanActivate ? "#fbbf24" : "#a855f7";
+      const ngIndicator = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 20, ngLabel, {
+        fontSize: "9px", color: ngColor, fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(52).setInteractive({ useHandCursor: true });
+
+      if (ngCanActivate) {
+        // Glowing pulse animation for available NG+
+        this.tweens.add({
+          targets: ngIndicator,
+          alpha: { from: 1, to: 0.4 },
+          duration: 800, yoyo: true, repeat: -1,
+        });
+      }
+
+      ngIndicator.on("pointerdown", () => this.showNGPlusPanel());
+    }
 
     // Settings button (gear icon)
     const settingsBtn = this.add.text(GAME_WIDTH - 50, GAME_HEIGHT - 8, "[Gear]", {
@@ -606,6 +635,121 @@ export class HubScene extends Phaser.Scene {
     const cleanup = () => { overlay.destroy(); text.destroy(); close.destroy(); };
     close.on("pointerdown", cleanup);
     overlay.on("pointerdown", cleanup);
+  }
+
+  private showNGPlusPanel() {
+    const uiItems: Phaser.GameObjects.GameObject[] = [];
+    const currentLevel = getNGPlusLevel(this.meta);
+    const ngCanActivate = canActivateNGPlus(this.meta);
+
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.85
+    ).setDepth(200).setInteractive();
+    uiItems.push(overlay);
+
+    // Title
+    const title = this.add.text(GAME_WIDTH / 2, 30, "-- New Game Plus --", {
+      fontSize: "14px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(201);
+    uiItems.push(title);
+
+    // Current NG+ level
+    const levelLabel = currentLevel > 0
+      ? `Current: NG+${currentLevel}`
+      : "Not yet activated";
+    const levelText = this.add.text(GAME_WIDTH / 2, 52, levelLabel, {
+      fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace",
+    }).setOrigin(0.5).setDepth(201);
+    uiItems.push(levelText);
+
+    let cy = 75;
+
+    // Current bonuses
+    if (currentLevel > 0) {
+      const bonusHeader = this.add.text(GAME_WIDTH / 2, cy, "Active Bonuses:", {
+        fontSize: "10px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(201);
+      uiItems.push(bonusHeader);
+      cy += 16;
+
+      const bonuses = getCurrentBonuses(currentLevel);
+      for (const b of bonuses) {
+        const bText = this.add.text(GAME_WIDTH / 2, cy, b.description, {
+          fontSize: "8px", color: "#a5f3a3", fontFamily: "monospace",
+        }).setOrigin(0.5).setDepth(201);
+        uiItems.push(bText);
+        cy += 13;
+      }
+      cy += 8;
+    }
+
+    // Next level preview
+    const nextReq = getNextNGPlusRequirement(currentLevel);
+    if (nextReq) {
+      const nextHeader = this.add.text(GAME_WIDTH / 2, cy, `Next: NG+${currentLevel + 1} (${nextReq.clears} clears)`, {
+        fontSize: "10px", color: "#fde68a", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(201);
+      uiItems.push(nextHeader);
+      cy += 16;
+
+      const progress = `Progress: ${this.meta.totalClears}/${nextReq.clears} clears`;
+      const progText = this.add.text(GAME_WIDTH / 2, cy, progress, {
+        fontSize: "9px", color: this.meta.totalClears >= nextReq.clears ? "#4ade80" : "#94a3b8",
+        fontFamily: "monospace",
+      }).setOrigin(0.5).setDepth(201);
+      uiItems.push(progText);
+      cy += 16;
+
+      const newLabel = this.add.text(GAME_WIDTH / 2, cy, "New bonuses:", {
+        fontSize: "9px", color: "#fde68a", fontFamily: "monospace",
+      }).setOrigin(0.5).setDepth(201);
+      uiItems.push(newLabel);
+      cy += 14;
+
+      for (const b of nextReq.bonuses) {
+        const bText = this.add.text(GAME_WIDTH / 2, cy, b.description, {
+          fontSize: "8px", color: "#fef3c7", fontFamily: "monospace",
+        }).setOrigin(0.5).setDepth(201);
+        uiItems.push(bText);
+        cy += 13;
+      }
+      cy += 12;
+    } else {
+      const maxText = this.add.text(GAME_WIDTH / 2, cy, "Maximum NG+ level reached!", {
+        fontSize: "10px", color: "#a855f7", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(201);
+      uiItems.push(maxText);
+      cy += 20;
+    }
+
+    const cleanup = () => { uiItems.forEach(o => o.destroy()); };
+
+    // Activate button (if available)
+    if (ngCanActivate) {
+      const activateBtn = this.add.text(GAME_WIDTH / 2 - 60, cy, "[Activate NG+]", {
+        fontSize: "13px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(201).setInteractive({ useHandCursor: true });
+      uiItems.push(activateBtn);
+
+      activateBtn.on("pointerdown", () => {
+        activateNGPlus(this.meta);
+        cleanup();
+        // Restart scene to reflect new NG+ level
+        this.scene.restart();
+      });
+
+      const laterBtn = this.add.text(GAME_WIDTH / 2 + 60, cy, "[Later]", {
+        fontSize: "13px", color: "#60a5fa", fontFamily: "monospace",
+      }).setOrigin(0.5).setDepth(201).setInteractive({ useHandCursor: true });
+      uiItems.push(laterBtn);
+      laterBtn.on("pointerdown", cleanup);
+    } else {
+      const closeBtn = this.add.text(GAME_WIDTH / 2, cy, "[Close]", {
+        fontSize: "13px", color: "#60a5fa", fontFamily: "monospace",
+      }).setOrigin(0.5).setDepth(201).setInteractive({ useHandCursor: true });
+      uiItems.push(closeBtn);
+      closeBtn.on("pointerdown", cleanup);
+    }
   }
 
   private showStarterSelect() {
