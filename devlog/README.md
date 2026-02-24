@@ -502,12 +502,19 @@
 
 ---
 
-## 현재 게임 규모 (v0.85.0)
+## Phase 83-85: Ice/Dark/Fairy 3차 던전 (v0.85.0 → v0.90.0)
+- **Ice 3rd**: Frostbite Chasm — Cryogonal(0615), Cubchoo(0613) + freezeDry 스킬
+- **Dark 3rd**: Midnight Alley — Sandile(0551), Inkay(0686) + knockOff 스킬
+- **Fairy 3rd**: Pixie Hollow — Spritzee(0682), Swirlix(0684) + moonlight 스킬
+- 기존 2nd 던전과 이름 충돌 해결 (glacialCavern→frostbiteChasm 등)
+- AbilityId.Intimidate 미존재 → AbilityId.Guts로 대체
+
+## 현재 게임 규모 (v0.90.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **63개 던전**: Beach Cave → Cosmic Rift + Destiny Tower
-- **153종+ 포켓몬** (진화 포함 173종+)
-- **141종+ 기술**
+- **66개 던전**: Beach Cave → Pixie Hollow + Destiny Tower
+- **159종+ 포켓몬** (진화 포함 179종+)
+- **144종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **85종 스타터** (클리어 수로 해금)
-- **120종+ 진화 경로**
+- **91종 스타터** (클리어 수로 해금)
+- **126종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
