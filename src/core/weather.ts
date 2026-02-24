@@ -97,6 +97,7 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     ampPlains: [WeatherType.Rain, WeatherType.Sandstorm],
     verdantForest: [WeatherType.Rain],
     mysticSanctum: [WeatherType.Hail, WeatherType.Rain],
+    shadowForest: [WeatherType.Rain, WeatherType.Hail],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

@@ -927,6 +927,31 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     description: "Fires sharp pins rapidly.",
   },
 
+  // ── Additional Dark Skills ──
+  crunch: {
+    id: "crunch",
+    name: "Crunch",
+    type: PokemonType.Dark,
+    power: 16,
+    pp: 12,
+    range: SkillRange.Front1,
+    accuracy: 90,
+    description: "Bites down hard. May lower DEF.",
+    effect: SkillEffect.None,
+  },
+  icePunch: {
+    id: "icePunch",
+    name: "Ice Punch",
+    type: PokemonType.Ice,
+    power: 15,
+    pp: 12,
+    range: SkillRange.Front1,
+    accuracy: 90,
+    description: "An ice-cold punch.",
+    effect: SkillEffect.Paralyze,
+    effectChance: 20,
+  },
+
   // ── Additional Psychic Skills ──
   psychic: {
     id: "psychic",

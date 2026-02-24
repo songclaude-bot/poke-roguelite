@@ -698,6 +698,33 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["bite", "pursuit", "tackle"],
     floors: [],
   },
+  // ── Shadow Forest ──
+  houndour: {
+    id: "houndour",
+    name: "Houndour",
+    spriteKey: "houndour",
+    types: [PokemonType.Dark, PokemonType.Fire],
+    attackType: PokemonType.Dark,
+    baseStats: { hp: 28, atk: 12, def: 6 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["crunch", "ember", "pursuit"],
+    floors: [],
+  },
+  sneasel: {
+    id: "sneasel",
+    name: "Sneasel",
+    spriteKey: "sneasel",
+    types: [PokemonType.Dark, PokemonType.Ice],
+    attackType: PokemonType.Dark,
+    baseStats: { hp: 26, atk: 14, def: 5 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 56,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["nightSlash", "icePunch", "pursuit"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -765,6 +792,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   spinarak: { 7: "signalBeam", 10: "pinMissile" },
   abra: { 7: "psybeam", 10: "psychic" },
   natu: { 7: "psybeam", 10: "psychic" },
+  houndour: { 7: "crunch", 10: "flamethrower" },
+  sneasel: { 7: "icePunch", 10: "darkPulse" },
 };
 
 /** Check if a species learns a new skill at this level */

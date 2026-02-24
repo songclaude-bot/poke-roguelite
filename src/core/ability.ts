@@ -146,4 +146,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   spinarak: AbilityId.ShieldDust,
   abra: AbilityId.ShieldDust,
   natu: AbilityId.ShieldDust,
+  houndour: AbilityId.FlameBody,
+  sneasel: AbilityId.Pickup,
 };
