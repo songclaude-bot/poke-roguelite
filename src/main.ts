@@ -7,6 +7,7 @@ import { AchievementScene } from "./scenes/AchievementScene";
 import { PokedexScene } from "./scenes/PokedexScene";
 import { MoveTutorScene } from "./scenes/MoveTutorScene";
 import { HeldItemScene } from "./scenes/HeldItemScene";
+import { HelpScene } from "./scenes/HelpScene";
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from "./config";
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
   render: {
     preserveDrawingBuffer: true,
   },
-  scene: [BootScene, HubScene, DungeonScene, UpgradeScene, AchievementScene, PokedexScene, MoveTutorScene, HeldItemScene],
+  scene: [BootScene, HubScene, DungeonScene, UpgradeScene, AchievementScene, PokedexScene, MoveTutorScene, HeldItemScene, HelpScene],
 };
 
 const game = new Phaser.Game(config);

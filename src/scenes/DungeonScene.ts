@@ -1382,6 +1382,19 @@ export class DungeonScene extends Phaser.Scene {
     } else {
       this.showLog(`${this.dungeonDef.name} B${this.currentFloor}F`);
     }
+
+    // First-time tips for brand new players
+    if (this.currentFloor === 1) {
+      const tipMeta = loadMeta();
+      if (tipMeta.totalRuns <= 1) {
+        this.time.delayedCall(1500, () => {
+          this.showLog("Tip: Use the D-Pad to move. Walk into enemies to attack!");
+        });
+        this.time.delayedCall(4500, () => {
+          this.showLog("Tip: Find the stairs (gold marker) to go deeper!");
+        });
+      }
+    }
   }
 
   // ── Helpers ──

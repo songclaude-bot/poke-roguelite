@@ -226,6 +226,12 @@ export class HubScene extends Phaser.Scene {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
+    // Help button
+    const helpBtn = this.add.text(GAME_WIDTH - 20, GAME_HEIGHT - 8, "[?]", {
+      fontSize: "10px", color: "#667eea", fontFamily: "monospace",
+    }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true });
+    helpBtn.on("pointerdown", () => this.scene.start("HelpScene"));
+
     // ── Scrollable dungeon list with collapsible tiers ──
     const scrollTop = y;
     const scrollBottom = fixedY - 16;
