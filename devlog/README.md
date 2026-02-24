@@ -1215,3 +1215,26 @@
 - **층 테마**: 12종 비주얼 테마 + 깊이 어두움
 - **인챈트**: 10종 장비 강화 + Phoenix 부활
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 26: 파티 관리 + QoL
+
+### 26-1. 파티 포메이션 (Phase 254)
+- 날짜: 2026-02-24
+- 동료 순서 변경 (Up/Dn 버튼)
+- 위치 기반 추적 거리 (2~5타일)
+- 강화된 파티 패널: HP바, 타입, 기술, 추적 거리
+- 동료 해산 버튼
+
+### 26-2. 빠른 재시작 (Phase 255)
+- 날짜: 2026-02-24
+- 게임오버 시 Quick Retry, 클리어 시 Run Again 버튼
+- 재시작 전 골드/통계/인벤토리 자동 저장
+- 허브에 Last Dungeon 빠른 진입 버튼
+- 던전별 런 카운터, Run #X 표시
+
+### v3.4.0 마일스톤
+- **파티 포메이션**: 동료 순서 + 위치별 추적 + 해산
+- **빠른 재시작**: Quick Retry + Run Again + Last Dungeon
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
