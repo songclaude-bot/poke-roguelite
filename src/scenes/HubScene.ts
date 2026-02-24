@@ -9,6 +9,7 @@ import { getHeldItem } from "../core/held-items";
 import { DUNGEONS, DungeonDef, getUnlockedDungeons, CHALLENGE_MODES } from "../core/dungeon-data";
 import { initAudio, startBgm, stopBgm } from "../core/sound-manager";
 import { getDailyConfig, hasDailyAttempt, loadDailyScores } from "../core/daily-dungeon";
+import { getStorageItemCount, addToStorage } from "../core/crafting";
 
 /**
  * HubScene — the town between dungeon runs.
@@ -33,6 +34,7 @@ export class HubScene extends Phaser.Scene {
     starter?: string;
     challengeMode?: string;
     pokemonSeen?: string[];
+    inventory?: { itemId: string; count: number }[];
   }) {
     this.meta = loadMeta();
 
@@ -72,6 +74,12 @@ export class HubScene extends Phaser.Scene {
       // Pokedex: track starter as "used"
       if (data.starter && !this.meta.pokemonUsed.includes(data.starter)) {
         this.meta.pokemonUsed.push(data.starter);
+      }
+      // Auto-store inventory items from dungeon run
+      if (data.inventory && data.inventory.length > 0) {
+        for (const stack of data.inventory) {
+          addToStorage(this.meta.storage, stack.itemId, stack.count);
+        }
       }
       saveMeta(this.meta);
     }
@@ -186,38 +194,44 @@ export class HubScene extends Phaser.Scene {
     const currentStarter = this.meta.starter ?? "mudkip";
     const starterName = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
 
-    const fixedY = GAME_HEIGHT - 220;
+    const fixedY = GAME_HEIGHT - 240;
+    const btnSpacing = 30;
     // Solid background behind fixed buttons — covers from scroll end to bottom
     const fixedBgTop = fixedY - 30;
     const fixedBgH = GAME_HEIGHT - fixedBgTop;
     this.add.rectangle(GAME_WIDTH / 2, fixedBgTop + fixedBgH / 2, GAME_WIDTH, fixedBgH, 0x1a2744).setDepth(50);
 
-    const starterBtnResult = this.createFixedButton(GAME_WIDTH / 2, fixedY, btnW, 30,
+    const starterBtnResult = this.createFixedButton(GAME_WIDTH / 2, fixedY, btnW, 28,
       `Starter: ${starterName}`, "Tap to change", "#f472b6",
       () => this.showStarterSelect()
     );
     this.starterLabel = starterBtnResult.titleText;
     this.starterDesc = starterBtnResult.descText;
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + 34, btnW, 30,
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing, btnW, 28,
       "Upgrade Shop", `Gold: ${this.meta.gold}`, "#fbbf24",
       () => this.scene.start("UpgradeScene")
     );
     const equippedHeldItem = this.meta.equippedHeldItem ? getHeldItem(this.meta.equippedHeldItem) : undefined;
     const heldItemDesc = equippedHeldItem ? equippedHeldItem.name : "None equipped";
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + 68, btnW, 30,
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 2, btnW, 28,
       "Held Items", heldItemDesc, "#f59e0b",
       () => this.scene.start("HeldItemScene")
     );
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + 102, btnW, 30,
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 3, btnW, 28,
       "Move Tutor", "Teach new skills!", "#a855f7",
       () => this.scene.start("MoveTutorScene")
     );
+    const storedItemCount = getStorageItemCount(this.meta.storage);
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 4, btnW, 28,
+      "Item Forge", `Stored: ${storedItemCount} items`, "#ff8c42",
+      () => this.scene.start("CraftingScene")
+    );
     const seenCount = (this.meta.pokemonSeen ?? []).length;
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + 136, btnW, 30,
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 5, btnW, 28,
       "Pokedex", `Seen: ${seenCount} Pokemon`, "#e879f9",
       () => this.scene.start("PokedexScene")
     );
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + 170, btnW, 30,
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 6, btnW, 28,
       "Records", `Clears: ${this.meta.totalClears}  Best: B${this.meta.bestFloor}F`, "#60a5fa",
       () => this.scene.start("AchievementScene")
     );

@@ -2106,6 +2106,7 @@ export class DungeonScene extends Phaser.Scene {
           starter: this.starterId,
           challengeMode: this.challengeMode ?? undefined,
           pokemonSeen: Array.from(this.seenSpecies),
+          inventory: serializeInventory(this.inventory),
         });
       });
     });
@@ -2482,6 +2483,7 @@ export class DungeonScene extends Phaser.Scene {
             starter: this.starterId,
             challengeMode: this.challengeMode ?? undefined,
             pokemonSeen: Array.from(this.seenSpecies),
+            inventory: serializeInventory(this.inventory),
           });
         });
         break;
@@ -2633,6 +2635,7 @@ export class DungeonScene extends Phaser.Scene {
             starter: this.starterId,
             challengeMode: this.challengeMode ?? undefined,
             pokemonSeen: Array.from(this.seenSpecies),
+            inventory: serializeInventory(this.inventory),
           });
         });
         break;
@@ -3788,6 +3791,7 @@ export class DungeonScene extends Phaser.Scene {
         starter: this.starterId,
         challengeMode: this.challengeMode ?? undefined,
         pokemonSeen: Array.from(this.seenSpecies),
+        inventory: serializeInventory(this.inventory),
       });
     });
 
@@ -3869,6 +3873,7 @@ export class DungeonScene extends Phaser.Scene {
         starter: this.starterId,
         challengeMode: this.challengeMode ?? undefined,
         pokemonSeen: Array.from(this.seenSpecies),
+        inventory: serializeInventory(this.inventory),
       });
     });
   }
