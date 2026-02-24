@@ -176,4 +176,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   bronzor: AbilityId.Levitate,
   misdreavus: AbilityId.Levitate,
   duskull: AbilityId.Levitate,
+  axew: AbilityId.Guts,
+  deino: AbilityId.Guts,
 };

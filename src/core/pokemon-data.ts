@@ -1095,6 +1095,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["shadowSneak", "nightShade", "lick"],
     floors: [],
   },
+
+  // ── Phase 55 Dragon 2nd ──
+  axew: {
+    id: "axew", name: "Axew", spriteKey: "axew",
+    types: [PokemonType.Dragon], attackType: PokemonType.Dragon,
+    baseStats: { hp: 30, atk: 14, def: 6 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["dragonClaw", "dragonRush", "dragonBreath"],
+    floors: [],
+  },
+  deino: {
+    id: "deino", name: "Deino", spriteKey: "deino",
+    types: [PokemonType.Dragon, PokemonType.Dark], attackType: PokemonType.Dragon,
+    baseStats: { hp: 28, atk: 12, def: 8 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["dragonBreath", "dragonRush", "bite"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1192,6 +1214,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   bronzor: { 7: "gyroBall", 10: "flashCannon" },
   misdreavus: { 7: "shadowBall", 10: "shadowSneak" },
   duskull: { 7: "shadowSneak", 10: "shadowBall" },
+  axew: { 7: "dragonClaw", 10: "dragonRush" },
+  deino: { 7: "dragonRush", 10: "dragonPulse" },
 };
 
 /** Check if a species learns a new skill at this level */
