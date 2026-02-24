@@ -1307,6 +1307,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Fires three beams of energy at the foe.",
   },
+
+  // ── Phase 67 Grass Skills ──
+  grassKnot: {
+    id: "grassKnot",
+    name: "Grass Knot",
+    type: PokemonType.Grass,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Trips the target with a grass snare.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

@@ -1283,6 +1283,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["triAttack", "hyperVoice", "headbutt"],
     floors: [],
   },
+
+  // ── Phase 67 Grass 3rd ──
+  foongus: {
+    id: "foongus", name: "Foongus", spriteKey: "foongus",
+    types: [PokemonType.Grass, PokemonType.Poison], attackType: PokemonType.Grass,
+    baseStats: { hp: 30, atk: 10, def: 10 },
+    walkFrameWidth: 24, walkFrameHeight: 24,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["grassKnot", "sludgeBomb", "sleepPowder"],
+    floors: [],
+  },
+  petilil: {
+    id: "petilil", name: "Petilil", spriteKey: "petilil",
+    types: [PokemonType.Grass], attackType: PokemonType.Grass,
+    baseStats: { hp: 24, atk: 12, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 6, idleFrames: 4,
+    skillIds: ["energyBall", "grassKnot", "petalDance"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1397,6 +1419,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   rockruff: { 7: "stoneEdge", 10: "rockWrecker" },
   lillipup: { 7: "triAttack", 10: "hyperVoice" },
   minccino: { 7: "hyperVoice", 10: "triAttack" },
+  foongus: { 7: "grassKnot", 10: "energyBall" },
+  petilil: { 7: "energyBall", 10: "grassKnot" },
 };
 
 /** Check if a species learns a new skill at this level */
