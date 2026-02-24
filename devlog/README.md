@@ -262,12 +262,36 @@
 
 ---
 
-## 현재 게임 규모 (v0.35.0)
+## Phase 43: Petal Garden
+
+### 43. Grass 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Oddish/Budew, petalDance/energyBall 스킬, Petal Garden 10층, Blooming Vileplume 보스
+
+---
+
+## Phase 44: Ember Grotto
+
+### 44. Fire 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Vulpix/Ponyta, flameWheel/fireSpin 스킬, Ember Grotto 12층, Blazing Rapidash 보스
+
+---
+
+## Phase 45: Coral Reef
+
+### 45. Water 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Staryu/Clamperl, whirlpool 스킬, Coral Reef 11층, Dazzling Starmie 보스
+
+---
+
+## 현재 게임 규모 (v0.40.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **28개 던전**: Beach Cave → Meadow Path + Destiny Tower
-- **70종+ 포켓몬** (진화 포함 80종+)
-- **100종+ 기술**
+- **31개 던전**: Beach Cave → Coral Reef + Destiny Tower
+- **76종+ 포켓몬** (진화 포함 88종+)
+- **105종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **26종 스타터** (클리어 수로 해금)
-- **55종+ 진화 경로**
+- **32종 스타터** (클리어 수로 해금)
+- **60종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
