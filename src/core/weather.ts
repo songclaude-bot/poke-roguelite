@@ -171,6 +171,10 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     steelworksCitadel: [WeatherType.None, WeatherType.Sandstorm],
     spectralCrypt: [WeatherType.None, WeatherType.Hail],
     astralSanctum: [WeatherType.None, WeatherType.Hail],
+    // Phase 130-132: Ice/Dark/Fairy 5th
+    glacialAbyss: [WeatherType.Hail],
+    shadowLabyrinth: [WeatherType.Sandstorm, WeatherType.Hail],
+    faerieGarden: [WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

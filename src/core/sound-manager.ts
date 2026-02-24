@@ -710,6 +710,25 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [262, 262, 330, 330, 262, 262, 220, 220, 262, 262, 330, 330, 392, 392, 262, 262],
     tempo: 0.34, melodyType: "sine", bassType: "sine",
   },
+  // Phase 130-132: Ice/Dark/Fairy 5th
+  // Glacial Abyss — frigid, deep, echoing
+  glacialAbyss: {
+    melody: [494, 440, 392, 349, 330, 349, 392, 440, 494, 523, 494, 440, 392, 349, 330, 294],
+    bass: [247, 247, 196, 196, 165, 165, 196, 196, 247, 247, 262, 262, 196, 196, 165, 165],
+    tempo: 0.36, melodyType: "sine", bassType: "triangle",
+  },
+  // Shadow Labyrinth — dark, tense, winding
+  shadowLabyrinth: {
+    melody: [196, 185, 175, 196, 220, 208, 196, 175, 165, 175, 196, 220, 247, 233, 220, 196],
+    bass: [98, 98, 88, 88, 110, 110, 98, 98, 82, 82, 98, 98, 123, 123, 110, 110],
+    tempo: 0.30, melodyType: "sawtooth", bassType: "square",
+  },
+  // Faerie Garden — whimsical, bright, fairy-like
+  faerieGarden: {
+    melody: [587, 659, 698, 784, 698, 659, 587, 523, 494, 523, 587, 659, 698, 784, 880, 784],
+    bass: [294, 294, 349, 349, 392, 392, 294, 294, 247, 247, 294, 294, 349, 349, 440, 440],
+    tempo: 0.34, melodyType: "triangle", bassType: "sine",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

@@ -328,6 +328,10 @@ export class DungeonScene extends Phaser.Scene {
       tinkatink: "0957", varoom: "0965",
       greavard: "0971", sinistea: "0854",
       flittle: "0955", espurr: "0677",
+      // Phase 130-132: Ice/Dark/Fairy 5th
+      cetoddle: "0974", frigibax: "0996",
+      zorua: "0570", pawniard: "0624",
+      fidough: "0926", dedenne: "0702",
     };
 
     // Load player + all enemy species + ally species for this dungeon

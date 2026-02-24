@@ -1837,6 +1837,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Attacks with a possessed item.",
   },
+
+  // ── Phase 130-132: Ice/Dark/Fairy 5th Skills ──
+  icicleCrash: {
+    id: "icicleCrash",
+    name: "Icicle Crash",
+    type: PokemonType.Ice,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front1,
+    accuracy: 90,
+    description: "Drops large icicles on the target.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

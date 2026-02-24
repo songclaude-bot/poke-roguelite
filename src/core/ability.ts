@@ -291,4 +291,11 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   sinistea: AbilityId.ShieldDust, // Weak Armor equivalent
   flittle: AbilityId.RunAway, // Speed Boost equivalent
   espurr: AbilityId.ShieldDust, // Keen Eye equivalent
+  // Phase 130-132: Ice/Dark/Fairy 5th
+  cetoddle: AbilityId.Sturdy, // Thick Fat equivalent
+  frigibax: AbilityId.RockHead, // Thermal Exchange equivalent
+  zorua: AbilityId.RunAway, // Illusion equivalent
+  pawniard: AbilityId.PurePower, // Defiant equivalent
+  fidough: AbilityId.ShieldDust, // Own Tempo equivalent
+  dedenne: AbilityId.Static, // Cheek Pouch equivalent
 };

@@ -2288,6 +2288,67 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["psyshock", "psychic", "confusion"],
     floors: [],
   },
+  // Phase 130-132: Ice/Dark/Fairy 5th
+  cetoddle: {
+    id: "cetoddle", name: "Cetoddle", spriteKey: "cetoddle",
+    types: [PokemonType.Ice], attackType: PokemonType.Ice,
+    baseStats: { hp: 108, atk: 68, def: 45 },
+    walkFrameWidth: 40, walkFrameHeight: 48,
+    idleFrameWidth: 48, idleFrameHeight: 40,
+    walkFrames: 17, idleFrames: 6,
+    skillIds: ["icicleCrash", "iceBeam", "iceShard"],
+    floors: [],
+  },
+  frigibax: {
+    id: "frigibax", name: "Frigibax", spriteKey: "frigibax",
+    types: [PokemonType.Dragon, PokemonType.Ice], attackType: PokemonType.Ice,
+    baseStats: { hp: 65, atk: 75, def: 45 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["icicleCrash", "dragonBreath", "iceShard"],
+    floors: [],
+  },
+  zorua: {
+    id: "zorua", name: "Zorua", spriteKey: "zorua",
+    types: [PokemonType.Dark], attackType: PokemonType.Dark,
+    baseStats: { hp: 40, atk: 65, def: 40 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 5, idleFrames: 4,
+    skillIds: ["darkPulse", "shadowBall", "feintAttack"],
+    floors: [],
+  },
+  pawniard: {
+    id: "pawniard", name: "Pawniard", spriteKey: "pawniard",
+    types: [PokemonType.Dark, PokemonType.Steel], attackType: PokemonType.Dark,
+    baseStats: { hp: 45, atk: 85, def: 70 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 3,
+    skillIds: ["darkPulse", "ironHead", "nightSlash"],
+    floors: [],
+  },
+  fidough: {
+    id: "fidough", name: "Fidough", spriteKey: "fidough",
+    types: [PokemonType.Fairy], attackType: PokemonType.Fairy,
+    baseStats: { hp: 37, atk: 55, def: 70 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 6, idleFrames: 7,
+    skillIds: ["drainingKiss", "dazzlingGleam", "playRough"],
+    floors: [],
+  },
+  dedenne: {
+    id: "dedenne", name: "Dedenne", spriteKey: "dedenne",
+    types: [PokemonType.Electric, PokemonType.Fairy], attackType: PokemonType.Fairy,
+    baseStats: { hp: 67, atk: 58, def: 57 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 8, idleFrames: 4,
+    skillIds: ["drainingKiss", "thunderbolt", "nuzzle"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -2500,6 +2561,13 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   sinistea: { 7: "poltergeist", 10: "shadowBall" },
   flittle: { 7: "psyshock", 10: "psychic" },
   espurr: { 7: "psyshock", 10: "psychic" },
+  // Phase 130-132: Ice/Dark/Fairy 5th
+  cetoddle: { 7: "icicleCrash", 10: "iceBeam" },
+  frigibax: { 7: "icicleCrash", 10: "dragonBreath" },
+  zorua: { 7: "darkPulse", 10: "shadowBall" },
+  pawniard: { 7: "darkPulse", 10: "ironHead" },
+  fidough: { 7: "drainingKiss", 10: "dazzlingGleam" },
+  dedenne: { 7: "drainingKiss", 10: "thunderbolt" },
 };
 
 /** Check if a species learns a new skill at this level */

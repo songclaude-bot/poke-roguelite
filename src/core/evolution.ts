@@ -190,6 +190,12 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "sinistea", to: "polteageist", level: 30, newName: "Polteageist", hpBonus: 12, atkBonus: 10, defBonus: 4, newSkillId: "shadowBall" },
   { from: "flittle", to: "espathra", level: 35, newName: "Espathra", hpBonus: 14, atkBonus: 10, defBonus: 6, newSkillId: "futuresight" },
   { from: "espurr", to: "meowstic", level: 25, newName: "Meowstic", hpBonus: 12, atkBonus: 8, defBonus: 8, newSkillId: "expandingForce" },
+  // Phase 130-132: Ice/Dark/Fairy 5th
+  { from: "cetoddle", to: "cetitan", level: 38, newName: "Cetitan", hpBonus: 20, atkBonus: 10, defBonus: 8, newSkillId: "iceBeam" },
+  { from: "frigibax", to: "arctibax", level: 35, newName: "Arctibax", hpBonus: 16, atkBonus: 12, defBonus: 6, newSkillId: "dragonClaw" },
+  { from: "zorua", to: "zoroark", level: 30, newName: "Zoroark", hpBonus: 14, atkBonus: 12, defBonus: 6, newSkillId: "nightSlash" },
+  { from: "pawniard", to: "bisharp", level: 52, newName: "Bisharp", hpBonus: 16, atkBonus: 12, defBonus: 10, newSkillId: "ironHead" },
+  { from: "fidough", to: "dachsbun", level: 26, newName: "Dachsbun", hpBonus: 14, atkBonus: 8, defBonus: 10, newSkillId: "playRough" },
 ];
 
 /** Check if a species can evolve at a given level */
