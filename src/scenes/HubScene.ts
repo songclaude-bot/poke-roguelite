@@ -116,7 +116,7 @@ export class HubScene extends Phaser.Scene {
       )
     );
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.7.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.8.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
@@ -782,6 +782,43 @@ export class HubScene extends Phaser.Scene {
       { id: "noivern", name: "Noivern", unlock: 21 },
       { id: "blissey", name: "Blissey", unlock: 22 },
       { id: "porygonZ", name: "Porygon-Z", unlock: 21 },
+      // 10th dungeon starters
+      { id: "blastoise", name: "Blastoise", unlock: 24 },
+      { id: "feraligatr", name: "Feraligatr", unlock: 23 },
+      { id: "charizard", name: "Charizard", unlock: 24 },
+      { id: "delphox", name: "Delphox", unlock: 23 },
+      { id: "torterra", name: "Torterra", unlock: 24 },
+      { id: "serperior", name: "Serperior", unlock: 23 },
+      { id: "electivire", name: "Electivire", unlock: 24 },
+      { id: "luxray", name: "Luxray", unlock: 23 },
+      { id: "roserade", name: "Roserade", unlock: 24 },
+      { id: "vileplume", name: "Vileplume", unlock: 23 },
+      { id: "rhyperior", name: "Rhyperior", unlock: 24 },
+      { id: "dugtrio", name: "Dugtrio", unlock: 23 },
+      { id: "golem", name: "Golem", unlock: 24 },
+      { id: "terrakion", name: "Terrakion", unlock: 23 },
+      { id: "pheromosa", name: "Pheromosa", unlock: 24 },
+      { id: "escavalier", name: "Escavalier", unlock: 23 },
+      { id: "kommoO", name: "Kommo-o", unlock: 24 },
+      { id: "gallade", name: "Gallade", unlock: 23 },
+      { id: "corviknight", name: "Corviknight", unlock: 24 },
+      { id: "bastiodon", name: "Bastiodon", unlock: 23 },
+      { id: "aegislash", name: "Aegislash", unlock: 24 },
+      { id: "jellicent", name: "Jellicent", unlock: 23 },
+      { id: "slowking", name: "Slowking", unlock: 24 },
+      { id: "bronzong", name: "Bronzong", unlock: 23 },
+      { id: "froslass", name: "Froslass", unlock: 24 },
+      { id: "abomasnow", name: "Abomasnow", unlock: 23 },
+      { id: "sharpedo", name: "Sharpedo", unlock: 24 },
+      { id: "zoroark", name: "Zoroark", unlock: 23 },
+      { id: "primarina", name: "Primarina", unlock: 24 },
+      { id: "diancie", name: "Diancie", unlock: 23 },
+      { id: "dragapult", name: "Dragapult", unlock: 24 },
+      { id: "duraludon", name: "Duraludon", unlock: 23 },
+      { id: "swellow", name: "Swellow", unlock: 24 },
+      { id: "talonflame", name: "Talonflame", unlock: 23 },
+      { id: "slaking", name: "Slaking", unlock: 24 },
+      { id: "lopunny", name: "Lopunny", unlock: 23 },
     ];
   }
 }

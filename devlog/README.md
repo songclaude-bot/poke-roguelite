@@ -748,3 +748,34 @@
 - **430종+ 포켓몬** (진화 포함)
 - **250종+ 기술**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 10: 10th Tier Dungeons
+
+### 10-1. Water/Fire/Grass/Electric/Poison/Ground (Phase 178-180)
+- 날짜: 2026-02-24
+- Blastoise, Feraligatr, Charizard, Delphox, Torterra, Serperior, Electivire, Luxray, Roserade, Vileplume, Rhyperior, Dugtrio
+- Abyssal Maelstrom (Water), Primordial Inferno (Fire), Yggdrasil Root (Grass)
+- Voltex Pinnacle (Electric), Miasmatic Core (Poison), Pangaea Fault (Ground)
+
+### 10-2. Rock/Bug/Fighting/Steel/Ghost/Psychic (Phase 181-183)
+- 날짜: 2026-02-24
+- Golem, Terrakion, Pheromosa, Escavalier, Kommo-o, Gallade, Corviknight, Bastiodon, Aegislash, Jellicent, Slowking, Bronzong
+- Titan's Geode (Rock), Sovereign Hive (Bug), Apex Colosseum (Fighting)
+- Adamantine Citadel (Steel), Ethereal Sanctum (Ghost), Transcendence Spire (Psychic)
+
+### 10-3. Ice/Dark/Fairy/Dragon/Flying/Normal (Phase 184-186)
+- 날짜: 2026-02-24
+- Froslass, Abomasnow, Sharpedo, Zoroark, Primarina, Diancie, Dragapult, Duraludon, Swellow, Talonflame, Slaking, Lopunny
+- Frozen Nether (Ice), Abyssal Eclipse (Dark), Radiant Crystal Garden (Fairy)
+- Void Dragon Spire (Dragon), Celestial Galefort (Flying), Primordial Colossus (Normal)
+
+### v1.8.0 마일스톤
+- **전 18타입 × 10개 던전 = 180개 던전** + Destiny Tower = 총 181개 던전!
+- **신규 포켓몬 36종** (Phases 178-186)
+- **349종 스타터** (전체)
+- **465종+ 포켓몬** (진화 포함)
+- **275종+ 기술**
+- **HubScene 리팩터링**: 가상 스크롤 스타터 선택 UI
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
