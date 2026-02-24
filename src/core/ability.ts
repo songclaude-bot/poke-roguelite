@@ -164,4 +164,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   ponyta: AbilityId.RunAway,
   staryu: AbilityId.SwiftSwim,
   clamperl: AbilityId.ShieldDust,
+  shinx: AbilityId.Static,
+  electrike: AbilityId.Static,
 };

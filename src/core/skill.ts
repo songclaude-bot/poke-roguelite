@@ -1122,6 +1122,29 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 85,
     description: "Traps foes in a fierce vortex of water.",
   },
+  // ── Phase 47 Electric Skills ──
+  sparkCharge: {
+    id: "sparkCharge",
+    name: "Spark",
+    type: PokemonType.Electric,
+    power: 12,
+    pp: 15,
+    range: SkillRange.Front1,
+    accuracy: 95,
+    effect: SkillEffect.Paralyze,
+    effectChance: 30,
+    description: "A jolt of electricity. May paralyze.",
+  },
+  wildCharge: {
+    id: "wildCharge",
+    name: "Wild Charge",
+    type: PokemonType.Electric,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Charges with electricity at full force.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

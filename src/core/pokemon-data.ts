@@ -939,6 +939,32 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["whirlpool", "waterGun", "tackle"],
     floors: [],
   },
+  shinx: {
+    id: "shinx",
+    name: "Shinx",
+    spriteKey: "shinx",
+    types: [PokemonType.Electric],
+    attackType: PokemonType.Electric,
+    baseStats: { hp: 28, atk: 12, def: 6 },
+    walkFrameWidth: 40, walkFrameHeight: 48,
+    idleFrameWidth: 40, idleFrameHeight: 48,
+    walkFrames: 7, idleFrames: 6,
+    skillIds: ["sparkCharge", "thunderShock", "tackle"],
+    floors: [],
+  },
+  electrike: {
+    id: "electrike",
+    name: "Electrike",
+    spriteKey: "electrike",
+    types: [PokemonType.Electric],
+    attackType: PokemonType.Electric,
+    baseStats: { hp: 26, atk: 13, def: 5 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["wildCharge", "thunderShock", "bite"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1024,6 +1050,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   ponyta: { 7: "flameWheel", 12: "fireBlast" },
   staryu: { 7: "aquaJet", 10: "surf" },
   clamperl: { 7: "whirlpool", 10: "surf" },
+  shinx: { 7: "sparkCharge", 10: "wildCharge" },
+  electrike: { 7: "wildCharge", 10: "thunderbolt" },
 };
 
 /** Check if a species learns a new skill at this level */

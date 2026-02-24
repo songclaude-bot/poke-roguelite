@@ -373,6 +373,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [196, 196, 247, 247, 262, 262, 196, 196, 165, 165, 196, 196, 247, 247, 294, 294],
     tempo: 0.28, melodyType: "triangle", bassType: "sine",
   },
+  // Voltage Lab — electronic, pulsing
+  voltageLab: {
+    melody: [523, 587, 659, 784, 659, 587, 523, 494, 440, 494, 523, 587, 659, 784, 880, 784],
+    bass: [262, 262, 330, 330, 392, 392, 262, 262, 220, 220, 262, 262, 330, 330, 440, 440],
+    tempo: 0.22, melodyType: "square", bassType: "sawtooth",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],
