@@ -227,6 +227,16 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "applin", to: "flapple", level: 28, newName: "Flapple", hpBonus: 14, atkBonus: 12, defBonus: 6, newSkillId: "dragonPulse" },
   { from: "hoppip", to: "skiploom", level: 18, newName: "Skiploom", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "hurricane" },
   { from: "aipom", to: "ambipom", level: 32, newName: "Ambipom", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "hyperVoice" },
+  // Phase 148-150: Water/Fire/Grass/Electric/Poison/Ground 7th
+  { from: "poliwag", to: "poliwhirl", level: 25, newName: "Poliwhirl", hpBonus: 16, atkBonus: 10, defBonus: 8, newSkillId: "hydroPump" },
+  { from: "corphish", to: "crawdaunt", level: 30, newName: "Crawdaunt", hpBonus: 14, atkBonus: 14, defBonus: 6, newSkillId: "hydroPump" },
+  { from: "magby", to: "magmar", level: 30, newName: "Magmar", hpBonus: 16, atkBonus: 12, defBonus: 6, newSkillId: "eruption" },
+  { from: "darumaka", to: "darmanitan", level: 35, newName: "Darmanitan", hpBonus: 18, atkBonus: 14, defBonus: 6, newSkillId: "eruption" },
+  { from: "sewaddle", to: "swadloon", level: 20, newName: "Swadloon", hpBonus: 14, atkBonus: 8, defBonus: 10, newSkillId: "powerWhip" },
+  { from: "pumpkaboo", to: "gourgeist", level: 32, newName: "Gourgeist", hpBonus: 16, atkBonus: 10, defBonus: 10, newSkillId: "powerWhip" },
+  { from: "nidoranF", to: "nidorina", level: 16, newName: "Nidorina", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "gunkShot" },
+  { from: "gligar", to: "gliscor", level: 35, newName: "Gliscor", hpBonus: 16, atkBonus: 10, defBonus: 12, newSkillId: "drillRun" },
+  { from: "rhyhorn", to: "rhydon", level: 42, newName: "Rhydon", hpBonus: 18, atkBonus: 12, defBonus: 10, newSkillId: "drillRun" },
 ];
 
 /** Check if a species can evolve at a given level */

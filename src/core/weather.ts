@@ -200,6 +200,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     wyrmsNest: [WeatherType.Sandstorm, WeatherType.Hail],
     skyPinnacle: [WeatherType.Rain, WeatherType.Sandstorm],
     primevalPlains: [WeatherType.Rain, WeatherType.Sandstorm],
+    // Phase 148-150: Water/Fire/Grass/Electric/Poison/Ground 7th
+    abyssopelagic: [WeatherType.Rain],
+    calderaCore: [WeatherType.Sandstorm],
+    primordialCanopy: [WeatherType.Rain],
+    plasmaCorridor: [WeatherType.Rain, WeatherType.Sandstorm],
+    corrosivePit: [WeatherType.Rain, WeatherType.Sandstorm],
+    mantleCavern: [WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

@@ -1947,6 +1947,47 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Deafening sound that fills the room.",
   },
+  // Phase 148-150: 7th tier dungeon skills
+  hydroPump: {
+    id: "hydroPump",
+    name: "Hydro Pump",
+    type: PokemonType.Water,
+    power: 18,
+    pp: 6,
+    range: SkillRange.Front2,
+    accuracy: 80,
+    description: "Blasts the target with a huge volume of water.",
+  },
+  eruption: {
+    id: "eruption",
+    name: "Eruption",
+    type: PokemonType.Fire,
+    power: 20,
+    pp: 5,
+    range: SkillRange.Around,
+    accuracy: 85,
+    description: "Erupts with volcanic fury, hitting all nearby.",
+  },
+  powerWhip: {
+    id: "powerWhip",
+    name: "Power Whip",
+    type: PokemonType.Grass,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Front2,
+    accuracy: 85,
+    description: "Violently whirls vines to lash the target.",
+  },
+  drillRun: {
+    id: "drillRun",
+    name: "Drill Run",
+    type: PokemonType.Ground,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Front2,
+    accuracy: 95,
+    description: "Spins like a drill to slam into the target.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

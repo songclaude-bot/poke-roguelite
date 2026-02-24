@@ -344,4 +344,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   tropius: AbilityId.Torrent, // Harvest equivalent
   aipom: AbilityId.Pickup, // Run Away equivalent
   smeargle: AbilityId.ShieldDust, // Own Tempo equivalent
+  // Phase 148-150: Water/Fire/Grass/Electric/Poison/Ground 7th
+  poliwag: AbilityId.SwiftSwim, // Water Absorb equivalent
+  corphish: AbilityId.Guts, // Adaptability equivalent
+  magby: AbilityId.FlameBody,
+  darumaka: AbilityId.Guts, // Hustle equivalent
+  sewaddle: AbilityId.ShieldDust, // Swarm equivalent
+  pumpkaboo: AbilityId.Levitate, // Frisk equivalent
+  plusle: AbilityId.Static, // Plus equivalent
+  minun: AbilityId.Static, // Minus equivalent
+  nidoranF: AbilityId.PurePower, // Poison Point equivalent
+  seviper: AbilityId.Guts, // Shed Skin equivalent
+  gligar: AbilityId.Levitate, // Hyper Cutter equivalent
+  rhyhorn: AbilityId.RockHead, // Lightning Rod equivalent
 };

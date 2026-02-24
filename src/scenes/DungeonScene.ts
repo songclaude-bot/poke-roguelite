@@ -357,6 +357,13 @@ export class DungeonScene extends Phaser.Scene {
       druddigon: "0621", applin: "0840",
       hoppip: "0187", tropius: "0357",
       aipom: "0190", smeargle: "0235",
+      // Phase 148-150: Water/Fire/Grass/Electric/Poison/Ground 7th
+      poliwag: "0060", corphish: "0341",
+      magby: "0240", darumaka: "0554",
+      sewaddle: "0540", pumpkaboo: "0710",
+      plusle: "0311", minun: "0312",
+      nidoranF: "0029", seviper: "0336",
+      gligar: "0207", rhyhorn: "0111",
     };
 
     // Load player + all enemy species + ally species for this dungeon
