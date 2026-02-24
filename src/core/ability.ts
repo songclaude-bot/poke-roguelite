@@ -148,4 +148,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   natu: AbilityId.ShieldDust,
   houndour: AbilityId.FlameBody,
   sneasel: AbilityId.Pickup,
+  taillow: AbilityId.Guts,
+  starly: AbilityId.Guts,
 };

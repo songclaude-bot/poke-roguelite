@@ -963,6 +963,28 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Powerful psychic force hits all around.",
   },
+
+  // ── Additional Flying Skills ──
+  braveBird: {
+    id: "braveBird",
+    name: "Brave Bird",
+    type: PokemonType.Flying,
+    power: 20,
+    pp: 8,
+    range: SkillRange.Front2,
+    accuracy: 85,
+    description: "A powerful diving attack.",
+  },
+  airSlash: {
+    id: "airSlash",
+    name: "Air Slash",
+    type: PokemonType.Flying,
+    power: 15,
+    pp: 12,
+    range: SkillRange.FrontLine,
+    accuracy: 90,
+    description: "Slices with blades of air.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

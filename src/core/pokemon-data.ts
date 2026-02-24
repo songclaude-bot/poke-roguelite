@@ -725,6 +725,33 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["nightSlash", "icePunch", "pursuit"],
     floors: [],
   },
+  // ── Windy Summit ──
+  taillow: {
+    id: "taillow",
+    name: "Taillow",
+    spriteKey: "taillow",
+    types: [PokemonType.Normal, PokemonType.Flying],
+    attackType: PokemonType.Flying,
+    baseStats: { hp: 24, atk: 11, def: 5 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 5, idleFrames: 5,
+    skillIds: ["wingAttack", "quickAttack", "gust"],
+    floors: [],
+  },
+  starly: {
+    id: "starly",
+    name: "Starly",
+    spriteKey: "starly",
+    types: [PokemonType.Normal, PokemonType.Flying],
+    attackType: PokemonType.Flying,
+    baseStats: { hp: 22, atk: 10, def: 5 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 5, idleFrames: 5,
+    skillIds: ["gust", "quickAttack", "tackle"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -794,6 +821,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   natu: { 7: "psybeam", 10: "psychic" },
   houndour: { 7: "crunch", 10: "flamethrower" },
   sneasel: { 7: "icePunch", 10: "darkPulse" },
+  taillow: { 7: "airSlash", 10: "braveBird" },
+  starly: { 7: "wingAttack", 10: "airSlash" },
 };
 
 /** Check if a species learns a new skill at this level */

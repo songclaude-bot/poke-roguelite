@@ -251,6 +251,7 @@ export class DungeonScene extends Phaser.Scene {
       wurmple: "0265", spinarak: "0167",
       abra: "0063", natu: "0177",
       houndour: "0228", sneasel: "0215",
+      taillow: "0276", starly: "0396",
     };
 
     // Load player + all enemy species + ally species for this dungeon
