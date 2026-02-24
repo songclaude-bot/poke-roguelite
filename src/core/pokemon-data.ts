@@ -2227,6 +2227,67 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["closeCombat", "rockSmash", "superpower"],
     floors: [],
   },
+  // Phase 127-129: Steel/Ghost/Psychic 5th
+  tinkatink: {
+    id: "tinkatink", name: "Tinkatink", spriteKey: "tinkatink",
+    types: [PokemonType.Fairy, PokemonType.Steel], attackType: PokemonType.Steel,
+    baseStats: { hp: 50, atk: 45, def: 45 },
+    walkFrameWidth: 32, walkFrameHeight: 24,
+    idleFrameWidth: 32, idleFrameHeight: 24,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["smartStrike", "dazzlingGleam", "metalClaw"],
+    floors: [],
+  },
+  varoom: {
+    id: "varoom", name: "Varoom", spriteKey: "varoom",
+    types: [PokemonType.Steel, PokemonType.Poison], attackType: PokemonType.Steel,
+    baseStats: { hp: 45, atk: 70, def: 63 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 40, idleFrameHeight: 48,
+    walkFrames: 5, idleFrames: 8,
+    skillIds: ["smartStrike", "sludgeBomb", "ironHead"],
+    floors: [],
+  },
+  greavard: {
+    id: "greavard", name: "Greavard", spriteKey: "greavard",
+    types: [PokemonType.Ghost], attackType: PokemonType.Ghost,
+    baseStats: { hp: 50, atk: 61, def: 60 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["poltergeist", "shadowBall", "lick"],
+    floors: [],
+  },
+  sinistea: {
+    id: "sinistea", name: "Sinistea", spriteKey: "sinistea",
+    types: [PokemonType.Ghost], attackType: PokemonType.Ghost,
+    baseStats: { hp: 40, atk: 45, def: 45 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 8, idleFrames: 8,
+    skillIds: ["poltergeist", "shadowBall", "nightShade"],
+    floors: [],
+  },
+  flittle: {
+    id: "flittle", name: "Flittle", spriteKey: "flittle",
+    types: [PokemonType.Psychic], attackType: PokemonType.Psychic,
+    baseStats: { hp: 30, atk: 35, def: 30 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 8, idleFrames: 8,
+    skillIds: ["psyshock", "psychic", "confusion"],
+    floors: [],
+  },
+  espurr: {
+    id: "espurr", name: "Espurr", spriteKey: "espurr",
+    types: [PokemonType.Psychic], attackType: PokemonType.Psychic,
+    baseStats: { hp: 62, atk: 48, def: 54 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["psyshock", "psychic", "confusion"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -2432,6 +2493,13 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   cutiefly: { 7: "bugBuzz", 10: "dazzlingGleam" },
   clobbopus: { 7: "closeCombat", 10: "lowKick" },
   passimian: { 7: "closeCombat", 10: "lowKick" },
+  // Phase 127-129: Steel/Ghost/Psychic 5th
+  tinkatink: { 7: "smartStrike", 10: "dazzlingGleam" },
+  varoom: { 7: "smartStrike", 10: "sludgeBomb" },
+  greavard: { 7: "poltergeist", 10: "shadowBall" },
+  sinistea: { 7: "poltergeist", 10: "shadowBall" },
+  flittle: { 7: "psyshock", 10: "psychic" },
+  espurr: { 7: "psyshock", 10: "psychic" },
 };
 
 /** Check if a species learns a new skill at this level */

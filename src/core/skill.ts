@@ -1816,6 +1816,27 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 100,
     description: "An all-out attack at close range.",
   },
+  // Phase 127-129: Steel/Ghost/Psychic 5th
+  smartStrike: {
+    id: "smartStrike",
+    name: "Smart Strike",
+    type: PokemonType.Steel,
+    power: 12,
+    pp: 14,
+    range: SkillRange.Front1,
+    accuracy: 100,
+    description: "A horn attack that never misses.",
+  },
+  poltergeist: {
+    id: "poltergeist",
+    name: "Poltergeist",
+    type: PokemonType.Ghost,
+    power: 16,
+    pp: 8,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Attacks with a possessed item.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

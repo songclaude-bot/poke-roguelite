@@ -183,6 +183,13 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "blipbug", to: "dottler", level: 10, newName: "Dottler", hpBonus: 10, atkBonus: 6, defBonus: 8, newSkillId: "psychic" },
   { from: "cutiefly", to: "ribombee", level: 25, newName: "Ribombee", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "dazzlingGleam" },
   { from: "clobbopus", to: "grapploct", level: 35, newName: "Grapploct", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "superpower" },
+  // Phase 127-129: Steel/Ghost/Psychic 5th
+  { from: "tinkatink", to: "tinkatuff", level: 24, newName: "Tinkatuff", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "flashCannon" },
+  { from: "varoom", to: "revavroom", level: 40, newName: "Revavroom", hpBonus: 16, atkBonus: 12, defBonus: 8, newSkillId: "gearGrind" },
+  { from: "greavard", to: "houndstone", level: 30, newName: "Houndstone", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "phantomForce" },
+  { from: "sinistea", to: "polteageist", level: 30, newName: "Polteageist", hpBonus: 12, atkBonus: 10, defBonus: 4, newSkillId: "shadowBall" },
+  { from: "flittle", to: "espathra", level: 35, newName: "Espathra", hpBonus: 14, atkBonus: 10, defBonus: 6, newSkillId: "futuresight" },
+  { from: "espurr", to: "meowstic", level: 25, newName: "Meowstic", hpBonus: 12, atkBonus: 8, defBonus: 8, newSkillId: "expandingForce" },
 ];
 
 /** Check if a species can evolve at a given level */

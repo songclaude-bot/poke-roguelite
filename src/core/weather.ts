@@ -167,6 +167,10 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     crystalDepths: [WeatherType.Sandstorm, WeatherType.None],
     silkwoodGrove: [WeatherType.Rain, WeatherType.None],
     warlordsArena: [WeatherType.Sandstorm, WeatherType.None],
+    // Phase 127-129: Steel/Ghost/Psychic 5th
+    steelworksCitadel: [WeatherType.None, WeatherType.Sandstorm],
+    spectralCrypt: [WeatherType.None, WeatherType.Hail],
+    astralSanctum: [WeatherType.None, WeatherType.Hail],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

@@ -691,6 +691,25 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [131, 131, 196, 196, 262, 262, 220, 220, 131, 131, 147, 147, 220, 220, 294, 294],
     tempo: 0.22, melodyType: "sawtooth", bassType: "square",
   },
+  // Phase 127-129: Steel/Ghost/Psychic 5th
+  // Steelworks Citadel — industrial, heavy, rhythmic
+  steelworksCitadel: {
+    melody: [262, 330, 392, 440, 392, 330, 262, 294, 330, 392, 440, 523, 440, 392, 330, 262],
+    bass: [131, 131, 196, 196, 220, 220, 131, 131, 165, 165, 220, 220, 262, 262, 196, 196],
+    tempo: 0.24, melodyType: "square", bassType: "sawtooth",
+  },
+  // Spectral Crypt — eerie, slow, haunting
+  spectralCrypt: {
+    melody: [196, 185, 175, 196, 220, 208, 196, 175, 165, 175, 196, 220, 247, 220, 196, 175],
+    bass: [98, 98, 88, 88, 110, 110, 98, 98, 82, 82, 88, 88, 123, 123, 98, 98],
+    tempo: 0.38, melodyType: "sine", bassType: "triangle",
+  },
+  // Astral Sanctum — ethereal, dreamy, psychic
+  astralSanctum: {
+    melody: [523, 587, 659, 587, 523, 494, 440, 494, 523, 587, 659, 784, 659, 587, 523, 494],
+    bass: [262, 262, 330, 330, 262, 262, 220, 220, 262, 262, 330, 330, 392, 392, 262, 262],
+    tempo: 0.34, melodyType: "sine", bassType: "sine",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

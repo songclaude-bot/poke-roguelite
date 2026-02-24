@@ -284,4 +284,11 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   cutiefly: AbilityId.ShieldDust,
   clobbopus: AbilityId.Guts, // Limber equivalent
   passimian: AbilityId.PurePower, // Defiant equivalent
+  // Phase 127-129: Steel/Ghost/Psychic 5th
+  tinkatink: AbilityId.ShieldDust, // Mold Breaker equivalent
+  varoom: AbilityId.FlameBody, // Overcoat equivalent (engine/exhaust)
+  greavard: AbilityId.Pickup, // Fluffy equivalent
+  sinistea: AbilityId.ShieldDust, // Weak Armor equivalent
+  flittle: AbilityId.RunAway, // Speed Boost equivalent
+  espurr: AbilityId.ShieldDust, // Keen Eye equivalent
 };
