@@ -724,7 +724,7 @@ export class DungeonScene extends Phaser.Scene {
           if (this.anims.exists(bossAnim)) boss.sprite.play(bossAnim);
         }
         // Red tint aura for boss
-        boss.sprite.setTint(0xff6666);
+        if (boss.sprite) boss.sprite.setTint(0xff6666);
         this.time.delayedCall(800, () => { if (boss.sprite) boss.sprite.clearTint(); });
 
         this.bossEntity = boss;
