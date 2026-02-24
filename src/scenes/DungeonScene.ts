@@ -495,6 +495,13 @@ export class DungeonScene extends Phaser.Scene {
       heatran: "0485", kartana: "0798",
       spectrier: "0897", polteageist: "0855",
       mew: "0151", cresselia: "0488",
+      // Phase 204-206: 12th Tier (FINAL) Ice/Dark/Fairy/Dragon/Flying/Normal
+      calyrexIce: "0898", cloyster: "0091",
+      grimmsnarl: "0861", incineroar: "0727",
+      zacian: "0888", tapuLele: "0786",
+      garchomp: "0445", latios: "0381",
+      zapdos: "0145", moltres: "0146",
+      silvally: "0773", meloetta: "0648",
     };
 
     // Load player + all enemy species + ally species for this dungeon

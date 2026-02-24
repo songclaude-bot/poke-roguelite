@@ -324,6 +324,13 @@ const DUNGEON_BGM_MAP: Record<string, string> = {
   thunderGodDomain: "dungeon-electric",
   eternaCore: "dungeon-poison",
   orderSanctum: "dungeon-ground",
+  // Phase 204-206: 12th Tier (FINAL) Ice/Dark/Fairy/Dragon/Flying/Normal
+  crownTundraThrone: "dungeon-ice",
+  abyssalDarkhold: "dungeon-dark",
+  radiantSwordGarden: "dungeon-fairy",
+  dragonSovereignSpire: "dungeon-dragon",
+  celestialThunderpeak: "dungeon-flying",
+  harmonyHall: "dungeon-normal",
   // Destiny Tower
   destinyTower: "destiny",
 };
@@ -1546,6 +1553,42 @@ const _LEGACY_BGM_UNUSED = {
   originHall: {
     melody: [262, 330, 392, 494, 587, 494, 392, 330, 294, 349, 440, 523, 659, 523, 440, 349],
     bass: [131, 131, 196, 196, 262, 262, 196, 196, 147, 147, 220, 220, 330, 330, 220, 131],
+    tempo: 0.21, melodyType: "sine", bassType: "square",
+  },
+  // Crown Tundra Throne — crystalline, frozen, royal
+  crownTundraThrone: {
+    melody: [175, 208, 247, 294, 349, 294, 247, 208, 185, 220, 262, 311, 370, 311, 262, 220],
+    bass: [88, 88, 124, 124, 175, 175, 124, 124, 93, 93, 131, 131, 185, 185, 131, 88],
+    tempo: 0.20, melodyType: "sine", bassType: "triangle",
+  },
+  // Abyssal Darkhold — ominous, heavy, sinister
+  abyssalDarkhold: {
+    melody: [131, 156, 185, 220, 247, 220, 185, 156, 139, 165, 196, 233, 262, 233, 196, 165],
+    bass: [65, 65, 93, 93, 124, 124, 93, 93, 69, 69, 98, 98, 131, 131, 98, 65],
+    tempo: 0.22, melodyType: "sawtooth", bassType: "square",
+  },
+  // Radiant Sword Garden — bright, heroic, fairy-tale
+  radiantSwordGarden: {
+    melody: [330, 392, 440, 523, 587, 523, 440, 392, 349, 415, 494, 587, 659, 587, 494, 415],
+    bass: [165, 165, 220, 220, 294, 294, 220, 220, 175, 175, 247, 247, 330, 330, 247, 165],
+    tempo: 0.18, melodyType: "sine", bassType: "triangle",
+  },
+  // Dragon Sovereign Spire — epic, thundering, draconic
+  dragonSovereignSpire: {
+    melody: [196, 233, 277, 330, 392, 330, 277, 233, 208, 247, 294, 349, 415, 349, 294, 247],
+    bass: [98, 98, 139, 139, 196, 196, 139, 139, 104, 104, 147, 147, 208, 208, 147, 98],
+    tempo: 0.17, melodyType: "sawtooth", bassType: "triangle",
+  },
+  // Celestial Thunderpeak — electric, soaring, intense
+  celestialThunderpeak: {
+    melody: [262, 311, 370, 440, 523, 440, 370, 311, 277, 330, 392, 466, 554, 466, 392, 330],
+    bass: [131, 131, 185, 185, 262, 262, 185, 185, 139, 139, 196, 196, 277, 277, 196, 131],
+    tempo: 0.16, melodyType: "square", bassType: "sawtooth",
+  },
+  // Harmony Hall — serene, melodic, divine
+  harmonyHall: {
+    melody: [294, 349, 392, 440, 494, 440, 392, 349, 330, 392, 440, 494, 554, 494, 440, 392],
+    bass: [147, 147, 196, 196, 247, 247, 196, 196, 165, 165, 220, 220, 277, 277, 220, 147],
     tempo: 0.21, melodyType: "sine", bassType: "square",
   },
   // Hub — peaceful town

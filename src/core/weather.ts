@@ -318,6 +318,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     moltenForge: [WeatherType.Sandstorm, WeatherType.Hail],
     spectralPlains: [WeatherType.Hail, WeatherType.None],
     genesisTemple: [WeatherType.None, WeatherType.Rain],
+    // Phase 204-206: 12th Tier (FINAL) Ice/Dark/Fairy/Dragon/Flying/Normal
+    crownTundraThrone: [WeatherType.Hail],
+    abyssalDarkhold: [WeatherType.None, WeatherType.Sandstorm],
+    radiantSwordGarden: [WeatherType.None, WeatherType.Rain],
+    dragonSovereignSpire: [WeatherType.Sandstorm, WeatherType.None],
+    celestialThunderpeak: [WeatherType.Rain, WeatherType.None],
+    harmonyHall: [WeatherType.None],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

@@ -568,4 +568,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   polteageist: AbilityId.ShieldDust,
   mew: AbilityId.ShieldDust,
   cresselia: AbilityId.Levitate,
+  // Phase 204-206: 12th Tier (FINAL) Ice/Dark/Fairy/Dragon/Flying/Normal
+  calyrexIce: AbilityId.PurePower, // As High King equivalent
+  cloyster: AbilityId.Sturdy, // Shell Armor equivalent
+  grimmsnarl: AbilityId.PurePower, // Prankster equivalent
+  incineroar: AbilityId.Guts, // Intimidate equivalent
+  zacian: AbilityId.PurePower, // Intrepid Sword equivalent
+  tapuLele: AbilityId.ShieldDust, // Psychic Surge equivalent
+  garchomp: AbilityId.Guts, // Rough Skin equivalent
+  latios: AbilityId.Levitate, // Levitate
+  zapdos: AbilityId.Static, // Static / Pressure
+  moltres: AbilityId.FlameBody, // Flame Body equivalent
+  silvally: AbilityId.PurePower, // RKS System equivalent
+  meloetta: AbilityId.ShieldDust, // Serene Grace equivalent
 };
