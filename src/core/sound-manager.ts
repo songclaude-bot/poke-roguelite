@@ -10,6 +10,9 @@ let sfxVolume = 0.4;
 let bgmTimer: ReturnType<typeof setInterval> | null = null;
 let bgmNoteIdx = 0;
 let currentBgmId = "";
+let currentBgmTheme = "";
+let synthBgmActive = false;
+let savedDungeonTheme = "";
 
 // Load saved volumes from localStorage
 try {
@@ -397,6 +400,310 @@ function getDungeonBgmFile(dungeonId: string): string {
   if (id.includes("sky") || id.includes("wind") || id.includes("fly") || id.includes("cloud") || id.includes("cumulus") || id.includes("aerie")) return "dungeon-flying";
   if (id.includes("destiny")) return "destiny";
   return "dungeon-normal";
+}
+
+// ── Themed Synth BGM Patterns (used as fallback when OGG files are unavailable) ──
+// Each theme has melody + bass arrays (frequencies), oscillator types, and tempo.
+// These play via Web Audio API oscillators for 8-bit style music.
+
+interface SynthBgmPattern {
+  melody: number[];
+  bass: number[];
+  tempo: number;
+  melodyType: OscillatorType;
+  bassType: OscillatorType;
+}
+
+const THEMED_BGM_PATTERNS: Record<string, SynthBgmPattern> = {
+  // CAVE — Dark, deep tones, minor key, slow tempo
+  cave: {
+    melody: [196, 185, 175, 196, 220, 196, 175, 165, 196, 220, 262, 247, 220, 196, 175, 165],
+    bass:   [98,  98,  88,  88,  110, 110, 88,  88,  98,  98,  131, 131, 110, 110, 88,  82],
+    tempo: 0.32,
+    melodyType: "sawtooth",
+    bassType: "triangle",
+  },
+  // FOREST — Cheerful, nature, major key, moderate tempo, light melody
+  forest: {
+    melody: [392, 440, 494, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 523, 587, 523],
+    bass:   [196, 196, 247, 247, 262, 262, 196, 196, 165, 165, 196, 196, 247, 247, 294, 294],
+    tempo: 0.28,
+    melodyType: "triangle",
+    bassType: "sine",
+  },
+  // OCEAN — Flowing, mysterious, pentatonic scale, gentle rhythm
+  ocean: {
+    melody: [330, 392, 440, 523, 440, 392, 330, 294, 262, 294, 330, 440, 523, 587, 523, 440],
+    bass:   [165, 165, 196, 196, 220, 220, 165, 165, 131, 131, 165, 165, 262, 262, 220, 220],
+    tempo: 0.34,
+    melodyType: "sine",
+    bassType: "triangle",
+  },
+  // VOLCANO — Intense, dramatic, fast tempo, dissonant intervals, heavy bass
+  volcano: {
+    melody: [262, 311, 330, 392, 440, 415, 392, 330, 294, 330, 392, 466, 440, 392, 330, 262],
+    bass:   [131, 131, 156, 156, 196, 196, 165, 165, 147, 147, 196, 196, 220, 220, 165, 131],
+    tempo: 0.20,
+    melodyType: "sawtooth",
+    bassType: "square",
+  },
+  // SKY — Ethereal, airy, high frequencies, suspended chords, slow arpeggio
+  sky: {
+    melody: [523, 587, 659, 784, 659, 587, 523, 494, 440, 494, 523, 659, 784, 880, 784, 659],
+    bass:   [262, 262, 294, 294, 330, 330, 262, 262, 220, 220, 262, 262, 392, 392, 330, 330],
+    tempo: 0.36,
+    melodyType: "triangle",
+    bassType: "sine",
+  },
+  // BOSS — Epic, urgent, fast tempo, dramatic progression, powerful bass
+  boss: {
+    melody: [262, 330, 392, 523, 494, 440, 392, 330, 262, 330, 392, 523, 659, 587, 523, 440],
+    bass:   [131, 131, 196, 196, 262, 262, 196, 196, 131, 131, 196, 196, 330, 330, 262, 220],
+    tempo: 0.18,
+    melodyType: "sawtooth",
+    bassType: "square",
+  },
+  // HUB — Light, relaxing, peaceful town
+  hub: {
+    melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],
+    bass:   [196, 196, 247, 247, 262, 262, 247, 247, 196, 196, 165, 165, 196, 196, 220, 220],
+    tempo: 0.35,
+    melodyType: "triangle",
+    bassType: "sine",
+  },
+  // ELECTRIC — Energetic, crackling, fast
+  electric: {
+    melody: [523, 587, 659, 784, 659, 587, 523, 494, 523, 659, 784, 880, 784, 659, 523, 494],
+    bass:   [262, 262, 330, 330, 392, 392, 262, 262, 247, 247, 330, 330, 440, 440, 330, 330],
+    tempo: 0.22,
+    melodyType: "square",
+    bassType: "sawtooth",
+  },
+  // ICE — Cold, sparse, crystalline
+  ice: {
+    melody: [523, 494, 440, 392, 349, 392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330],
+    bass:   [262, 262, 220, 220, 175, 175, 196, 196, 262, 262, 294, 294, 220, 220, 175, 175],
+    tempo: 0.36,
+    melodyType: "sine",
+    bassType: "triangle",
+  },
+  // DARK — Ominous, menacing, creepy
+  dark: {
+    melody: [196, 185, 175, 165, 175, 185, 196, 220, 247, 220, 196, 175, 165, 156, 165, 175],
+    bass:   [98,  98,  88,  88,  82,  82,  98,  98,  123, 123, 110, 110, 82,  82,  78,  78],
+    tempo: 0.30,
+    melodyType: "sawtooth",
+    bassType: "triangle",
+  },
+  // PSYCHIC — Magical, twinkling, ethereal
+  psychic: {
+    melody: [523, 587, 659, 784, 659, 587, 523, 494, 523, 587, 659, 784, 880, 784, 659, 523],
+    bass:   [262, 262, 294, 294, 330, 330, 262, 262, 247, 247, 294, 294, 330, 330, 262, 262],
+    tempo: 0.32,
+    melodyType: "sine",
+    bassType: "sine",
+  },
+  // POISON — Murky, unsettling, dripping
+  poison: {
+    melody: [220, 247, 262, 220, 196, 220, 247, 294, 262, 220, 196, 175, 196, 220, 247, 220],
+    bass:   [110, 110, 131, 131, 98,  98,  123, 123, 131, 131, 110, 110, 98,  98,  110, 110],
+    tempo: 0.30,
+    melodyType: "sawtooth",
+    bassType: "triangle",
+  },
+  // GROUND — Rumbling, deep, heavy
+  ground: {
+    melody: [196, 220, 262, 294, 262, 220, 196, 175, 196, 262, 294, 330, 294, 262, 220, 196],
+    bass:   [98,  98,  131, 131, 147, 147, 98,  98,  98,  98,  147, 147, 165, 165, 131, 131],
+    tempo: 0.28,
+    melodyType: "square",
+    bassType: "sawtooth",
+  },
+  // DRAGON — Epic, intense, powerful
+  dragon: {
+    melody: [196, 262, 330, 392, 330, 262, 196, 175, 196, 262, 330, 392, 440, 392, 330, 262],
+    bass:   [98,  98,  165, 165, 196, 196, 98,  98,  88,  88,  131, 131, 220, 220, 165, 165],
+    tempo: 0.24,
+    melodyType: "sawtooth",
+    bassType: "square",
+  },
+  // FAIRY — Sparkling, gentle, whimsical
+  fairy: {
+    melody: [523, 587, 659, 698, 659, 587, 523, 494, 440, 494, 523, 587, 659, 698, 784, 698],
+    bass:   [262, 262, 330, 330, 349, 349, 262, 262, 220, 220, 262, 262, 330, 330, 392, 392],
+    tempo: 0.34,
+    melodyType: "triangle",
+    bassType: "sine",
+  },
+  // GHOST — Eerie, slow, haunting
+  ghost: {
+    melody: [220, 262, 247, 220, 196, 220, 262, 294, 262, 220, 196, 175, 196, 220, 262, 247],
+    bass:   [110, 110, 131, 131, 98,  98,  110, 110, 131, 131, 98,  98,  88,  88,  110, 110],
+    tempo: 0.38,
+    melodyType: "sine",
+    bassType: "triangle",
+  },
+  // STEEL — Mechanical, rhythmic, industrial
+  steel: {
+    melody: [262, 330, 392, 330, 262, 330, 392, 440, 392, 330, 262, 330, 392, 440, 523, 440],
+    bass:   [131, 131, 196, 196, 131, 131, 196, 196, 220, 220, 165, 165, 196, 196, 262, 262],
+    tempo: 0.24,
+    melodyType: "square",
+    bassType: "sawtooth",
+  },
+  // BUG — Buzzy, light, quick
+  bug: {
+    melody: [330, 392, 349, 330, 294, 330, 349, 392, 440, 392, 349, 330, 294, 262, 294, 330],
+    bass:   [165, 165, 175, 175, 147, 147, 175, 175, 220, 220, 196, 196, 147, 147, 131, 131],
+    tempo: 0.26,
+    melodyType: "square",
+    bassType: "sine",
+  },
+  // FIGHTING — Intense, martial, rhythmic
+  fighting: {
+    melody: [262, 330, 392, 440, 523, 440, 392, 330, 262, 294, 330, 392, 440, 523, 587, 523],
+    bass:   [131, 131, 196, 196, 262, 262, 220, 220, 131, 131, 147, 147, 220, 220, 294, 294],
+    tempo: 0.22,
+    melodyType: "sawtooth",
+    bassType: "square",
+  },
+  // FLYING — Breezy, uplifting, airy
+  flying: {
+    melody: [392, 440, 523, 587, 523, 440, 392, 349, 392, 523, 587, 659, 587, 523, 440, 392],
+    bass:   [196, 196, 262, 262, 294, 294, 196, 196, 175, 175, 262, 262, 330, 330, 220, 196],
+    tempo: 0.28,
+    melodyType: "triangle",
+    bassType: "sine",
+  },
+  // NORMAL — Calm, neutral, pastoral
+  normal: {
+    melody: [330, 392, 440, 494, 440, 392, 330, 294, 262, 294, 330, 392, 440, 494, 523, 494],
+    bass:   [165, 165, 220, 220, 220, 220, 165, 165, 131, 131, 165, 165, 220, 220, 262, 262],
+    tempo: 0.32,
+    melodyType: "triangle",
+    bassType: "sine",
+  },
+  // ROCK — Deep, heavy, echoing
+  rock: {
+    melody: [196, 220, 196, 165, 196, 220, 262, 220, 196, 165, 147, 165, 196, 220, 196, 165],
+    bass:   [98,  98,  82,  82,  98,  98,  131, 131, 98,  98,  73,  73,  82,  82,  98,  98],
+    tempo: 0.28,
+    melodyType: "sawtooth",
+    bassType: "sine",
+  },
+  // DESTINY — Grand, final, majestic
+  destiny: {
+    melody: [262, 330, 392, 523, 392, 330, 262, 196, 262, 392, 523, 659, 523, 392, 330, 262],
+    bass:   [131, 131, 196, 196, 262, 262, 131, 131, 98,  98,  196, 196, 262, 262, 165, 131],
+    tempo: 0.25,
+    melodyType: "square",
+    bassType: "sawtooth",
+  },
+};
+
+/** Map BGM file name (from getDungeonBgmFile) to synth theme key */
+function bgmFileToSynthTheme(bgmFile: string): string {
+  // Strip "dungeon-" prefix if present
+  if (bgmFile.startsWith("dungeon-")) {
+    const typeKey = bgmFile.slice(8); // e.g. "dungeon-water" -> "water"
+    // Map type-based file names to closest synth theme
+    const typeToTheme: Record<string, string> = {
+      water: "ocean",
+      fire: "volcano",
+      grass: "forest",
+      electric: "electric",
+      ice: "ice",
+      dark: "dark",
+      rock: "rock",
+      psychic: "psychic",
+      poison: "poison",
+      ground: "ground",
+      dragon: "dragon",
+      fairy: "fairy",
+      ghost: "ghost",
+      steel: "steel",
+      bug: "bug",
+      fighting: "fighting",
+      flying: "flying",
+      normal: "normal",
+    };
+    return typeToTheme[typeKey] ?? "cave";
+  }
+  if (bgmFile === "hub") return "hub";
+  if (bgmFile === "destiny") return "destiny";
+  return "cave";
+}
+
+/**
+ * Get the BGM theme string for a given dungeon ID.
+ * Returns one of: cave, forest, ocean, volcano, sky, boss, hub, electric, ice, dark,
+ * psychic, poison, ground, dragon, fairy, ghost, steel, bug, fighting, flying, normal, rock, destiny
+ */
+export function getDungeonBGMTheme(dungeonId: string): string {
+  if (!dungeonId || dungeonId === "hub") return "hub";
+  if (dungeonId === "bossRush") return "boss";
+  const bgmFile = getDungeonBgmFile(dungeonId);
+  return bgmFileToSynthTheme(bgmFile);
+}
+
+/** Start synthesized BGM using Web Audio oscillators for a given theme */
+function startSynthBgm(theme: string) {
+  const pattern = THEMED_BGM_PATTERNS[theme] ?? THEMED_BGM_PATTERNS["cave"];
+  synthBgmActive = true;
+  bgmNoteIdx = 0;
+
+  const playNote = () => {
+    if (!synthBgmActive || !bgmPlaying) return;
+    try {
+      const c = getCtx();
+      const idx = bgmNoteIdx % pattern.melody.length;
+
+      // Melody note
+      const melFreq = pattern.melody[idx];
+      if (melFreq > 0) {
+        const melOsc = c.createOscillator();
+        const melGain = c.createGain();
+        melOsc.type = pattern.melodyType;
+        melOsc.frequency.setValueAtTime(melFreq, c.currentTime);
+        melGain.gain.setValueAtTime(masterVolume * 0.15, c.currentTime);
+        melGain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + pattern.tempo * 0.9);
+        melOsc.connect(melGain);
+        melGain.connect(c.destination);
+        melOsc.start(c.currentTime);
+        melOsc.stop(c.currentTime + pattern.tempo * 0.95);
+      }
+
+      // Bass note
+      const bassFreq = pattern.bass[idx];
+      if (bassFreq > 0) {
+        const bassOsc = c.createOscillator();
+        const bassGain = c.createGain();
+        bassOsc.type = pattern.bassType;
+        bassOsc.frequency.setValueAtTime(bassFreq, c.currentTime);
+        bassGain.gain.setValueAtTime(masterVolume * 0.1, c.currentTime);
+        bassGain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + pattern.tempo * 0.9);
+        bassOsc.connect(bassGain);
+        bassGain.connect(c.destination);
+        bassOsc.start(c.currentTime);
+        bassOsc.stop(c.currentTime + pattern.tempo * 0.95);
+      }
+
+      bgmNoteIdx++;
+    } catch { /* ignore audio errors */ }
+  };
+
+  bgmTimer = setInterval(playNote, pattern.tempo * 1000);
+  playNote(); // Play first note immediately
+}
+
+/** Stop synthesized BGM */
+function stopSynthBgm() {
+  synthBgmActive = false;
+  if (bgmTimer) {
+    clearInterval(bgmTimer);
+    bgmTimer = null;
+  }
+  bgmNoteIdx = 0;
 }
 
 // Legacy BGM patterns kept as type reference only — unused, OGG files replace them
@@ -1638,46 +1945,115 @@ const _LEGACY_BGM_UNUSED = {
   },
 };
 
-/** Start BGM — plays OGG file from public/audio/bgm/ */
-export function startBgm(dungeonId?: string) {
+/**
+ * Start BGM — tries OGG file first, falls back to synthesized theme BGM.
+ * Accepts a dungeonId (mapped to theme automatically) or an explicit theme override.
+ * If the same theme is already playing, does nothing (avoids restart on floor advance).
+ */
+export function startBgm(dungeonId?: string, themeOverride?: string) {
   const id = dungeonId ?? "beachCave";
-  if (bgmPlaying && currentBgmId === id) return;
+  const theme = themeOverride ?? getDungeonBGMTheme(id);
+
+  // If same theme is already playing, skip restart
+  if (bgmPlaying && currentBgmTheme === theme) return;
 
   stopBgm();
   bgmPlaying = true;
   currentBgmId = id;
+  currentBgmTheme = theme;
+
+  // Remember the dungeon's natural theme for restoration after boss
+  if (theme !== "boss") {
+    savedDungeonTheme = theme;
+  }
 
   const bgmFile = getDungeonBgmFile(id);
   try {
     bgmAudio = new Audio(`audio/bgm/${bgmFile}.ogg`);
     bgmAudio.loop = true;
     bgmAudio.volume = masterVolume;
+
+    // Try OGG first; on error, fall back to synth
+    const startSynthFallback = () => {
+      bgmAudio = null;
+      startSynthBgm(theme);
+    };
+
+    bgmAudio.addEventListener("error", startSynthFallback, { once: true });
+
     bgmAudio.play().catch(() => {
-      // Autoplay blocked — will play on next user interaction
+      // Autoplay blocked or file missing — try synth fallback
+      // Check if element already errored (file not found triggers error event)
+      if (!bgmAudio || bgmAudio.error) {
+        startSynthFallback();
+        return;
+      }
+      // Autoplay blocked — wait for user interaction then try OGG, else synth
       const resumeOnClick = () => {
         if (bgmAudio && bgmPlaying) {
           bgmAudio.volume = masterVolume;
-          bgmAudio.play().catch(() => {});
+          bgmAudio.play().catch(() => {
+            startSynthFallback();
+          });
+        } else if (bgmPlaying) {
+          startSynthBgm(theme);
         }
         document.removeEventListener("pointerdown", resumeOnClick);
       };
       document.addEventListener("pointerdown", resumeOnClick, { once: true });
     });
-  } catch { /* ignore audio errors */ }
+  } catch {
+    // Audio constructor failed — use synth
+    startSynthBgm(theme);
+  }
 }
 
 export function stopBgm() {
   bgmPlaying = false;
   currentBgmId = "";
+  currentBgmTheme = "";
+  stopSynthBgm();
   if (bgmAudio) {
     bgmAudio.pause();
     bgmAudio.src = "";
     bgmAudio = null;
   }
-  if (bgmTimer) {
-    clearInterval(bgmTimer);
-    bgmTimer = null;
+}
+
+/**
+ * Switch to boss theme temporarily.
+ * Call this when entering a boss floor to get the epic urgent music.
+ */
+export function switchToBossTheme() {
+  if (currentBgmTheme === "boss") return;
+  // Save current dungeon theme for later restoration
+  if (currentBgmTheme && currentBgmTheme !== "boss") {
+    savedDungeonTheme = currentBgmTheme;
   }
+  // Stop current and start boss synth
+  const wasId = currentBgmId;
+  stopBgm();
+  bgmPlaying = true;
+  currentBgmId = wasId;
+  currentBgmTheme = "boss";
+  startSynthBgm("boss");
+}
+
+/**
+ * Restore the dungeon's natural theme after a boss encounter.
+ * Falls back to "cave" if no saved theme exists.
+ */
+export function restoreDungeonTheme() {
+  const theme = savedDungeonTheme || "cave";
+  if (currentBgmTheme === theme) return;
+  const wasId = currentBgmId;
+  stopBgm();
+  startBgm(wasId, theme);
+}
+
+/** Get the currently playing BGM theme */
+export function getCurrentBgmTheme(): string {
+  return currentBgmTheme;
 }
 
 /** Update BGM volume in real-time (called when user changes volume slider) */

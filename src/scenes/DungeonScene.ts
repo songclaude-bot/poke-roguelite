@@ -58,7 +58,7 @@ import {
 } from "../core/new-game-plus";
 import { checkCombo, ComboEffect, SkillCombo } from "../core/skill-combos";
 import {
-  initAudio, startBgm, stopBgm,
+  initAudio, startBgm, stopBgm, switchToBossTheme,
   sfxHit, sfxSuperEffective, sfxNotEffective, sfxMove, sfxPickup,
   sfxLevelUp, sfxRecruit, sfxStairs, sfxDeath, sfxBossDefeat,
   sfxHeal, sfxSkill, sfxMenuOpen, sfxMenuClose,
@@ -1359,6 +1359,12 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Kecleon Shop (20% chance, not on boss floors) ──
     const isBossFloor = (this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors) || this.isBossRush;
+
+    // Switch to boss BGM theme on boss floors for dramatic atmosphere
+    if (isBossFloor) {
+      switchToBossTheme();
+    }
+
     if (!isBossFloor && shouldSpawnShop() && rooms.length > 2) {
       // Pick a room that isn't the player's or stairs room
       const shopCandidates = rooms.filter(r =>
