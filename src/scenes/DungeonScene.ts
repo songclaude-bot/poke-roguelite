@@ -106,11 +106,17 @@ export class DungeonScene extends Phaser.Scene {
   // Minimap + Fog of War
   private minimapGfx!: Phaser.GameObjects.Graphics;
   private minimapBg!: Phaser.GameObjects.Graphics;
+  private minimapBorder!: Phaser.GameObjects.Graphics;
   private minimapVisible = true;
+  private minimapExpanded = false;
+  private minimapHitZone!: Phaser.GameObjects.Zone;
+  private minimapLegendTexts: Phaser.GameObjects.Text[] = [];
   private visited!: boolean[][];
-  private readonly MINIMAP_TILE = 3; // px per tile
-  private readonly MINIMAP_X = GAME_WIDTH - 80; // top-right
-  private readonly MINIMAP_Y = 4;
+  private readonly MINIMAP_TILE_SMALL = 3; // px per tile (small mode)
+  private readonly MINIMAP_TILE_LARGE = 7; // px per tile (large mode)
+  private readonly MINIMAP_X_SMALL = GAME_WIDTH - 80; // top-right
+  private readonly MINIMAP_Y_SMALL = 4;
+  // Large mode positions computed dynamically (centered)
 
   // HP Bar graphics
   private hpBarBg!: Phaser.GameObjects.Graphics;
@@ -1175,17 +1181,24 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Minimap ──
     this.minimapBg = this.add.graphics().setScrollFactor(0).setDepth(100);
+    this.minimapBorder = this.add.graphics().setScrollFactor(0).setDepth(100);
     this.minimapGfx = this.add.graphics().setScrollFactor(0).setDepth(101);
+    this.minimapExpanded = false;
+    this.minimapLegendTexts = [];
     this.createMinimap();
 
-    // Minimap toggle
-    const mmToggle = this.add.text(this.MINIMAP_X - 2, this.MINIMAP_Y + height * this.MINIMAP_TILE + 4, "[Map]", {
-      fontSize: "8px", color: "#666680", fontFamily: "monospace",
-    }).setScrollFactor(0).setDepth(101).setInteractive();
-    mmToggle.on("pointerdown", () => {
-      this.minimapVisible = !this.minimapVisible;
-      this.minimapBg.setVisible(this.minimapVisible);
-      this.minimapGfx.setVisible(this.minimapVisible);
+    // Tap on minimap zone to toggle small ↔ large
+    const smW = width * this.MINIMAP_TILE_SMALL + 4;
+    const smH = height * this.MINIMAP_TILE_SMALL + 4;
+    this.minimapHitZone = this.add.zone(
+      this.MINIMAP_X_SMALL - 2 + smW / 2,
+      this.MINIMAP_Y_SMALL - 2 + smH / 2,
+      smW, smH
+    ).setScrollFactor(0).setDepth(102).setInteractive();
+    this.minimapHitZone.on("pointerdown", () => {
+      this.minimapExpanded = !this.minimapExpanded;
+      this.updateMinimapHitZone();
+      this.updateMinimap();
     });
 
     // ── Skill Buttons ──
@@ -1221,8 +1234,8 @@ export class DungeonScene extends Phaser.Scene {
       });
 
     // ── Hamburger menu button (under minimap, top-right) ──
-    const hamX = this.MINIMAP_X + 30;
-    const hamY = this.MINIMAP_Y + 70;
+    const hamX = this.MINIMAP_X_SMALL + 30;
+    const hamY = this.MINIMAP_Y_SMALL + 70;
     this.add.text(hamX, hamY, "☰", {
       fontSize: "20px", color: "#aab0c8", fontFamily: "monospace",
       backgroundColor: "#1a1a2ecc", padding: { x: 6, y: 2 },
@@ -1515,47 +1528,58 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
-  private createMinimap() {
-    const { width, height, terrain } = this.dungeon;
-    const t = this.MINIMAP_TILE;
-    const mx = this.MINIMAP_X;
-    const my = this.MINIMAP_Y;
-
-    // Background
-    this.minimapBg.clear();
-    this.minimapBg.fillStyle(0x000000, 0.7);
-    this.minimapBg.fillRoundedRect(mx - 2, my - 2, width * t + 4, height * t + 4, 2);
-
-    // Terrain
-    this.minimapGfx.clear();
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (terrain[y][x] === TerrainType.GROUND) {
-          this.minimapGfx.fillStyle(0x334455, 1);
-          this.minimapGfx.fillRect(mx + x * t, my + y * t, t, t);
-        }
-      }
+  /** Get current minimap tile size and origin based on expanded state */
+  private getMinimapParams() {
+    const { width, height } = this.dungeon;
+    if (this.minimapExpanded) {
+      const t = this.MINIMAP_TILE_LARGE;
+      const totalW = width * t;
+      const totalH = height * t;
+      const mx = Math.floor((GAME_WIDTH - totalW) / 2);
+      const my = Math.floor((GAME_HEIGHT - totalH) / 2) - 10;
+      return { t, mx, my, totalW, totalH };
     }
+    const t = this.MINIMAP_TILE_SMALL;
+    const totalW = width * t;
+    const totalH = height * t;
+    return { t, mx: this.MINIMAP_X_SMALL, my: this.MINIMAP_Y_SMALL, totalW, totalH };
+  }
 
-    // Stairs
-    const { stairsPos } = this.dungeon;
-    this.minimapGfx.fillStyle(0xfbbf24, 1);
-    this.minimapGfx.fillRect(mx + stairsPos.x * t, my + stairsPos.y * t, t, t);
+  /** Update the hit zone position/size to match current minimap mode */
+  private updateMinimapHitZone() {
+    const { mx, my, totalW, totalH } = this.getMinimapParams();
+    const pad = 4;
+    this.minimapHitZone.setPosition(mx - pad / 2 + totalW / 2, my - pad / 2 + totalH / 2);
+    this.minimapHitZone.setSize(totalW + pad, totalH + pad);
+  }
+
+  private createMinimap() {
+    // Initial draw happens through updateMinimap
+    this.updateMinimap();
   }
 
   private updateMinimap() {
     if (!this.minimapVisible) return;
-    const t = this.MINIMAP_TILE;
-    const mx = this.MINIMAP_X;
-    const my = this.MINIMAP_Y;
     const { width, height, terrain } = this.dungeon;
+    const { t, mx, my, totalW, totalH } = this.getMinimapParams();
+    const expanded = this.minimapExpanded;
+    const pad = 4; // padding around minimap
 
     // Reveal area around player each update
     this.revealArea(this.player.tileX, this.player.tileY, 4);
 
-    this.minimapGfx.clear();
+    // ── Background ──
+    this.minimapBg.clear();
+    this.minimapBg.fillStyle(0x0a0a1a, expanded ? 0.88 : 0.75);
+    this.minimapBg.fillRoundedRect(mx - pad, my - pad, totalW + pad * 2, totalH + pad * 2, 4);
 
-    // Terrain (only visited tiles fully visible, unvisited = dark)
+    // ── Border ──
+    this.minimapBorder.clear();
+    this.minimapBorder.lineStyle(1, expanded ? 0x5566aa : 0x334466, expanded ? 0.9 : 0.6);
+    this.minimapBorder.strokeRoundedRect(mx - pad, my - pad, totalW + pad * 2, totalH + pad * 2, 4);
+
+    // ── Terrain ──
+    this.minimapGfx.clear();
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         if (terrain[y][x] === TerrainType.GROUND) {
@@ -1569,20 +1593,45 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // Stairs (only if visited)
+    // ── Shop room outline (gold border) ──
+    if (this.shopRoom) {
+      const sr = this.shopRoom;
+      // Only show if any tile in the shop room has been visited
+      let shopVisible = false;
+      for (let sy = sr.y; sy < sr.y + sr.h && !shopVisible; sy++) {
+        for (let sx = sr.x; sx < sr.x + sr.w && !shopVisible; sx++) {
+          if (this.visited[sy]?.[sx]) shopVisible = true;
+        }
+      }
+      if (shopVisible) {
+        this.minimapGfx.lineStyle(expanded ? 2 : 1, 0xfbbf24, 0.8);
+        this.minimapGfx.strokeRect(
+          mx + sr.x * t - 1, my + sr.y * t - 1,
+          sr.w * t + 2, sr.h * t + 2
+        );
+      }
+    }
+
+    // ── Stairs (gold, only if visited) ──
     const { stairsPos } = this.dungeon;
     if (this.visited[stairsPos.y]?.[stairsPos.x]) {
       this.minimapGfx.fillStyle(0xfbbf24, 1);
-      this.minimapGfx.fillRect(mx + stairsPos.x * t, my + stairsPos.y * t, t, t);
+      const sp = expanded ? 1 : 0;
+      this.minimapGfx.fillRect(
+        mx + stairsPos.x * t - sp, my + stairsPos.y * t - sp,
+        t + sp * 2, t + sp * 2
+      );
     }
 
-    // Floor items (pink dots)
-    this.minimapGfx.fillStyle(0xff6b9d, 1);
+    // ── Floor items (yellow dots, only in visited tiles) ──
+    this.minimapGfx.fillStyle(0xfde047, 1);
     for (const fi of this.floorItems) {
-      this.minimapGfx.fillRect(mx + fi.x * t, my + fi.y * t, t, t);
+      if (this.visited[fi.y]?.[fi.x]) {
+        this.minimapGfx.fillRect(mx + fi.x * t, my + fi.y * t, t, t);
+      }
     }
 
-    // Revealed traps (purple dots)
+    // ── Revealed traps (purple dots) ──
     this.minimapGfx.fillStyle(0xa855f7, 1);
     for (const tr of this.floorTraps) {
       if (tr.revealed) {
@@ -1590,9 +1639,9 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // Enemies (red dots, boss = larger)
+    // ── Enemies (red dots, boss = larger, only in visited tiles) ──
     for (const e of this.enemies) {
-      if (e.alive) {
+      if (e.alive && this.visited[e.tileY]?.[e.tileX]) {
         if (e.isBoss) {
           this.minimapGfx.fillStyle(0xff2222, 1);
           this.minimapGfx.fillRect(mx + e.tileX * t - 1, my + e.tileY * t - 1, t + 2, t + 2);
@@ -1603,21 +1652,75 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // Allies (blue dots)
-    this.minimapGfx.fillStyle(0x60a5fa, 1);
+    // ── Allies (green dots) ──
+    this.minimapGfx.fillStyle(0x4ade80, 1);
     for (const a of this.allies) {
       if (a.alive) {
         this.minimapGfx.fillRect(mx + a.tileX * t, my + a.tileY * t, t, t);
       }
     }
 
-    // Player (green dot, slightly larger)
-    this.minimapGfx.fillStyle(0x4ade80, 1);
+    // ── Player (blue dot, slightly larger) ──
+    this.minimapGfx.fillStyle(0x60a5fa, 1);
     this.minimapGfx.fillRect(
       mx + this.player.tileX * t - 1,
       my + this.player.tileY * t - 1,
       t + 2, t + 2
     );
+
+    // ── Legend (only in expanded mode) ──
+    this.updateMinimapLegend(expanded, mx, my, totalW, totalH, pad);
+  }
+
+  private updateMinimapLegend(
+    show: boolean, mx: number, my: number,
+    totalW: number, totalH: number, pad: number
+  ) {
+    // Clean up old legend texts
+    for (const lt of this.minimapLegendTexts) lt.destroy();
+    this.minimapLegendTexts = [];
+
+    if (!show) return;
+
+    const legendY = my + totalH + pad + 4;
+    const legendStyle: Phaser.Types.GameObjects.Text.TextStyle = {
+      fontSize: "8px", fontFamily: "monospace", color: "#aab0c8",
+    };
+    const entries: { color: string; label: string }[] = [
+      { color: "#60a5fa", label: "You" },
+      { color: "#4ade80", label: "Ally" },
+      { color: "#ef4444", label: "Foe" },
+      { color: "#fde047", label: "Item" },
+      { color: "#fbbf24", label: "Stairs" },
+      { color: "#a855f7", label: "Trap" },
+    ];
+
+    // Lay out entries horizontally centered under the minimap
+    const entryWidth = 42;
+    const cols = 3;
+    const rows = Math.ceil(entries.length / cols);
+    const gridW = cols * entryWidth;
+    const startX = mx + Math.floor((totalW - gridW) / 2);
+
+    for (let i = 0; i < entries.length; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const ex = startX + col * entryWidth;
+      const ey = legendY + row * 12;
+      const { color, label } = entries[i];
+      const txt = this.add.text(ex, ey, `\u25CF ${label}`, {
+        ...legendStyle, color,
+      }).setScrollFactor(0).setDepth(102);
+      this.minimapLegendTexts.push(txt);
+    }
+
+    // "Tap to close" hint
+    const hintTxt = this.add.text(
+      mx + totalW / 2, legendY + rows * 12 + 2,
+      "tap map to close",
+      { fontSize: "7px", fontFamily: "monospace", color: "#555570" }
+    ).setOrigin(0.5, 0).setScrollFactor(0).setDepth(102);
+    this.minimapLegendTexts.push(hintTxt);
   }
 
   private updateHUD() {
