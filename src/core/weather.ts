@@ -12,6 +12,39 @@ export enum WeatherType {
   Hail = "hail",         // Ice immune, others take 5 dmg/turn
 }
 
+/** Weather intensity increases as the player goes deeper into the dungeon */
+export enum WeatherIntensity {
+  Mild = "Mild",
+  Normal = "Normal",
+  Intense = "Intense",
+  Extreme = "Extreme",
+}
+
+/** Multiplier for each intensity level */
+export const INTENSITY_MULTIPLIER: Record<WeatherIntensity, number> = {
+  [WeatherIntensity.Mild]: 0.5,
+  [WeatherIntensity.Normal]: 1.0,
+  [WeatherIntensity.Intense]: 1.5,
+  [WeatherIntensity.Extreme]: 2.0,
+};
+
+/** HUD color for each intensity level */
+export const INTENSITY_COLOR: Record<WeatherIntensity, string> = {
+  [WeatherIntensity.Mild]: "#ffffff",
+  [WeatherIntensity.Normal]: "#facc15",
+  [WeatherIntensity.Intense]: "#f97316",
+  [WeatherIntensity.Extreme]: "#ef4444",
+};
+
+/** Determine weather intensity based on dungeon progress */
+export function getWeatherIntensity(floor: number, totalFloors: number): WeatherIntensity {
+  const progress = floor / totalFloors;
+  if (progress <= 0.25) return WeatherIntensity.Mild;
+  if (progress <= 0.50) return WeatherIntensity.Normal;
+  if (progress <= 0.75) return WeatherIntensity.Intense;
+  return WeatherIntensity.Extreme;
+}
+
 export interface WeatherDef {
   type: WeatherType;
   name: string;
@@ -69,6 +102,36 @@ export function isWeatherImmune(weather: WeatherType, types: PokemonType[]): boo
     return types.some(t => t === PokemonType.Ice);
   }
   return true; // No chip damage for Rain/None
+}
+
+// ── Weather Transition ──
+
+/** Chance (0–1) that weather changes mid-floor. Base 5%, +1% per 3 floors, cap 20%. */
+export function getWeatherTransitionChance(floor: number): number {
+  return Math.min(0.20, 0.05 + Math.floor(floor / 3) * 0.01);
+}
+
+/** Roll whether a mid-floor weather transition should happen */
+export function shouldWeatherTransition(floor: number): boolean {
+  return Math.random() < getWeatherTransitionChance(floor);
+}
+
+// ── Weather Synergy Bonus ──
+
+/**
+ * Returns a damage multiplier bonus for pokemon whose type matches the weather.
+ *   Rain + Water:          +15%  →  0.15
+ *   Sandstorm + Rock/Ground/Steel: +15%  →  0.15
+ *   Hail + Ice:            +15%  →  0.15
+ *   Otherwise:              0%   →  0.00
+ * The caller multiplies damage by (1 + bonus).
+ */
+export function getWeatherSynergyBonus(weather: WeatherType, pokemonType: PokemonType): number {
+  if (weather === WeatherType.Rain && pokemonType === PokemonType.Water) return 0.15;
+  if (weather === WeatherType.Sandstorm &&
+      (pokemonType === PokemonType.Rock || pokemonType === PokemonType.Ground || pokemonType === PokemonType.Steel)) return 0.15;
+  if (weather === WeatherType.Hail && pokemonType === PokemonType.Ice) return 0.15;
+  return 0;
 }
 
 /** Roll weather for a dungeon floor (based on dungeon-specific weights) */

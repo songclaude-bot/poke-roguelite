@@ -37,7 +37,7 @@ import {
   getStaticChance, getFlameBodyChance, getPickupChance,
   getRunAwayDodgeBonus, getLevitateDodgeBonus,
 } from "../core/ability-upgrade";
-import { WeatherType, WEATHERS, weatherDamageMultiplier, isWeatherImmune, rollFloorWeather } from "../core/weather";
+import { WeatherType, WEATHERS, weatherDamageMultiplier, isWeatherImmune, rollFloorWeather, WeatherIntensity, INTENSITY_MULTIPLIER, INTENSITY_COLOR, getWeatherIntensity, shouldWeatherTransition, getWeatherSynergyBonus } from "../core/weather";
 import { ShopItem, generateShopItems, shouldSpawnShop } from "../core/shop";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
 import { HeldItemEffect, getHeldItem } from "../core/held-items";
@@ -234,10 +234,13 @@ export class DungeonScene extends Phaser.Scene {
 
   // Weather
   private currentWeather = WeatherType.None;
+  private currentWeatherIntensity = WeatherIntensity.Mild;
   private weatherText!: Phaser.GameObjects.Text;
+  private weatherIntensityHudText: Phaser.GameObjects.Text | null = null;
   private weatherOverlay: Phaser.GameObjects.Rectangle | null = null;
   private weatherParticles: Phaser.GameObjects.Graphics | null = null;
   private weatherTimer: Phaser.Time.TimerEvent | null = null;
+  private floorTurns = 0; // turns taken on the current floor
 
   // Boss state
   private bossEntity: Entity | null = null;
@@ -1540,29 +1543,35 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Weather ──
     this.currentWeather = rollFloorWeather(this.dungeonDef.id, this.currentFloor);
+    this.currentWeatherIntensity = getWeatherIntensity(this.currentFloor, this.dungeonDef.floors);
+    this.floorTurns = 0;
     this.weatherText = this.add.text(GAME_WIDTH / 2, 24, "", {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
 
     if (this.currentWeather !== WeatherType.None) {
       const wd = WEATHERS[this.currentWeather];
-      this.weatherText.setText(`${wd.symbol} ${wd.name}: ${wd.description}`);
-      this.weatherText.setColor(wd.color);
+      const intLabel = this.currentWeatherIntensity;
+      this.weatherText.setText(`${wd.symbol} ${wd.name} (${intLabel}): ${wd.description}`);
+      this.weatherText.setColor(INTENSITY_COLOR[this.currentWeatherIntensity]);
       sfxWeatherChange();
-      this.showLog(`The weather is ${wd.name}!`);
+      this.showLog(`The weather is ${wd.name} (${intLabel})!`);
     }
     this.setupWeatherVisuals();
     this.setupStatusFlashAnimations();
 
     // ── Weather HUD Indicator ──
+    this.weatherIntensityHudText = null;
     if (this.currentWeather !== WeatherType.None) {
       const weatherNames: Record<string, string> = {
         [WeatherType.Rain]: "Rain",
         [WeatherType.Sandstorm]: "Sandstorm",
         [WeatherType.Hail]: "Hail",
       };
-      this.add.text(GAME_WIDTH - 10, 55, weatherNames[this.currentWeather], {
-        fontSize: "8px", color: "#94a3b8", fontFamily: "monospace",
+      const intLabel = this.currentWeatherIntensity;
+      this.weatherIntensityHudText = this.add.text(GAME_WIDTH - 10, 55,
+        `${weatherNames[this.currentWeather]} (${intLabel})`, {
+        fontSize: "8px", color: INTENSITY_COLOR[this.currentWeatherIntensity], fontFamily: "monospace",
       }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
     }
 
@@ -4113,8 +4122,17 @@ export class DungeonScene extends Phaser.Scene {
   // ── Weather Tick ──
 
   private tickWeather() {
+    this.floorTurns++;
+
+    // Check mid-floor weather transition every 10 turns
+    if (this.floorTurns % 10 === 0 && this.currentWeather !== WeatherType.None) {
+      this.checkWeatherTransition();
+    }
+
     if (this.currentWeather === WeatherType.None || this.currentWeather === WeatherType.Rain) return;
-    const WEATHER_DMG = 5;
+    const BASE_WEATHER_DMG = 5;
+    const intensityMult = INTENSITY_MULTIPLIER[this.currentWeatherIntensity];
+    const WEATHER_DMG = Math.max(1, Math.floor(BASE_WEATHER_DMG * intensityMult));
 
     // Apply chip damage to all entities not immune
     for (const entity of this.allEntities) {
@@ -4131,6 +4149,60 @@ export class DungeonScene extends Phaser.Scene {
         this.checkDeath(entity);
       }
     }
+  }
+
+  /** Check and perform a mid-floor weather transition */
+  private checkWeatherTransition() {
+    if (!shouldWeatherTransition(this.currentFloor)) return;
+    const newWeather = rollFloorWeather(this.dungeonDef.id, this.currentFloor);
+    if (newWeather === this.currentWeather) return; // no change
+
+    this.currentWeather = newWeather;
+    this.showLog("The weather changed!");
+
+    // Update weather text HUD
+    if (this.currentWeather !== WeatherType.None) {
+      const wd = WEATHERS[this.currentWeather];
+      const intLabel = this.currentWeatherIntensity;
+      this.weatherText.setText(`${wd.symbol} ${wd.name} (${intLabel}): ${wd.description}`);
+      this.weatherText.setColor(INTENSITY_COLOR[this.currentWeatherIntensity]);
+      sfxWeatherChange();
+      this.showLog(`The weather is now ${wd.name} (${intLabel})!`);
+    } else {
+      this.weatherText.setText("");
+    }
+
+    // Update the compact HUD indicator
+    if (this.weatherIntensityHudText) {
+      this.weatherIntensityHudText.destroy();
+      this.weatherIntensityHudText = null;
+    }
+    if (this.currentWeather !== WeatherType.None) {
+      const weatherNames: Record<string, string> = {
+        [WeatherType.Rain]: "Rain",
+        [WeatherType.Sandstorm]: "Sandstorm",
+        [WeatherType.Hail]: "Hail",
+      };
+      const intLabel = this.currentWeatherIntensity;
+      this.weatherIntensityHudText = this.add.text(GAME_WIDTH - 10, 55,
+        `${weatherNames[this.currentWeather]} (${intLabel})`, {
+        fontSize: "8px", color: INTENSITY_COLOR[this.currentWeatherIntensity], fontFamily: "monospace",
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
+
+      // Flash effect on weather change
+      this.weatherIntensityHudText.setAlpha(0);
+      this.tweens.add({
+        targets: this.weatherIntensityHudText,
+        alpha: { from: 0, to: 1 },
+        duration: 300,
+        yoyo: true,
+        repeat: 2,
+        onComplete: () => { if (this.weatherIntensityHudText) this.weatherIntensityHudText.setAlpha(1); },
+      });
+    }
+
+    // Rebuild weather visuals
+    this.setupWeatherVisuals();
   }
 
   private checkPlayerDeath() {
@@ -5783,13 +5855,20 @@ export class DungeonScene extends Phaser.Scene {
         }
       }
       const wMult = weatherDamageMultiplier(this.currentWeather, attacker.attackType);
+      // Weather intensity scales the weather multiplier deviation from 1.0
+      const intensityMult = INTENSITY_MULTIPLIER[this.currentWeatherIntensity];
+      const scaledWMult = wMult === 1.0 ? 1.0 : 1.0 + (wMult - 1.0) * intensityMult;
+      // Weather synergy bonus for matching pokemon type
+      const synergyBonus = (attacker === this.player)
+        ? 1.0 + getWeatherSynergyBonus(this.currentWeather, attacker.attackType)
+        : 1.0;
       // Held item: crit chance (attacker is player)
       const critChance = this.heldItemEffect.critChance ?? 0;
       const isCrit = attacker === this.player && critChance > 0 && Math.random() * 100 < critChance;
       const critMult = isCrit ? 1.5 : 1.0;
       // Apply difficulty playerDamageMult when defender is the player
       const diffDmgMult = defender === this.player ? this.difficultyMods.playerDamageMult : 1.0;
-      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * wMult * critMult * diffDmgMult));
+      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * scaledWMult * synergyBonus * critMult * diffDmgMult));
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
       // Sound effects based on effectiveness
@@ -5809,7 +5888,8 @@ export class DungeonScene extends Phaser.Scene {
       if (isCrit) logMsg += " Critical hit!";
       if (effText) logMsg += ` ${effText}`;
       if (abilityMult > 1) logMsg += " (Torrent!)";
-      if (wMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
+      if (scaledWMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
+      if (synergyBonus > 1.0) logMsg += " (Weather Synergy!)";
       this.showLog(logMsg);
 
       // Ability: Static — paralyze chance scaled by ability level
@@ -5916,6 +5996,13 @@ export class DungeonScene extends Phaser.Scene {
           const def = getEffectiveDef(target);
           const baseDmg = Math.max(1, Math.floor(skill.power * atk / 10) - Math.floor(def / 2));
           const wMult = weatherDamageMultiplier(this.currentWeather, skill.type);
+          // Weather intensity scales the weather multiplier deviation from 1.0
+          const skillIntensityMult = INTENSITY_MULTIPLIER[this.currentWeatherIntensity];
+          const skillScaledWMult = wMult === 1.0 ? 1.0 : 1.0 + (wMult - 1.0) * skillIntensityMult;
+          // Weather synergy bonus for matching pokemon type (player only)
+          const skillSynergyBonus = (user === this.player)
+            ? 1.0 + getWeatherSynergyBonus(this.currentWeather, user.attackType)
+            : 1.0;
           // Held item: crit chance (user is player)
           const skillCritChance = this.heldItemEffect.critChance ?? 0;
           const skillIsCrit = user === this.player && (this.comboCritGuarantee || (skillCritChance > 0 && Math.random() * 100 < skillCritChance));
@@ -5924,7 +6011,7 @@ export class DungeonScene extends Phaser.Scene {
           const comboMult = (user === this.player && this.comboDoubleDamage) ? 2.0 : 1.0;
           // Apply difficulty playerDamageMult when target is the player
           const skillDiffDmgMult = target === this.player ? this.difficultyMods.playerDamageMult : 1.0;
-          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * wMult * skillCritMult * comboMult * skillDiffDmgMult));
+          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * skillScaledWMult * skillSynergyBonus * skillCritMult * comboMult * skillDiffDmgMult));
           target.stats.hp = Math.max(0, target.stats.hp - dmg);
 
           this.flashEntity(target, effectiveness);
@@ -5939,7 +6026,8 @@ export class DungeonScene extends Phaser.Scene {
           let logMsg = `${user.name}'s ${skill.name} hit ${target.name}! ${dmg} dmg!`;
           if (skillIsCrit) logMsg += " Critical hit!";
           if (effText) logMsg += ` ${effText}`;
-          if (wMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
+          if (skillScaledWMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
+          if (skillSynergyBonus > 1.0) logMsg += " (Weather Synergy!)";
           this.showLog(logMsg);
 
           // Thorns enchantment: reflect 10% damage back when player is hit by skill
