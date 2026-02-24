@@ -1295,6 +1295,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 80,
     description: "Hurls a massive boulder at the foe.",
   },
+
+  // ── Phase 65 Normal Skills ──
+  triAttack: {
+    id: "triAttack",
+    name: "Tri Attack",
+    type: PokemonType.Normal,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Fires three beams of energy at the foe.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

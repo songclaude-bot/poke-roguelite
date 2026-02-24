@@ -1261,6 +1261,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["stoneEdge", "rockWrecker", "bite"],
     floors: [],
   },
+
+  // ── Phase 65 Normal 2nd ──
+  lillipup: {
+    id: "lillipup", name: "Lillipup", spriteKey: "lillipup",
+    types: [PokemonType.Normal], attackType: PokemonType.Normal,
+    baseStats: { hp: 26, atk: 12, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 6, idleFrames: 4,
+    skillIds: ["headbutt", "triAttack", "bite"],
+    floors: [],
+  },
+  minccino: {
+    id: "minccino", name: "Minccino", spriteKey: "minccino",
+    types: [PokemonType.Normal], attackType: PokemonType.Normal,
+    baseStats: { hp: 24, atk: 10, def: 10 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 6, idleFrames: 4,
+    skillIds: ["triAttack", "hyperVoice", "headbutt"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1373,6 +1395,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   crabrawler: { 7: "drainPunch", 10: "hammerArm" },
   roggenrola: { 7: "rockWrecker", 10: "stoneEdge" },
   rockruff: { 7: "stoneEdge", 10: "rockWrecker" },
+  lillipup: { 7: "triAttack", 10: "hyperVoice" },
+  minccino: { 7: "hyperVoice", 10: "triAttack" },
 };
 
 /** Check if a species learns a new skill at this level */

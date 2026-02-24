@@ -449,6 +449,11 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [98, 98, 123, 123, 131, 131, 123, 123, 98, 98, 88, 88, 98, 98, 131, 131],
     tempo: 0.34, melodyType: "sawtooth", bassType: "triangle",
   },
+  tranquilGrove: {
+    melody: [392, 440, 494, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 523, 587, 523],
+    bass: [196, 196, 247, 247, 262, 262, 247, 247, 196, 196, 175, 175, 196, 196, 247, 247],
+    tempo: 0.36, melodyType: "triangle", bassType: "sine",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],
