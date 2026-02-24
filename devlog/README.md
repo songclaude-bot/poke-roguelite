@@ -176,11 +176,37 @@
 - 날짜: 2026-02-24
 - 핵심: 허브 스크롤 가능 던전 리스트, Poochyena 추가, 16종 스타터, 35종+ 포켓몬
 
+## Phase 23: 브라우저 테스트 + 버그 수정
+
+### 23. Hub 스크롤 UI 버그 수정
+- 날짜: 2026-02-24
+- 핵심: 던전 리스트 스크롤 시 고정 버튼과 겹치는 문제 수정, createFixedButton depth 레이어링
+
+## Phase 24: Steel Fortress
+
+### 24. Steel 포켓몬 + 15번째 던전
+- 날짜: 2026-02-24
+- 핵심: Beldum/Skarmory, 3종 Steel 스킬(ironHead/flashCannon/bulletPunch), Steel Fortress 14층, Iron Metagross 보스
+
+## Phase 25: TM 시스템
+
+### 25. TM + 신규 아이템
+- 날짜: 2026-02-24
+- 핵심: 6종 TM(Flamethrower/Thunderbolt/IceBeam/ShadowBall/DragonPulse/Earthquake), Warp Orb, Foe-Hold Orb, Max Elixir
+
+## Phase 26-27: Ground + 스타터 확장
+
+### 26-27. Ground 포켓몬 + Buried Ruins + 스타터
+- 날짜: 2026-02-24
+- 핵심: Sandshrew/Trapinch/Phanpy, 2종 Ground 스킬(dig/sandTomb), Buried Ruins 12층, Ancient Flygon 보스, 20종 스타터, 스크롤 가능 스타터 선택
+
 ---
 
-## 현재 게임 규모 (v0.20.0)
+## 현재 게임 규모 (v0.22.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **14개 던전**: Beach Cave → Destiny Tower
-- **35종+ 포켓몬** (진화 포함 50종+)
-- **60종+ 기술**
+- **16개 던전**: Beach Cave → Destiny Tower
+- **40종+ 포켓몬** (진화 포함 55종+)
+- **70종+ 기술**
+- **20종 아이템** (6종 TM 포함)
+- **20종 스타터** (클리어 수로 해금)
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
