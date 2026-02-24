@@ -689,3 +689,32 @@
 - **360종+ 포켓몬** (진화 포함)
 - **220종+ 기술**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 8: 8th Tier Dungeons
+
+### 8-1. Water/Fire/Grass/Electric/Poison/Ground (Phase 158-160)
+- 날짜: 2026-02-24
+- Psyduck, Seel, Cyndaquil, Fennekin, Sunkern, Cacnea, Pichu, Chinchou, Weedle, Qwilfish, Donphan, Marowak
+- Abyssal Trench (Water), Volcanic Core (Fire), Primeval Canopy (Grass)
+- Thunder Spire (Electric), Venom Abyss (Poison), Tectonic Depths (Ground)
+
+### 8-2. Rock/Bug/Fighting/Steel/Ghost/Psychic (Phase 161-163)
+- 날짜: 2026-02-24
+- Onix, Omanyte, Scyther, Pinsir, Medicham, Lucario, Metang, Lairon, Gengar, Chandelure, Alakazam, Gardevoir
+- 진화 대상 추가: Omastar, Metagross, Aggron
+
+### 8-3. Ice/Dark/Fairy/Dragon/Flying/Normal (Phase 164-166)
+- 날짜: 2026-02-24
+- Lapras, Weavile, Honchkrow, Houndoom, Florges, Mimikyu, Dragonite, Flygon, Staraptor, Braviary, Snorlax, Zangoose
+- Glacial Tomb (Ice), Abyssal Shadow (Dark), Enchanted Grove (Fairy)
+- Wyrmpeak Summit (Dragon), Gale Stronghold (Flying), Apex Arena (Normal)
+
+### v1.6.0 마일스톤
+- **전 18타입 × 8개 던전 = 144개 던전** + Destiny Tower = 총 145개 던전!
+- **신규 포켓몬 36종** (Phases 158-166) + 진화 대상 3종
+- **277종 스타터** (전체)
+- **395종+ 포켓몬** (진화 포함)
+- **230종+ 기술**
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
