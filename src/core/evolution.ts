@@ -142,6 +142,12 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "larvesta", to: "volcarona", level: 14, newName: "Volcarona", hpBonus: 12, atkBonus: 12, defBonus: 6, newSkillId: "heatWave" },
   { from: "fomantis", to: "lurantis", level: 14, newName: "Lurantis", hpBonus: 12, atkBonus: 12, defBonus: 6, newSkillId: "leafBlade" },
   { from: "morelull", to: "shiinotic", level: 14, newName: "Shiinotic", hpBonus: 14, atkBonus: 6, defBonus: 10, newSkillId: "leafStorm" },
+  { from: "charjabug", to: "vikavolt", level: 14, newName: "Vikavolt", hpBonus: 12, atkBonus: 14, defBonus: 4, newSkillId: "thunderbolt" },
+  { from: "helioptile", to: "heliolisk", level: 14, newName: "Heliolisk", hpBonus: 10, atkBonus: 14, defBonus: 4, newSkillId: "electricTerrain" },
+  { from: "mareanie", to: "toxapex", level: 14, newName: "Toxapex", hpBonus: 14, atkBonus: 4, defBonus: 14, newSkillId: "poisonJab" },
+  { from: "croagunk", to: "toxicroak", level: 14, newName: "Toxicroak", hpBonus: 12, atkBonus: 12, defBonus: 6, newSkillId: "drainPunch" },
+  { from: "sandygast", to: "palossand", level: 14, newName: "Palossand", hpBonus: 14, atkBonus: 8, defBonus: 10, newSkillId: "scorchingSand" },
+  { from: "silicobra", to: "sandaconda", level: 14, newName: "Sandaconda", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "earthPower" },
 ];
 
 /** Check if a species can evolve at a given level */

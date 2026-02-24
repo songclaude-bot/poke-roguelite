@@ -142,6 +142,9 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     tidalGrotto: [WeatherType.Rain],
     blazingCaldera: [WeatherType.Sandstorm],
     verdantCanopy: [WeatherType.Rain],
+    sparkingPlant: [WeatherType.Rain, WeatherType.Sandstorm],
+    venomousReef: [WeatherType.Rain, WeatherType.Sandstorm],
+    shiftingSands: [WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

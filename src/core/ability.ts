@@ -235,4 +235,10 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   larvesta: AbilityId.FlameBody,
   fomantis: AbilityId.Torrent, // Contrary equivalent
   morelull: AbilityId.ShieldDust, // Effect Spore equivalent
+  charjabug: AbilityId.Sturdy, // Battery equivalent
+  helioptile: AbilityId.Static, // Dry Skin equivalent
+  mareanie: AbilityId.Sturdy, // Regenerator equivalent
+  croagunk: AbilityId.Guts, // Dry Skin equivalent
+  sandygast: AbilityId.Levitate, // Water Compaction equivalent
+  silicobra: AbilityId.Sturdy, // Shed Skin equivalent
 };

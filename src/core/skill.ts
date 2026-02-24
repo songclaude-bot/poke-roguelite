@@ -1567,6 +1567,48 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 80,
     description: "Whips up a storm of sharp leaves.",
   },
+
+  // ── Phase 99 Electric 4th Skills ──
+  electricTerrain: {
+    id: "electricTerrain",
+    name: "Electric Terrain",
+    type: PokemonType.Electric,
+    power: 0,
+    pp: 8,
+    range: SkillRange.Room,
+    accuracy: 100,
+    effect: SkillEffect.AtkUp,
+    effectChance: 100,
+    description: "Electrifies the ground, boosting Electric moves.",
+  },
+
+  // ── Phase 100 Poison 4th Skills ──
+  poisonJab: {
+    id: "poisonJab",
+    name: "Poison Jab",
+    type: PokemonType.Poison,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front1,
+    accuracy: 90,
+    effect: SkillEffect.Burn,
+    effectChance: 30,
+    description: "Stabs with a toxic barb. May poison the target.",
+  },
+
+  // ── Phase 101 Ground 4th Skills ──
+  scorchingSand: {
+    id: "scorchingSand",
+    name: "Scorching Sand",
+    type: PokemonType.Ground,
+    power: 14,
+    pp: 10,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    effect: SkillEffect.Burn,
+    effectChance: 30,
+    description: "Hurls scorching sand. May burn the target.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

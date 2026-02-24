@@ -1736,6 +1736,69 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["energyBall", "leafStorm", "drainingKiss"],
     floors: [],
   },
+  // ── Phase 99 Electric 4th ──
+  charjabug: {
+    id: "charjabug", name: "Charjabug", spriteKey: "charjabug",
+    types: [PokemonType.Electric, PokemonType.Bug], attackType: PokemonType.Electric,
+    baseStats: { hp: 28, atk: 8, def: 14 },
+    walkFrameWidth: 40, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 6, idleFrames: 2,
+    skillIds: ["electricTerrain", "thunderbolt", "xScissor"],
+    floors: [],
+  },
+  helioptile: {
+    id: "helioptile", name: "Helioptile", spriteKey: "helioptile",
+    types: [PokemonType.Electric, PokemonType.Normal], attackType: PokemonType.Electric,
+    baseStats: { hp: 22, atk: 14, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["thunderbolt", "electricTerrain", "headbutt"],
+    floors: [],
+  },
+  // ── Phase 100 Poison 4th ──
+  mareanie: {
+    id: "mareanie", name: "Mareanie", spriteKey: "mareanie",
+    types: [PokemonType.Poison, PokemonType.Water], attackType: PokemonType.Poison,
+    baseStats: { hp: 26, atk: 8, def: 14 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 6, idleFrames: 4,
+    skillIds: ["poisonJab", "venoshock", "waterPulse"],
+    floors: [],
+  },
+  croagunk: {
+    id: "croagunk", name: "Croagunk", spriteKey: "croagunk",
+    types: [PokemonType.Poison, PokemonType.Fighting], attackType: PokemonType.Poison,
+    baseStats: { hp: 24, atk: 12, def: 8 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 7,
+    skillIds: ["poisonJab", "drainPunch", "venoshock"],
+    floors: [],
+  },
+  // ── Phase 101 Ground 4th ──
+  sandygast: {
+    id: "sandygast", name: "Sandygast", spriteKey: "sandygast",
+    types: [PokemonType.Ground, PokemonType.Ghost], attackType: PokemonType.Ground,
+    baseStats: { hp: 26, atk: 10, def: 12 },
+    walkFrameWidth: 40, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 3, idleFrames: 2,
+    skillIds: ["scorchingSand", "earthPower", "shadowBall"],
+    floors: [],
+  },
+  silicobra: {
+    id: "silicobra", name: "Silicobra", spriteKey: "silicobra",
+    types: [PokemonType.Ground], attackType: PokemonType.Ground,
+    baseStats: { hp: 28, atk: 10, def: 10 },
+    walkFrameWidth: 48, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 6, idleFrames: 2,
+    skillIds: ["earthPower", "scorchingSand", "headbutt"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1892,6 +1955,12 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   larvesta: { 7: "fireWhip", 10: "flameWheel" },
   fomantis: { 7: "leafStorm", 10: "leafBlade" },
   morelull: { 7: "leafStorm", 10: "energyBall" },
+  charjabug: { 7: "electricTerrain", 10: "thunderbolt" },
+  helioptile: { 7: "electricTerrain", 10: "thunderbolt" },
+  mareanie: { 7: "poisonJab", 10: "venoshock" },
+  croagunk: { 7: "poisonJab", 10: "drainPunch" },
+  sandygast: { 7: "scorchingSand", 10: "earthPower" },
+  silicobra: { 7: "scorchingSand", 10: "earthPower" },
 };
 
 /** Check if a species learns a new skill at this level */
