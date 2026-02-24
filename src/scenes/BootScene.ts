@@ -32,7 +32,7 @@ export class BootScene extends Phaser.Scene {
       fontSize: "14px", color: hasSave ? "#4ade80" : "#667eea", fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    this.add.text(cx, cy + 60, "v0.55.0 — Glacial Cavern", {
+    this.add.text(cx, cy + 60, "v0.60.0 — Gale Cliffs", {
       fontSize: "9px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 

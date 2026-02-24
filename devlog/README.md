@@ -358,12 +358,36 @@
 
 ---
 
-## 현재 게임 규모 (v0.55.0)
+## Phase 59: Astral Spire
+
+### 59. Psychic 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Spoink (Natu 기존), psyshock 스킬, Astral Spire 11층, Cosmic Grumpig 보스
+
+---
+
+## Phase 60: Shadow Alley
+
+### 60. Dark 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Stunky/Purrloin, foulPlay 스킬, Shadow Alley 11층, Shadow Skuntank 보스
+
+---
+
+## Phase 61: Gale Cliffs
+
+### 61. Flying 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Pidove/Rufflet, hurricane 스킬, Gale Cliffs 11층, Storm Braviary 보스
+
+---
+
+## 현재 게임 규모 (v0.60.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **43개 던전**: Beach Cave → Glacial Cavern + Destiny Tower
-- **102종+ 포켓몬** (진화 포함 118종+)
-- **119종+ 기술**
+- **47개 던전**: Beach Cave → Gale Cliffs + Destiny Tower
+- **109종+ 포켓몬** (진화 포함 127종+)
+- **124종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **50종 스타터** (클리어 수로 해금)
-- **82종+ 진화 경로**
+- **55종 스타터** (클리어 수로 해금)
+- **90종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
