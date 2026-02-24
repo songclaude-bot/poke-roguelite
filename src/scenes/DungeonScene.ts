@@ -460,6 +460,13 @@ export class DungeonScene extends Phaser.Scene {
       dragapult: "0887", duraludon: "0884",
       swellow: "0277", talonflame: "0663",
       slaking: "0289", lopunny: "0428",
+      // Phase 188-190: 11th Tier Water/Fire/Grass/Electric/Poison/Ground
+      suicune: "0245", lugia: "0249",
+      hooh: "0250", entei: "0244",
+      celebi: "0251", virizion: "0640",
+      raikou: "0243", zekrom: "0644",
+      nihilego: "0793", naganadel: "0804",
+      groudon: "0383", landorus: "0645",
     };
 
     // Load player + all enemy species + ally species for this dungeon

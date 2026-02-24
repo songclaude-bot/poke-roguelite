@@ -503,4 +503,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   talonflame: AbilityId.FlameBody, // Flame Body
   slaking: AbilityId.PurePower, // Truant → compensated with raw power
   lopunny: AbilityId.Guts, // Limber equivalent
+  // Phase 188-190: 11th Tier Water/Fire/Grass/Electric/Poison/Ground
+  suicune: AbilityId.SwiftSwim, // Pressure equivalent
+  lugia: AbilityId.Sturdy, // Multiscale equivalent
+  hooh: AbilityId.FlameBody, // Regenerator equivalent
+  entei: AbilityId.PurePower, // Pressure equivalent
+  celebi: AbilityId.ShieldDust, // Natural Cure equivalent
+  virizion: AbilityId.PurePower, // Justified equivalent
+  raikou: AbilityId.Static, // Pressure equivalent
+  zekrom: AbilityId.PurePower, // Teravolt equivalent
+  nihilego: AbilityId.Sturdy, // Beast Boost equivalent
+  naganadel: AbilityId.PurePower, // Beast Boost equivalent
+  groudon: AbilityId.Sturdy, // Drought equivalent
+  landorus: AbilityId.Guts, // Sand Force equivalent
 };

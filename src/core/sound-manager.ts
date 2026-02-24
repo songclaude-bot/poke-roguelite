@@ -1419,6 +1419,42 @@ const _LEGACY_BGM_UNUSED = {
     bass: [131, 131, 165, 165, 196, 196, 131, 131, 147, 147, 175, 175, 220, 220, 147, 131],
     tempo: 0.20, melodyType: "sawtooth", bassType: "square",
   },
+  // Ocean Sovereignty — deep, majestic, tidal
+  oceanSovereignty: {
+    melody: [196, 247, 294, 330, 392, 330, 294, 247, 220, 262, 330, 392, 440, 392, 330, 262],
+    bass: [98, 98, 131, 131, 165, 165, 131, 131, 110, 110, 165, 165, 196, 196, 131, 98],
+    tempo: 0.22, melodyType: "sine", bassType: "triangle",
+  },
+  // Sacred Pyre — divine, fiery, intense
+  sacredPyre: {
+    melody: [330, 392, 440, 523, 587, 523, 440, 392, 349, 440, 523, 587, 659, 587, 523, 440],
+    bass: [165, 165, 220, 220, 262, 262, 220, 220, 175, 175, 262, 262, 330, 330, 220, 165],
+    tempo: 0.17, melodyType: "sawtooth", bassType: "square",
+  },
+  // Timeless Grove — ethereal, peaceful yet ancient
+  timelessGrove: {
+    melody: [392, 440, 523, 587, 523, 494, 440, 392, 349, 392, 440, 523, 587, 523, 494, 440],
+    bass: [196, 196, 262, 262, 247, 247, 196, 196, 175, 175, 220, 220, 294, 294, 247, 196],
+    tempo: 0.24, melodyType: "triangle", bassType: "sine",
+  },
+  // Thunder Sovereignty — electrifying, pulsing, powerful
+  thunderSovereignty: {
+    melody: [220, 262, 330, 392, 440, 392, 330, 262, 247, 294, 349, 440, 523, 440, 349, 294],
+    bass: [110, 110, 165, 165, 220, 220, 165, 165, 124, 124, 175, 175, 262, 262, 175, 110],
+    tempo: 0.15, melodyType: "square", bassType: "sawtooth",
+  },
+  // Ultra Venom Nexus — alien, toxic, unsettling
+  ultraVenomNexus: {
+    melody: [175, 196, 233, 262, 294, 262, 233, 196, 185, 220, 262, 311, 330, 311, 262, 220],
+    bass: [88, 88, 117, 117, 147, 147, 117, 117, 93, 93, 131, 131, 165, 165, 117, 88],
+    tempo: 0.20, melodyType: "sawtooth", bassType: "square",
+  },
+  // Pangaea Throne — primal, earthshaking, colossal
+  pangaeaThrone: {
+    melody: [147, 175, 220, 262, 294, 262, 220, 175, 165, 196, 247, 294, 330, 294, 247, 196],
+    bass: [73, 73, 110, 110, 147, 147, 110, 110, 82, 82, 124, 124, 165, 165, 110, 73],
+    tempo: 0.19, melodyType: "sawtooth", bassType: "square",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

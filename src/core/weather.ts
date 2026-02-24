@@ -284,6 +284,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     voidDragonSpire: [WeatherType.Sandstorm, WeatherType.Hail],
     celestialGalefort: [WeatherType.Rain, WeatherType.Sandstorm],
     primordialColossus: [WeatherType.Rain, WeatherType.Sandstorm],
+    // Phase 188-190: 11th Tier Water/Fire/Grass/Electric/Poison/Ground
+    oceanSovereignty: [WeatherType.Rain],
+    sacredPyre: [WeatherType.Sandstorm],
+    timelessGrove: [WeatherType.Rain],
+    thunderSovereignty: [WeatherType.Rain, WeatherType.Sandstorm],
+    ultraVenomNexus: [WeatherType.Rain, WeatherType.Sandstorm],
+    pangaeaThrone: [WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 
