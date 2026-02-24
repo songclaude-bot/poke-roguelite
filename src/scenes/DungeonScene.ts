@@ -62,6 +62,13 @@ const MOVE_DURATION = 150; // ms per tile movement
 function enemiesPerRoom(floor: number): number {
   return Math.min(3, 1 + Math.floor((floor - 1) / 3)); // 1→2→3
 }
+
+/** Monster House types */
+enum MonsterHouseType {
+  Standard = "standard",   // Extra enemies spawn
+  Treasure = "treasure",   // More items + more enemies, 2x gold on clear
+  Ambush = "ambush",       // Enemies invisible until triggered, then all attack
+}
 const MAX_ALLIES = 4; // max party members (excluding player)
 
 // Per-floor enemy scaling (uses species base stats + dungeon difficulty + NG+ bonus)
@@ -168,6 +175,9 @@ export class DungeonScene extends Phaser.Scene {
   // Monster House
   private monsterHouseRoom: { x: number; y: number; w: number; h: number } | null = null;
   private monsterHouseTriggered = false;
+  private monsterHouseType: MonsterHouseType = MonsterHouseType.Standard;
+  private monsterHouseCleared = false;
+  private monsterHouseEnemies: Entity[] = []; // track enemies spawned in monster house
 
   // NG+ difficulty scaling
   private ngPlusLevel = 0;
@@ -317,6 +327,9 @@ export class DungeonScene extends Phaser.Scene {
     this.shopTiles = [];
     this.monsterHouseRoom = null;
     this.monsterHouseTriggered = false;
+    this.monsterHouseType = MonsterHouseType.Standard;
+    this.monsterHouseCleared = false;
+    this.monsterHouseEnemies = [];
     this.ngPlusLevel = Math.min(10, meta.totalClears); // Cap at NG+10
     this.gold = meta.gold;
 
@@ -855,21 +868,6 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // ── Monster House (15% chance, not on floor 1 or boss floors) ──
-    const isEndlessBossFloor = this.dungeonDef.id === "endlessDungeon" && this.currentFloor % 10 === 0;
-    const isLastFloor = (this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors) || isEndlessBossFloor || this.isBossRush;
-    if (!isLastFloor && this.currentFloor > 1 && Math.random() < 0.15 && rooms.length > 2) {
-      const mhCandidates = rooms.filter((r, idx) =>
-        idx > 0 && // Not player's room
-        !(stairsPos.x >= r.x && stairsPos.x < r.x + r.w &&
-          stairsPos.y >= r.y && stairsPos.y < r.y + r.h) &&
-        (!this.shopRoom || !(r.x === this.shopRoom.x && r.y === this.shopRoom.y))
-      );
-      if (mhCandidates.length > 0) {
-        this.monsterHouseRoom = mhCandidates[Math.floor(Math.random() * mhCandidates.length)];
-      }
-    }
-
     // ── Spawn boss on final floor ──
     if (this.currentFloor === this.dungeonDef.floors && this.dungeonDef.boss) {
       const bossDef = this.dungeonDef.boss;
@@ -1143,6 +1141,37 @@ export class DungeonScene extends Phaser.Scene {
       );
       if (mhCandidates.length > 0) {
         this.monsterHouseRoom = mhCandidates[Math.floor(Math.random() * mhCandidates.length)];
+        // Roll monster house type: 50% Standard, 25% Treasure, 25% Ambush
+        const typeRoll = Math.random();
+        if (typeRoll < 0.50) {
+          this.monsterHouseType = MonsterHouseType.Standard;
+        } else if (typeRoll < 0.75) {
+          this.monsterHouseType = MonsterHouseType.Treasure;
+        } else {
+          this.monsterHouseType = MonsterHouseType.Ambush;
+        }
+
+        // Treasure type: pre-place extra items in the room
+        if (this.monsterHouseType === MonsterHouseType.Treasure) {
+          const mhRoom = this.monsterHouseRoom;
+          const treasureCount = 2 + Math.floor(Math.random() * 3); // 2-4 extra items
+          for (let ti = 0; ti < treasureCount; ti++) {
+            const ix = mhRoom.x + 1 + Math.floor(Math.random() * Math.max(1, mhRoom.w - 2));
+            const iy = mhRoom.y + 1 + Math.floor(Math.random() * Math.max(1, mhRoom.h - 2));
+            if (terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
+            if (ix === stairsPos.x && iy === stairsPos.y) continue;
+
+            const item = rollFloorItem();
+            const icon = item.category === "berry" ? "●" : item.category === "seed" ? "◆" : "★";
+            const color = item.category === "berry" ? "#ff6b9d" : item.category === "seed" ? "#4ade80" : "#60a5fa";
+            const sprite = this.add.text(
+              ix * TILE_DISPLAY + TILE_DISPLAY / 2,
+              iy * TILE_DISPLAY + TILE_DISPLAY / 2,
+              icon, { fontSize: "16px", color, fontFamily: "monospace" }
+            ).setOrigin(0.5).setDepth(6);
+            this.floorItems.push({ x: ix, y: iy, item, sprite });
+          }
+        }
       }
     }
 
@@ -3107,17 +3136,60 @@ export class DungeonScene extends Phaser.Scene {
     const py = this.player.tileY;
     if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h) {
       this.monsterHouseTriggered = true;
-      this.cameras.main.shake(300, 0.01);
-      this.cameras.main.flash(200, 255, 0, 0);
-      this.showLog("It's a Monster House!");
 
-      // Spawn 4-6 extra enemies in this room
-      const count = 4 + Math.floor(Math.random() * 3);
+      // Type-specific warning colors and messages
+      const typeConfig: Record<MonsterHouseType, { color: string, hexColor: number, label: string, flashR: number, flashG: number, flashB: number }> = {
+        [MonsterHouseType.Standard]: { color: "#ff4444", hexColor: 0xff4444, label: "Monster House!", flashR: 255, flashG: 0, flashB: 0 },
+        [MonsterHouseType.Treasure]: { color: "#ffd700", hexColor: 0xffd700, label: "Treasure House!", flashR: 255, flashG: 215, flashB: 0 },
+        [MonsterHouseType.Ambush]: { color: "#bb44ff", hexColor: 0xbb44ff, label: "Ambush House!", flashR: 187, flashG: 68, flashB: 255 },
+      };
+      const cfg = typeConfig[this.monsterHouseType];
+
+      // Camera shake (stronger for Ambush)
+      const shakeIntensity = this.monsterHouseType === MonsterHouseType.Ambush ? 0.02 : 0.01;
+      this.cameras.main.shake(400, shakeIntensity);
+      this.cameras.main.flash(250, cfg.flashR, cfg.flashG, cfg.flashB);
+
+      // Big warning text popup (centered, fades out)
+      const warningText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, cfg.label, {
+        fontSize: "24px", color: cfg.color, fontFamily: "monospace", fontStyle: "bold",
+        stroke: "#000000", strokeThickness: 4,
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(300);
+      this.tweens.add({
+        targets: warningText,
+        y: GAME_HEIGHT / 2 - 80,
+        alpha: { from: 1, to: 0 },
+        scaleX: { from: 1, to: 1.3 },
+        scaleY: { from: 1, to: 1.3 },
+        duration: 2000,
+        ease: "Quad.easeOut",
+        onComplete: () => warningText.destroy(),
+      });
+
+      this.showLog(`It's a ${cfg.label}`);
+
+      // Determine enemy count based on type + dungeon difficulty scaling
+      const diffScale = 1 + (this.currentFloor - 3) * 0.15; // extra enemies on deeper floors
+      let baseMin: number, baseMax: number;
+      switch (this.monsterHouseType) {
+        case MonsterHouseType.Standard:  baseMin = 3; baseMax = 5; break;
+        case MonsterHouseType.Treasure:  baseMin = 5; baseMax = 8; break;
+        case MonsterHouseType.Ambush:    baseMin = 4; baseMax = 6; break;
+      }
+      const scaledMin = Math.floor(baseMin * diffScale);
+      const scaledMax = Math.floor(baseMax * diffScale);
+      const count = scaledMin + Math.floor(Math.random() * (scaledMax - scaledMin + 1));
+
       const floorSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
         ? this.getEndlessEnemies(this.currentFloor)
         : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
       const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
       if (floorSpecies.length === 0) return;
+
+      // Difficulty multiplier for monster house enemies
+      const diffMult = this.monsterHouseType === MonsterHouseType.Ambush ? 1.3 : 1.2;
+
+      this.monsterHouseEnemies = [];
 
       for (let i = 0; i < count; i++) {
         const ex = r.x + 1 + Math.floor(Math.random() * Math.max(1, r.w - 2));
@@ -3126,7 +3198,7 @@ export class DungeonScene extends Phaser.Scene {
         if (this.allEntities.some(e => e.alive && e.tileX === ex && e.tileY === ey)) continue;
 
         const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
-        const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty * 1.2, sp, this.ngPlusLevel);
+        const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty * diffMult, sp, this.ngPlusLevel);
 
         const enemy: Entity = {
           tileX: ex, tileY: ey,
@@ -3150,11 +3222,132 @@ export class DungeonScene extends Phaser.Scene {
           enemy.sprite.setScale(TILE_SCALE).setDepth(9);
           const eAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
           if (this.anims.exists(eAnim)) enemy.sprite.play(eAnim);
+
+          // Ambush type: enemies start invisible (alpha 0), then fade in on trigger
+          if (this.monsterHouseType === MonsterHouseType.Ambush) {
+            enemy.sprite.setAlpha(0);
+            this.tweens.add({
+              targets: enemy.sprite,
+              alpha: 1,
+              duration: 600,
+              delay: 200 + i * 100,
+              ease: "Power2",
+            });
+          }
         }
         this.enemies.push(enemy);
         this.allEntities.push(enemy);
+        this.monsterHouseEnemies.push(enemy);
         this.seenSpecies.add(sp.id); // Pokedex tracking
       }
+
+      // Also track any enemies already in the room before trigger as monster house enemies
+      for (const e of this.enemies) {
+        if (e.alive && !this.monsterHouseEnemies.includes(e) &&
+            e.tileX >= r.x && e.tileX < r.x + r.w &&
+            e.tileY >= r.y && e.tileY < r.y + r.h) {
+          this.monsterHouseEnemies.push(e);
+        }
+      }
+    }
+  }
+
+  /** Check if all monster house enemies are defeated, then reward */
+  private checkMonsterHouseCleared() {
+    if (!this.monsterHouseRoom || !this.monsterHouseTriggered || this.monsterHouseCleared) return;
+    if (this.monsterHouseEnemies.length === 0) return;
+
+    // Check if all monster house enemies are dead
+    const allDefeated = this.monsterHouseEnemies.every(e => !e.alive);
+    if (!allDefeated) return;
+
+    this.monsterHouseCleared = true;
+
+    // "Monster House Cleared!" popup
+    const clearColor = this.monsterHouseType === MonsterHouseType.Treasure ? "#ffd700"
+      : this.monsterHouseType === MonsterHouseType.Ambush ? "#bb44ff" : "#4ade80";
+    const clearText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "Monster House Cleared!", {
+      fontSize: "20px", color: clearColor, fontFamily: "monospace", fontStyle: "bold",
+      stroke: "#000000", strokeThickness: 3,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(300);
+    this.tweens.add({
+      targets: clearText,
+      y: GAME_HEIGHT / 2 - 80,
+      alpha: { from: 1, to: 0 },
+      scaleX: { from: 1, to: 1.2 },
+      scaleY: { from: 1, to: 1.2 },
+      duration: 2500,
+      ease: "Quad.easeOut",
+      onComplete: () => clearText.destroy(),
+    });
+
+    // Rewards based on type
+    const r = this.monsterHouseRoom;
+    switch (this.monsterHouseType) {
+      case MonsterHouseType.Standard: {
+        // 1 random item drop
+        this.spawnMonsterHouseRewardItems(r, 1);
+        this.showLog("Monster House cleared! A reward appeared!");
+        break;
+      }
+      case MonsterHouseType.Treasure: {
+        // 3-5 item drops + bonus gold (2x gold bonus)
+        const itemCount = 3 + Math.floor(Math.random() * 3);
+        this.spawnMonsterHouseRewardItems(r, itemCount);
+        const bonusGold = Math.floor((20 + this.currentFloor * 10) * 2);
+        this.gold += bonusGold;
+        const meta = loadMeta();
+        meta.gold = this.gold;
+        saveMeta(meta);
+        this.showLog(`Treasure House cleared! +${bonusGold}G and items!`);
+        break;
+      }
+      case MonsterHouseType.Ambush: {
+        // 2 item drops + EXP bonus
+        this.spawnMonsterHouseRewardItems(r, 2);
+        const heldExpMult = 1 + (this.heldItemEffect.expBonus ?? 0) / 100;
+        const expBonus = Math.floor((15 + this.currentFloor * 8) * this.modifierEffects.expMult * heldExpMult);
+        this.totalExp += expBonus;
+        // Process potential level ups from bonus EXP
+        const levelResult = processLevelUp(this.player.stats, 0, this.totalExp);
+        this.totalExp = levelResult.totalExp;
+        this.showLog(`Ambush House survived! +${expBonus} EXP bonus!`);
+        break;
+      }
+    }
+
+    sfxVictory();
+    this.cameras.main.flash(300, 200, 255, 200);
+    this.updateHUD();
+  }
+
+  /** Spawn reward items on the floor inside a monster house room */
+  private spawnMonsterHouseRewardItems(room: { x: number; y: number; w: number; h: number }, count: number) {
+    for (let i = 0; i < count; i++) {
+      const ix = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
+      const iy = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
+      if (this.dungeon.terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
+
+      const item = rollFloorItem();
+      const icon = item.category === "berry" ? "●" : item.category === "seed" ? "◆" : "★";
+      const color = item.category === "berry" ? "#ff6b9d" : item.category === "seed" ? "#4ade80" : "#60a5fa";
+      const sprite = this.add.text(
+        ix * TILE_DISPLAY + TILE_DISPLAY / 2,
+        iy * TILE_DISPLAY + TILE_DISPLAY / 2,
+        icon, { fontSize: "16px", color, fontFamily: "monospace" }
+      ).setOrigin(0.5).setDepth(6);
+
+      // Reward items spawn with a pop-in animation
+      sprite.setScale(0);
+      this.tweens.add({
+        targets: sprite,
+        scaleX: 1, scaleY: 1,
+        duration: 400,
+        delay: i * 150,
+        ease: "Back.easeOut",
+      });
+
+      this.floorItems.push({ x: ix, y: iy, item, sprite });
     }
   }
 
@@ -4283,6 +4476,11 @@ export class DungeonScene extends Phaser.Scene {
           this.recruitEnemy(entity);
         });
       }
+
+      // ── Monster House clear check ──
+      this.time.delayedCall(300, () => {
+        this.checkMonsterHouseCleared();
+      });
     }
   }
 
