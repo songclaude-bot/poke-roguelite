@@ -779,6 +779,43 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [88, 88, 110, 110, 131, 131, 110, 110, 88, 88, 82, 82, 98, 98, 131, 131],
     tempo: 0.30, melodyType: "sawtooth", bassType: "square",
   },
+  // Phase 140-142: Rock/Bug/Fighting/Steel/Ghost/Psychic 6th
+  // Fossil Crypt — ancient, echoing, rocky
+  fossilCrypt: {
+    melody: [196, 220, 247, 262, 247, 220, 196, 175, 196, 220, 262, 294, 262, 220, 196, 175],
+    bass: [98, 98, 123, 123, 131, 131, 98, 98, 88, 88, 131, 131, 147, 147, 110, 110],
+    tempo: 0.32, melodyType: "sawtooth", bassType: "triangle",
+  },
+  // Cocoon Hollow — buzzing, airy, nature
+  cocoonHollow: {
+    melody: [392, 440, 494, 523, 494, 440, 392, 349, 392, 440, 523, 587, 523, 494, 440, 392],
+    bass: [196, 196, 247, 247, 262, 262, 196, 196, 175, 175, 262, 262, 294, 294, 220, 220],
+    tempo: 0.30, melodyType: "triangle", bassType: "sine",
+  },
+  // Titan's Dojo — intense, martial, fast
+  titansDojo: {
+    melody: [262, 330, 392, 440, 523, 440, 392, 330, 262, 294, 330, 392, 440, 523, 587, 523],
+    bass: [131, 131, 196, 196, 262, 262, 220, 220, 131, 131, 165, 165, 220, 220, 294, 294],
+    tempo: 0.22, melodyType: "sawtooth", bassType: "square",
+  },
+  // Iron Vault — heavy, metallic, rhythmic
+  ironVault: {
+    melody: [262, 294, 330, 392, 330, 294, 262, 247, 262, 330, 392, 440, 392, 330, 294, 262],
+    bass: [131, 131, 165, 165, 196, 196, 131, 131, 124, 124, 165, 165, 220, 220, 165, 165],
+    tempo: 0.26, melodyType: "square", bassType: "sawtooth",
+  },
+  // Phantom Rift — eerie, ghostly, slow
+  phantomRift: {
+    melody: [220, 208, 196, 185, 175, 185, 196, 220, 247, 233, 220, 208, 196, 185, 175, 165],
+    bass: [110, 110, 98, 98, 88, 88, 98, 98, 123, 123, 110, 110, 98, 98, 88, 88],
+    tempo: 0.38, melodyType: "sine", bassType: "triangle",
+  },
+  // Mind Palace — dreamy, ethereal, psychic
+  mindPalace: {
+    melody: [523, 587, 659, 698, 659, 587, 523, 494, 440, 494, 523, 587, 659, 698, 784, 698],
+    bass: [262, 262, 330, 330, 349, 349, 262, 262, 220, 220, 262, 262, 330, 330, 392, 392],
+    tempo: 0.34, melodyType: "sine", bassType: "sine",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

@@ -343,6 +343,13 @@ export class DungeonScene extends Phaser.Scene {
       pachirisu: "0417", emolga: "0587",
       glimmet: "0969", koffing: "0109",
       wooper: "0194", baltoy: "0343",
+      // Phase 140-142: Rock/Bug/Fighting/Steel/Ghost/Psychic 6th
+      anorith: "0347", lunatone: "0337",
+      surskit: "0283", volbeat: "0313",
+      scraggy: "0559", mankey: "0056",
+      klefki: "0707", mawile: "0303",
+      rotom: "0479", dreepy: "0885",
+      munna: "0517", chingling: "0433",
     };
 
     // Load player + all enemy species + ally species for this dungeon

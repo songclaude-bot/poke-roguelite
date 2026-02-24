@@ -211,6 +211,14 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "koffing", to: "weezing", level: 35, newName: "Weezing", hpBonus: 16, atkBonus: 8, defBonus: 12, newSkillId: "sludgeBomb" },
   { from: "wooper", to: "quagsire", level: 20, newName: "Quagsire", hpBonus: 16, atkBonus: 8, defBonus: 8, newSkillId: "earthquake" },
   { from: "baltoy", to: "claydol", level: 36, newName: "Claydol", hpBonus: 14, atkBonus: 8, defBonus: 12, newSkillId: "psychic" },
+  // Phase 140-142: Rock/Bug/Fighting/Steel/Ghost/Psychic 6th
+  { from: "anorith", to: "armaldo", level: 40, newName: "Armaldo", hpBonus: 16, atkBonus: 12, defBonus: 8, newSkillId: "rockSlide" },
+  { from: "surskit", to: "masquerain", level: 22, newName: "Masquerain", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "silverWind" },
+  { from: "scraggy", to: "scrafty", level: 39, newName: "Scrafty", hpBonus: 16, atkBonus: 10, defBonus: 10, newSkillId: "closeCombat" },
+  { from: "mankey", to: "primeape", level: 28, newName: "Primeape", hpBonus: 14, atkBonus: 12, defBonus: 6, newSkillId: "closeCombat" },
+  { from: "dreepy", to: "drakloak", level: 50, newName: "Drakloak", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "dragonPulse" },
+  { from: "munna", to: "musharna", level: 30, newName: "Musharna", hpBonus: 16, atkBonus: 8, defBonus: 10, newSkillId: "futuresight" },
+  { from: "chingling", to: "chimecho", level: 20, newName: "Chimecho", hpBonus: 12, atkBonus: 8, defBonus: 6, newSkillId: "psychic" },
 ];
 
 /** Check if a species can evolve at a given level */

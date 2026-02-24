@@ -1883,6 +1883,48 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Causes a massive quake that hits the entire room.",
   },
+
+  // ── Phase 140-142: Rock/Bug/Fighting/Steel/Ghost/Psychic 6th Skills ──
+  ancientPower: {
+    id: "ancientPower",
+    name: "Ancient Power",
+    type: PokemonType.Rock,
+    power: 10,
+    pp: 14,
+    range: SkillRange.Front1,
+    accuracy: 100,
+    description: "Attacks with primordial energy. May boost all stats.",
+  },
+  silverWind: {
+    id: "silverWind",
+    name: "Silver Wind",
+    type: PokemonType.Bug,
+    power: 10,
+    pp: 14,
+    range: SkillRange.Around,
+    accuracy: 100,
+    description: "Attacks with silvery wind in all directions.",
+  },
+  aurasphere: {
+    id: "aurasphere",
+    name: "Aura Sphere",
+    type: PokemonType.Fighting,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front2,
+    accuracy: 100,
+    description: "An aura-based attack that never misses.",
+  },
+  shadowForce: {
+    id: "shadowForce",
+    name: "Shadow Force",
+    type: PokemonType.Ghost,
+    power: 18,
+    pp: 6,
+    range: SkillRange.Front1,
+    accuracy: 100,
+    description: "Disappears then strikes from the shadows.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

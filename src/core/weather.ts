@@ -186,6 +186,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     voltChamber: [WeatherType.Rain, WeatherType.Sandstorm],
     // venomDepths already defined above
     faultlineChasm: [WeatherType.Sandstorm],
+    // Phase 140-142: Rock/Bug/Fighting/Steel/Ghost/Psychic 6th
+    fossilCrypt: [WeatherType.Sandstorm],
+    cocoonHollow: [WeatherType.Rain],
+    titansDojo: [WeatherType.Sandstorm],
+    ironVault: [WeatherType.Sandstorm, WeatherType.Hail],
+    phantomRift: [WeatherType.Hail],
+    mindPalace: [WeatherType.Rain, WeatherType.Hail],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

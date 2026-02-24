@@ -318,4 +318,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   koffing: AbilityId.Levitate,
   wooper: AbilityId.SwiftSwim, // Water Absorb equivalent
   baltoy: AbilityId.Levitate,
+  // Phase 140-142: Rock/Bug/Fighting/Steel/Ghost/Psychic 6th
+  anorith: AbilityId.Sturdy, // Battle Armor equivalent
+  lunatone: AbilityId.Levitate,
+  surskit: AbilityId.SwiftSwim, // Rain Dish equivalent
+  volbeat: AbilityId.ShieldDust, // Illuminate equivalent
+  scraggy: AbilityId.Guts, // Moxie equivalent
+  mankey: AbilityId.Guts, // Vital Spirit equivalent
+  klefki: AbilityId.ShieldDust, // Prankster equivalent
+  mawile: AbilityId.Sturdy, // Intimidate equivalent
+  rotom: AbilityId.Levitate,
+  dreepy: AbilityId.RunAway, // Clear Body equivalent
+  munna: AbilityId.ShieldDust, // Synchronize equivalent
+  chingling: AbilityId.Levitate,
 };
