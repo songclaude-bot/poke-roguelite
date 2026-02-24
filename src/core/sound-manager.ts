@@ -414,6 +414,11 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [98, 98, 131, 131, 165, 165, 131, 131, 98, 98, 88, 88, 98, 98, 131, 131],
     tempo: 0.32, melodyType: "sawtooth", bassType: "triangle",
   },
+  enchantedGlade: {
+    melody: [523, 587, 659, 587, 523, 494, 440, 494, 523, 587, 659, 698, 659, 587, 523, 494],
+    bass: [262, 262, 330, 330, 262, 262, 220, 220, 262, 262, 330, 330, 349, 349, 262, 262],
+    tempo: 0.34, melodyType: "sine", bassType: "triangle",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

@@ -113,6 +113,7 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     ironWorks: [WeatherType.Sandstorm, WeatherType.Hail],
     phantomCrypt: [WeatherType.Hail],
     wyrmAbyss: [WeatherType.Sandstorm, WeatherType.Hail],
+    enchantedGlade: [WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

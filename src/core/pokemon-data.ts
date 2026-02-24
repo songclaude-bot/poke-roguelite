@@ -1117,6 +1117,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["dragonBreath", "dragonRush", "bite"],
     floors: [],
   },
+
+  // ── Phase 56 Fairy 2nd ──
+  snubbull: {
+    id: "snubbull", name: "Snubbull", spriteKey: "snubbull",
+    types: [PokemonType.Fairy], attackType: PokemonType.Fairy,
+    baseStats: { hp: 30, atk: 14, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["playRough", "fairyWind", "bite"],
+    floors: [],
+  },
+  togepi: {
+    id: "togepi", name: "Togepi", spriteKey: "togepi",
+    types: [PokemonType.Fairy], attackType: PokemonType.Fairy,
+    baseStats: { hp: 26, atk: 10, def: 10 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 6, idleFrames: 4,
+    skillIds: ["disarmingVoice", "drainingKiss", "fairyWind"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1216,6 +1238,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   duskull: { 7: "shadowSneak", 10: "shadowBall" },
   axew: { 7: "dragonClaw", 10: "dragonRush" },
   deino: { 7: "dragonRush", 10: "dragonPulse" },
+  snubbull: { 7: "playRough", 10: "dazzlingGleam" },
+  togepi: { 7: "drainingKiss", 10: "moonblast" },
 };
 
 /** Check if a species learns a new skill at this level */

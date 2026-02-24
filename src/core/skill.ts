@@ -1211,6 +1211,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 85,
     description: "Charges the foe with overwhelming draconic force.",
   },
+
+  // ── Phase 56 Fairy Skills ──
+  playRough: {
+    id: "playRough",
+    name: "Play Rough",
+    type: PokemonType.Fairy,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Front1,
+    accuracy: 90,
+    description: "Plays rough with the target. High contact damage.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
