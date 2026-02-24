@@ -218,14 +218,44 @@
 - 날짜: 2026-02-24
 - 핵심: Abra/Natu, psychic 스킬, Mystic Sanctum 12층, Grand Alakazam 보스(5.5x)
 
+## Phase 34: Shadow Forest
+
+### 34. Dark 포켓몬 + 22번째 던전
+- 날짜: 2026-02-24
+- 핵심: Houndour(Dark/Fire)/Sneasel(Dark/Ice), crunch/icePunch 스킬, Shadow Forest 14층, Dread Absol 보스
+
+## Phase 35: Windy Summit
+
+### 35. Flying 포켓몬 + 23번째 던전
+- 날짜: 2026-02-24
+- 핵심: Taillow/Starly, braveBird/airSlash 스킬, Windy Summit 10층, Storm Swellow 보스
+
+## Phase 36: Battle Arena
+
+### 36. Fighting 포켓몬 + 24번째 던전
+- 날짜: 2026-02-24
+- 핵심: Makuhita/Riolu, auraSphere/drainPunch 스킬, Battle Arena 12층, Champion Lucario 보스
+
+## Phase 37: Rocky Cavern
+
+### 37. Rock 포켓몬 + 25번째 던전
+- 날짜: 2026-02-24
+- 핵심: Larvitar/Nosepass, rockSlide/stoneEdge 스킬, Rocky Cavern 12층, Ancient Tyranitar 보스(6.0x)
+
+## Phase 38: 스타터 확장
+
+### 38. 26종 스타터 + v0.30.0
+- 날짜: 2026-02-24
+- 핵심: Houndour/Sneasel/Riolu/Larvitar/Taillow/Starly 스타터 추가 (총 26종)
+
 ---
 
-## 현재 게임 규모 (v0.25.0)
+## 현재 게임 규모 (v0.30.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **21개 던전**: Beach Cave → Mystic Sanctum
-- **50종+ 포켓몬** (진화 포함 60종+)
-- **80종+ 기술**
+- **25개 던전**: Beach Cave → Rocky Cavern + Destiny Tower
+- **60종+ 포켓몬** (진화 포함 70종+)
+- **90종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **20종 스타터** (클리어 수로 해금)
-- **40종+ 진화 경로**
+- **26종 스타터** (클리어 수로 해금)
+- **50종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
