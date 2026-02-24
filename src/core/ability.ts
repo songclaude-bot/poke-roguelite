@@ -166,4 +166,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   clamperl: AbilityId.ShieldDust,
   shinx: AbilityId.Static,
   electrike: AbilityId.Static,
+  gulpin: AbilityId.Guts,
+  ekans: AbilityId.ShieldDust,
 };

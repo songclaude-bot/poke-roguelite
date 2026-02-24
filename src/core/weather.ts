@@ -107,6 +107,7 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     emberGrotto: [WeatherType.Sandstorm],
     coralReef: [WeatherType.Rain],
     voltageLab: [WeatherType.Rain, WeatherType.Sandstorm],
+    venomDepths: [WeatherType.Rain, WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

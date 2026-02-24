@@ -379,6 +379,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [262, 262, 330, 330, 392, 392, 262, 262, 220, 220, 262, 262, 330, 330, 440, 440],
     tempo: 0.22, melodyType: "square", bassType: "sawtooth",
   },
+  // Venom Depths — ominous, dripping
+  venomDepths: {
+    melody: [262, 294, 262, 247, 220, 247, 262, 294, 330, 294, 262, 247, 220, 196, 220, 247],
+    bass: [131, 131, 147, 147, 110, 110, 131, 131, 165, 165, 131, 131, 110, 110, 98, 98],
+    tempo: 0.34, melodyType: "sawtooth", bassType: "triangle",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

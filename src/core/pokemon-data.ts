@@ -965,6 +965,32 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["wildCharge", "thunderShock", "bite"],
     floors: [],
   },
+  gulpin: {
+    id: "gulpin",
+    name: "Gulpin",
+    spriteKey: "gulpin",
+    types: [PokemonType.Poison],
+    attackType: PokemonType.Poison,
+    baseStats: { hp: 32, atk: 10, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 2,
+    skillIds: ["sludgeBomb", "poisonSting", "tackle"],
+    floors: [],
+  },
+  ekans: {
+    id: "ekans",
+    name: "Ekans",
+    spriteKey: "ekans",
+    types: [PokemonType.Poison],
+    attackType: PokemonType.Poison,
+    baseStats: { hp: 27, atk: 12, def: 6 },
+    walkFrameWidth: 40, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 2,
+    skillIds: ["venoshock", "poisonSting", "bite"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1052,6 +1078,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   clamperl: { 7: "whirlpool", 10: "surf" },
   shinx: { 7: "sparkCharge", 10: "wildCharge" },
   electrike: { 7: "wildCharge", 10: "thunderbolt" },
+  gulpin: { 7: "sludgeBomb", 10: "venoshock" },
+  ekans: { 7: "venoshock", 10: "sludgeBomb" },
 };
 
 /** Check if a species learns a new skill at this level */
