@@ -1799,6 +1799,69 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["earthPower", "scorchingSand", "headbutt"],
     floors: [],
   },
+  // ── Phase 102 Rock 4th ──
+  carbink: {
+    id: "carbink", name: "Carbink", spriteKey: "carbink",
+    types: [PokemonType.Rock, PokemonType.Fairy], attackType: PokemonType.Rock,
+    baseStats: { hp: 24, atk: 8, def: 16 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 48,
+    walkFrames: 7, idleFrames: 6,
+    skillIds: ["stealthRock", "rockSlide", "dazzlingGleam"],
+    floors: [],
+  },
+  minior: {
+    id: "minior", name: "Minior", spriteKey: "minior",
+    types: [PokemonType.Rock, PokemonType.Flying], attackType: PokemonType.Rock,
+    baseStats: { hp: 22, atk: 14, def: 10 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 12, idleFrames: 12,
+    skillIds: ["rockSlide", "stealthRock", "airSlash"],
+    floors: [],
+  },
+  // ── Phase 103 Bug 4th ──
+  dewpider: {
+    id: "dewpider", name: "Dewpider", spriteKey: "dewpider",
+    types: [PokemonType.Bug, PokemonType.Water], attackType: PokemonType.Bug,
+    baseStats: { hp: 26, atk: 10, def: 10 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 56,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["lunge", "waterPulse", "leechLife"],
+    floors: [],
+  },
+  sizzlipede: {
+    id: "sizzlipede", name: "Sizzlipede", spriteKey: "sizzlipede",
+    types: [PokemonType.Bug, PokemonType.Fire], attackType: PokemonType.Bug,
+    baseStats: { hp: 24, atk: 12, def: 8 },
+    walkFrameWidth: 40, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 2,
+    skillIds: ["lunge", "ember", "leechLife"],
+    floors: [],
+  },
+  // ── Phase 104 Fighting 4th ──
+  pancham: {
+    id: "pancham", name: "Pancham", spriteKey: "pancham",
+    types: [PokemonType.Fighting], attackType: PokemonType.Fighting,
+    baseStats: { hp: 26, atk: 14, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["skyUppercut", "hammerArm", "crunch"],
+    floors: [],
+  },
+  hawlucha: {
+    id: "hawlucha", name: "Hawlucha", spriteKey: "hawlucha",
+    types: [PokemonType.Fighting, PokemonType.Flying], attackType: PokemonType.Fighting,
+    baseStats: { hp: 22, atk: 14, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 40, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["skyUppercut", "aerialAce", "closeCombat"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1961,6 +2024,12 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   croagunk: { 7: "poisonJab", 10: "drainPunch" },
   sandygast: { 7: "scorchingSand", 10: "earthPower" },
   silicobra: { 7: "scorchingSand", 10: "earthPower" },
+  carbink: { 7: "stealthRock", 10: "rockSlide" },
+  minior: { 7: "stealthRock", 10: "rockSlide" },
+  dewpider: { 7: "lunge", 10: "waterPulse" },
+  sizzlipede: { 7: "lunge", 10: "ember" },
+  pancham: { 7: "skyUppercut", 10: "hammerArm" },
+  hawlucha: { 7: "skyUppercut", 10: "aerialAce" },
 };
 
 /** Check if a species learns a new skill at this level */

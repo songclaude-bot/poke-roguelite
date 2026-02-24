@@ -1609,6 +1609,42 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     effectChance: 30,
     description: "Hurls scorching sand. May burn the target.",
   },
+
+  // ── Phase 102 Rock 4th Skills ──
+  stealthRock: {
+    id: "stealthRock",
+    name: "Stealth Rock",
+    type: PokemonType.Rock,
+    power: 12,
+    pp: 14,
+    range: SkillRange.Around,
+    accuracy: 90,
+    description: "Sets a trap of floating rocks around the area.",
+  },
+
+  // ── Phase 103 Bug 4th Skills ──
+  lunge: {
+    id: "lunge",
+    name: "Lunge",
+    type: PokemonType.Bug,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Lunges at the target, lowering its Attack.",
+  },
+
+  // ── Phase 104 Fighting 4th Skills ──
+  skyUppercut: {
+    id: "skyUppercut",
+    name: "Sky Uppercut",
+    type: PokemonType.Fighting,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Front1,
+    accuracy: 85,
+    description: "An uppercut thrown with such force it hits airborne foes.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

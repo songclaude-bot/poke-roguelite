@@ -148,6 +148,9 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "croagunk", to: "toxicroak", level: 14, newName: "Toxicroak", hpBonus: 12, atkBonus: 12, defBonus: 6, newSkillId: "drainPunch" },
   { from: "sandygast", to: "palossand", level: 14, newName: "Palossand", hpBonus: 14, atkBonus: 8, defBonus: 10, newSkillId: "scorchingSand" },
   { from: "silicobra", to: "sandaconda", level: 14, newName: "Sandaconda", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "earthPower" },
+  { from: "dewpider", to: "araquanid", level: 14, newName: "Araquanid", hpBonus: 14, atkBonus: 8, defBonus: 10, newSkillId: "lunge" },
+  { from: "sizzlipede", to: "centiskorch", level: 14, newName: "Centiskorch", hpBonus: 12, atkBonus: 12, defBonus: 6, newSkillId: "fireWhip" },
+  { from: "pancham", to: "pangoro", level: 14, newName: "Pangoro", hpBonus: 14, atkBonus: 12, defBonus: 4, newSkillId: "skyUppercut" },
 ];
 
 /** Check if a species can evolve at a given level */

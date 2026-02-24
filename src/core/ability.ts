@@ -241,4 +241,10 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   croagunk: AbilityId.Guts, // Dry Skin equivalent
   sandygast: AbilityId.Levitate, // Water Compaction equivalent
   silicobra: AbilityId.Sturdy, // Shed Skin equivalent
+  carbink: AbilityId.Sturdy, // Clear Body equivalent
+  minior: AbilityId.ShieldDust, // Shields Down equivalent
+  dewpider: AbilityId.SwiftSwim, // Water Bubble equivalent
+  sizzlipede: AbilityId.FlameBody,
+  pancham: AbilityId.Guts, // Iron Fist equivalent
+  hawlucha: AbilityId.PurePower, // Unburden equivalent
 };

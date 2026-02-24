@@ -298,6 +298,9 @@ export class DungeonScene extends Phaser.Scene {
       charjabug: "0737", helioptile: "0694",
       mareanie: "0747", croagunk: "0453",
       sandygast: "0769", silicobra: "0843",
+      carbink: "0703", minior: "0774",
+      dewpider: "0751", sizzlipede: "0850",
+      pancham: "0674", hawlucha: "0701",
     };
 
     // Load player + all enemy species + ally species for this dungeon
