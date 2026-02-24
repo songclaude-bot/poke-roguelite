@@ -2548,6 +2548,24 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
+  /** Floating stat gain popup for level-ups */
+  private showStatPopup(x: number, y: number, text: string, color: string, delay: number) {
+    this.time.delayedCall(delay, () => {
+      const popup = this.add.text(x, y, text, {
+        fontSize: "8px", color, fontFamily: "monospace", fontStyle: "bold",
+        stroke: "#000000", strokeThickness: 2,
+      }).setOrigin(0.5).setDepth(52);
+      this.tweens.add({
+        targets: popup,
+        y: y - 30,
+        alpha: { from: 1, to: 0 },
+        duration: 1200,
+        ease: "Quad.easeOut",
+        onComplete: () => popup.destroy(),
+      });
+    });
+  }
+
   private checkDeath(entity: Entity) {
     if (entity.stats.hp > 0 || !entity.alive) return;
 
@@ -2620,9 +2638,21 @@ export class DungeonScene extends Phaser.Scene {
           this.showLog(`Level up! Lv.${r.newLevel}! HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
           if (this.player.sprite) {
             this.player.sprite.setTint(0xffff44);
+            // Scale bounce animation
+            this.tweens.add({
+              targets: this.player.sprite,
+              scaleX: TILE_SCALE * 1.3, scaleY: TILE_SCALE * 1.3,
+              duration: 200, yoyo: true, ease: "Quad.easeOut",
+            });
             this.time.delayedCall(600, () => {
               if (this.player.sprite) this.player.sprite.clearTint();
             });
+            // Floating stat popups
+            const px = this.player.sprite.x;
+            const py = this.player.sprite.y;
+            this.showStatPopup(px - 16, py - 20, `HP+${r.hpGain}`, "#4ade80", 0);
+            this.showStatPopup(px, py - 20, `ATK+${r.atkGain}`, "#f87171", 200);
+            this.showStatPopup(px + 16, py - 20, `DEF+${r.defGain}`, "#60a5fa", 400);
           }
           this.updateHUD();
 
@@ -2658,7 +2688,15 @@ export class DungeonScene extends Phaser.Scene {
                 this.player.skills.push(createSkill(SKILL_DB[evo.newSkillId]));
               }
               sfxEvolution();
-              this.cameras.main.flash(500, 255, 255, 255);
+              this.cameras.main.flash(800, 255, 255, 255);
+              this.cameras.main.shake(400, 0.01);
+              if (this.player.sprite) {
+                this.tweens.add({
+                  targets: this.player.sprite,
+                  scaleX: TILE_SCALE * 1.5, scaleY: TILE_SCALE * 1.5,
+                  duration: 400, yoyo: true, ease: "Quad.easeInOut",
+                });
+              }
               this.showLog(`Congratulations! ${evo.from} evolved into ${evo.newName}!`);
               this.updateHUD();
             });
