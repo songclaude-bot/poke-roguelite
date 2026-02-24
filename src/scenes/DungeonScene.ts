@@ -69,6 +69,10 @@ import {
 import { DungeonEvent, EventChoice, rollDungeonEvent } from "../core/dungeon-events";
 import { FloorTheme, getDepthAdjustedTheme, darkenColor } from "../core/floor-themes";
 import { addToStorage } from "../core/crafting";
+import {
+  ScoreChain, ChainAction, createScoreChain, addChainAction, resetChain,
+  tickChainIdle, getChainTier, getChainColor, getChainHexColor,
+} from "../core/score-chain";
 
 interface AllyData {
   speciesId: string;
@@ -311,6 +315,13 @@ export class DungeonScene extends Phaser.Scene {
   private comboCritGuarantee = false;     // next attack is guaranteed crit
   private comboSpeedBoost = false;        // get 2 actions next turn
 
+  // Score Chain state
+  private scoreChain: ScoreChain = createScoreChain();
+  private chainHudText: Phaser.GameObjects.Text | null = null;
+  private chainHudBg: Phaser.GameObjects.Graphics | null = null;
+  private lastChainTier = "";
+  private chainActionThisTurn = false; // tracks if a scoring action happened this turn
+
   // Floor Theme state
   private currentTheme!: FloorTheme;
   private themeOverlay: Phaser.GameObjects.Graphics | null = null;
@@ -326,7 +337,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private persistentAllies: AllyData[] | null = null;
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number; scoreChain?: ScoreChain }) {
     // Load D-Pad side preference
     try {
       const side = localStorage.getItem("poke-roguelite-dpadSide");
@@ -446,6 +457,12 @@ export class DungeonScene extends Phaser.Scene {
     this.comboDoubleDamage = false;
     this.comboCritGuarantee = false;
     this.comboSpeedBoost = false;
+    // Score chain persists across floors; create fresh on new run
+    this.scoreChain = data?.scoreChain ?? createScoreChain();
+    this.chainHudText = null;
+    this.chainHudBg = null;
+    this.lastChainTier = "";
+    this.chainActionThisTurn = false;
     this.turnManager = new TurnManager();
     this.persistentAllies = data?.allies ?? null;
     this.floorTraps = [];
@@ -1567,6 +1584,19 @@ export class DungeonScene extends Phaser.Scene {
         padding: { x: 6, y: 4 },
       })
       .setScrollFactor(0).setDepth(100);
+
+    // ── Chain HUD ──
+    this.chainHudBg = this.add.graphics().setScrollFactor(0).setDepth(99);
+    this.chainHudText = this.add.text(GAME_WIDTH - 10, GAME_HEIGHT - 210, "", {
+      fontSize: "11px", color: "#999999", fontFamily: "monospace", fontStyle: "bold",
+      stroke: "#000000", strokeThickness: 2,
+    }).setOrigin(1, 1).setScrollFactor(0).setDepth(100);
+    this.chainHudText.setAlpha(0); // hidden initially
+    this.lastChainTier = "";
+    // If chain was carried from previous floor, show it
+    if (this.scoreChain.currentMultiplier > 1.0) {
+      this.updateChainHUD();
+    }
 
     // ── Weather ──
     this.currentWeather = rollFloorWeather(this.dungeonDef.id, this.currentFloor);
@@ -3234,6 +3264,11 @@ export class DungeonScene extends Phaser.Scene {
     fi.sprite.destroy();
     this.floorItems.splice(idx, 1);
     this.showLog(`Picked up ${fi.item.name}!`);
+
+    // Score chain: item pickup
+    addChainAction(this.scoreChain, "itemPickup");
+    this.chainActionThisTurn = true;
+    this.updateChainHUD();
   }
 
   private toggleBag() {
@@ -3331,6 +3366,12 @@ export class DungeonScene extends Phaser.Scene {
         this.player.stats.hp += heal;
         this.showLog(`Used Oran Berry! Restored ${heal} HP.`);
         if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
+        // Score chain: healing item resets chain
+        if (this.scoreChain.currentMultiplier > 1.0) {
+          resetChain(this.scoreChain);
+          this.showLog("Chain reset (healed).");
+          this.updateChainHUD();
+        }
         break;
       }
       case "sitrusBerry": {
@@ -3339,6 +3380,12 @@ export class DungeonScene extends Phaser.Scene {
         this.player.stats.hp += actual;
         this.showLog(`Used Sitrus Berry! Restored ${actual} HP.`);
         if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, actual);
+        // Score chain: healing item resets chain
+        if (this.scoreChain.currentMultiplier > 1.0) {
+          resetChain(this.scoreChain);
+          this.showLog("Chain reset (healed).");
+          this.updateChainHUD();
+        }
         break;
       }
       case "pechaberry": {
@@ -3748,6 +3795,55 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
+  /** Update the chain HUD indicator */
+  private updateChainHUD() {
+    if (!this.chainHudText || !this.chainHudBg) return;
+
+    const mult = this.scoreChain.currentMultiplier;
+    const tier = getChainTier(mult);
+
+    if (!tier || mult <= 1.0) {
+      // Hide HUD when no chain
+      this.chainHudText.setAlpha(0);
+      this.chainHudBg.clear();
+      this.lastChainTier = "";
+      return;
+    }
+
+    const color = getChainColor(tier);
+    const displayStr = `[${tier}] x${mult.toFixed(1)}`;
+
+    this.chainHudText.setText(displayStr);
+    this.chainHudText.setColor(color);
+    this.chainHudText.setAlpha(1);
+
+    // Background box
+    const bounds = this.chainHudText.getBounds();
+    this.chainHudBg.clear();
+    this.chainHudBg.fillStyle(0x000000, 0.7);
+    this.chainHudBg.fillRoundedRect(bounds.x - 4, bounds.y - 2, bounds.width + 8, bounds.height + 4, 3);
+
+    // Tier-up animation: brief scale pop + flash when tier changes
+    if (tier !== this.lastChainTier && this.lastChainTier !== "") {
+      // Scale pop
+      this.tweens.add({
+        targets: this.chainHudText,
+        scaleX: 1.4, scaleY: 1.4,
+        duration: 150,
+        yoyo: true,
+        ease: "Quad.easeOut",
+      });
+      // Flash the screen briefly with tier color
+      const hexColor = getChainHexColor(tier);
+      const r = (hexColor >> 16) & 0xff;
+      const g = (hexColor >> 8) & 0xff;
+      const b = hexColor & 0xff;
+      this.cameras.main.flash(150, r, g, b);
+    }
+
+    this.lastChainTier = tier;
+  }
+
   /** Update the status icons HUD next to the HP bar */
   private updateStatusHud() {
     // Destroy previous status HUD texts
@@ -3964,6 +4060,12 @@ export class DungeonScene extends Phaser.Scene {
         const dmg = Math.floor(this.player.stats.maxHp * 0.15);
         this.player.stats.hp = Math.max(1, this.player.stats.hp - dmg);
         if (this.player.sprite) this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, dmg, 1.0);
+        // Score chain: taking trap damage resets chain
+        if (this.scoreChain.currentMultiplier > 1.0) {
+          resetChain(this.scoreChain);
+          this.showLog("Chain broken!");
+          this.updateChainHUD();
+        }
         this.checkPlayerDeath();
         break;
       }
@@ -4423,6 +4525,16 @@ export class DungeonScene extends Phaser.Scene {
   private tickWeather() {
     this.floorTurns++;
 
+    // Score chain: tick idle counter if no scoring action happened this turn
+    if (!this.chainActionThisTurn && this.scoreChain.currentMultiplier > 1.0) {
+      const wasReset = tickChainIdle(this.scoreChain);
+      if (wasReset) {
+        this.showLog("Chain expired (idle).");
+        this.updateChainHUD();
+      }
+    }
+    this.chainActionThisTurn = false; // reset for next turn
+
     // Check mid-floor weather transition every 10 turns
     if (this.floorTurns % 10 === 0 && this.currentWeather !== WeatherType.None) {
       this.checkWeatherTransition();
@@ -4828,6 +4940,15 @@ export class DungeonScene extends Phaser.Scene {
 
     sfxVictory();
     this.cameras.main.flash(300, 200, 255, 200);
+
+    // Score chain: monster house clear
+    {
+      const mhBonus = addChainAction(this.scoreChain, "monsterHouseClear");
+      this.chainActionThisTurn = true;
+      if (mhBonus > 0) this.showLog(`Monster House chain bonus! +${mhBonus} pts!`);
+      this.updateChainHUD();
+    }
+
     this.updateHUD();
   }
 
@@ -5417,6 +5538,13 @@ export class DungeonScene extends Phaser.Scene {
       this.showLog(`Held item healed ${healPerFloor} HP!`);
     }
 
+    // Score chain: quick floor bonus if cleared in under 20 turns
+    if (this.floorTurns < 20) {
+      const bonus = addChainAction(this.scoreChain, "quickFloor");
+      if (bonus > 0) this.showLog(`Quick clear! Chain +${bonus} pts!`);
+      this.updateChainHUD();
+    }
+
     // Auto-save before advancing floor
     this.autoSave();
 
@@ -5446,6 +5574,7 @@ export class DungeonScene extends Phaser.Scene {
         challengeMode: this.challengeMode ?? undefined,
         modifiers: modifierIds,
         runElapsedTime: this.runElapsedSeconds,
+        scoreChain: this.scoreChain,
       });
     });
   }
@@ -5512,8 +5641,8 @@ export class DungeonScene extends Phaser.Scene {
       });
     }
 
-    // Leaderboard: calculate and save run score
-    const clearRunScore = calculateScore({
+    // Leaderboard: calculate and save run score (with chain bonus added)
+    const clearBaseScore = calculateScore({
       dungeonId: this.dungeonDef.id,
       starter: this.starterId,
       floorsCleared: this.dungeonDef.floors,
@@ -5524,6 +5653,8 @@ export class DungeonScene extends Phaser.Scene {
       totalFloors: this.dungeonDef.floors,
       challengeMode: this.challengeMode ?? undefined,
     });
+    const clearChainBonus = this.scoreChain.totalBonusScore;
+    const clearRunScore = clearBaseScore + clearChainBonus;
     saveRunScore({
       dungeonId: this.dungeonDef.id,
       starter: this.starterId,
@@ -5568,6 +5699,12 @@ export class DungeonScene extends Phaser.Scene {
       }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
     }
 
+    // Chain bonus display
+    const clearMaxTier = getChainTier(this.scoreChain.maxChainReached);
+    const clearChainStr = clearMaxTier
+      ? `Best Chain: ${clearMaxTier} (x${this.scoreChain.maxChainReached.toFixed(1)})  +${clearChainBonus} pts`
+      : "";
+
     // Stats summary
     const clearStats = [
       `Run #${clearDungeonRunCount}`,
@@ -5577,6 +5714,7 @@ export class DungeonScene extends Phaser.Scene {
       this.challengeMode === "speedrun" ? "Speed Run Bonus: 2x Gold!" : "",
       this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
       this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
+      clearChainStr,
       `Score: ${clearRunScore}`,
     ].filter(Boolean).join("\n");
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 55, clearStats, {
@@ -5671,8 +5809,8 @@ export class DungeonScene extends Phaser.Scene {
       });
     }
 
-    // Leaderboard: calculate and save run score on game over
-    const goRunScore = calculateScore({
+    // Leaderboard: calculate and save run score on game over (with chain bonus)
+    const goBaseScore = calculateScore({
       dungeonId: this.dungeonDef.id,
       starter: this.starterId,
       floorsCleared: this.currentFloor,
@@ -5683,6 +5821,8 @@ export class DungeonScene extends Phaser.Scene {
       totalFloors: this.dungeonDef.floors,
       challengeMode: this.challengeMode ?? undefined,
     });
+    const goChainBonus = this.scoreChain.totalBonusScore;
+    const goRunScore = goBaseScore + goChainBonus;
     saveRunScore({
       dungeonId: this.dungeonDef.id,
       starter: this.starterId,
@@ -5701,12 +5841,19 @@ export class DungeonScene extends Phaser.Scene {
     const goMeta = loadMeta();
     const goDungeonRunCount = (goMeta.dungeonRunCounts ?? {})[this.dungeonDef.id] ?? 0;
 
+    // Chain bonus display
+    const goMaxTier = getChainTier(this.scoreChain.maxChainReached);
+    const goChainStr = goMaxTier
+      ? `Best Chain: ${goMaxTier} (x${this.scoreChain.maxChainReached.toFixed(1)})  +${goChainBonus} pts`
+      : "";
+
     // Stats summary
     const goStats = [
       `Run #${goDungeonRunCount}`,
       `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
       this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
       this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
+      goChainStr,
       `Score: ${goRunScore}`,
     ].filter(Boolean).join("\n");
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 48, goStats, {
@@ -6192,6 +6339,21 @@ export class DungeonScene extends Phaser.Scene {
       if (synergyBonus > 1.0) logMsg += " (Weather Synergy!)";
       this.showLog(logMsg);
 
+      // Score chain: type-effective basic attack by player
+      if (attacker === this.player && effectiveness >= 2.0) {
+        addChainAction(this.scoreChain, "effective");
+        this.chainActionThisTurn = true;
+        this.updateChainHUD();
+      }
+      // Score chain: player took damage from basic attack → reset chain
+      if (defender === this.player && dmg > 0) {
+        if (this.scoreChain.currentMultiplier > 1.0) {
+          resetChain(this.scoreChain);
+          this.showLog("Chain broken!");
+          this.updateChainHUD();
+        }
+      }
+
       // Ability: Static — paralyze chance scaled by ability level
       if (defender.ability === AbilityId.Static && Math.random() < getStaticChance(defender.abilityLevel ?? 1)) {
         if (!attacker.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
@@ -6329,6 +6491,21 @@ export class DungeonScene extends Phaser.Scene {
           if (skillScaledWMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
           if (skillSynergyBonus > 1.0) logMsg += " (Weather Synergy!)";
           this.showLog(logMsg);
+
+          // Score chain: type-effective hit by player
+          if (user === this.player && effectiveness >= 2.0) {
+            addChainAction(this.scoreChain, "effective");
+            this.chainActionThisTurn = true;
+            this.updateChainHUD();
+          }
+          // Score chain: player took damage → reset chain
+          if (target === this.player && dmg > 0) {
+            if (this.scoreChain.currentMultiplier > 1.0) {
+              resetChain(this.scoreChain);
+              this.showLog("Chain broken!");
+              this.updateChainHUD();
+            }
+          }
 
           // Thorns enchantment: reflect 10% damage back when player is hit by skill
           if (this.enchantment?.id === "thorns" && target === this.player && user.alive && dmg > 0) {
@@ -6817,6 +6994,14 @@ export class DungeonScene extends Phaser.Scene {
     } else {
       // Enemy defeated — track for gold
       this.enemiesDefeated++;
+
+      // Score chain: enemy kill
+      {
+        const chainBonus = addChainAction(this.scoreChain, "kill");
+        this.chainActionThisTurn = true;
+        if (chainBonus > 0) this.showLog(`Chain x${this.scoreChain.currentMultiplier.toFixed(1)}! +${chainBonus} bonus`);
+        this.updateChainHUD();
+      }
 
       // Vampiric enchantment: heal 1 HP per enemy defeated
       if (this.enchantment?.id === "vampiric" && this.player.alive && this.player.stats.hp < this.player.stats.maxHp) {
