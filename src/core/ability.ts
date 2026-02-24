@@ -180,4 +180,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   deino: AbilityId.Guts,
   snubbull: AbilityId.Guts,
   togepi: AbilityId.ShieldDust,
+  snover: AbilityId.Sturdy,
+  bergmite: AbilityId.Sturdy,
 };

@@ -1139,6 +1139,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["disarmingVoice", "drainingKiss", "fairyWind"],
     floors: [],
   },
+
+  // ── Phase 57 Ice 2nd ──
+  snover: {
+    id: "snover", name: "Snover", spriteKey: "snover",
+    types: [PokemonType.Ice, PokemonType.Grass], attackType: PokemonType.Ice,
+    baseStats: { hp: 30, atk: 12, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["iceShard", "iceHammer", "absorb"],
+    floors: [],
+  },
+  bergmite: {
+    id: "bergmite", name: "Bergmite", spriteKey: "bergmite",
+    types: [PokemonType.Ice], attackType: PokemonType.Ice,
+    baseStats: { hp: 28, atk: 10, def: 12 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["avalanche", "iceShard", "iceHammer"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1240,6 +1262,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   deino: { 7: "dragonRush", 10: "dragonPulse" },
   snubbull: { 7: "playRough", 10: "dazzlingGleam" },
   togepi: { 7: "drainingKiss", 10: "moonblast" },
+  snover: { 7: "iceHammer", 10: "iceBeam" },
+  bergmite: { 7: "avalanche", 10: "iceHammer" },
 };
 
 /** Check if a species learns a new skill at this level */

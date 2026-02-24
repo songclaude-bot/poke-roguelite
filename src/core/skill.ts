@@ -1223,6 +1223,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Plays rough with the target. High contact damage.",
   },
+
+  // ── Phase 57 Ice Skills ──
+  iceHammer: {
+    id: "iceHammer",
+    name: "Ice Hammer",
+    type: PokemonType.Ice,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Front1,
+    accuracy: 85,
+    description: "Swings a heavy ice fist down on the foe.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
