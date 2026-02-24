@@ -1111,6 +1111,17 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     effectChance: 20,
     description: "Traps foes in a vortex of fire.",
   },
+  // ── Phase 45 Water Skills ──
+  whirlpool: {
+    id: "whirlpool",
+    name: "Whirlpool",
+    type: PokemonType.Water,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Around,
+    accuracy: 85,
+    description: "Traps foes in a fierce vortex of water.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

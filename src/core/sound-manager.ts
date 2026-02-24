@@ -361,6 +361,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [165, 165, 220, 220, 262, 262, 196, 196, 165, 165, 220, 220, 294, 294, 220, 220],
     tempo: 0.24, melodyType: "sawtooth", bassType: "square",
   },
+  // Coral Reef — flowing, oceanic
+  coralReef: {
+    melody: [349, 440, 523, 587, 523, 440, 349, 330, 349, 392, 440, 523, 587, 523, 440, 392],
+    bass: [175, 175, 220, 220, 262, 262, 220, 220, 175, 175, 196, 196, 294, 294, 220, 220],
+    tempo: 0.30, melodyType: "sine", bassType: "triangle",
+  },
   // Meadow Path — cheerful, light
   meadowPath: {
     melody: [392, 440, 494, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 523, 587, 523],

@@ -105,6 +105,7 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     meadowPath: [WeatherType.Rain],
     petalGarden: [WeatherType.Rain],
     emberGrotto: [WeatherType.Sandstorm],
+    coralReef: [WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 
