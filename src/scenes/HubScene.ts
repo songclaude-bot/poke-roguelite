@@ -157,6 +157,17 @@ export class HubScene extends Phaser.Scene {
       y += 52;
     }
 
+    // Boss Rush button (unlocked after 30 clears)
+    if (this.meta.totalClears >= 30) {
+      this.createButton(GAME_WIDTH / 2, y, btnW, 42,
+        "Boss Rush",
+        "10 boss fights! Survive them all!",
+        "#dc2626",
+        () => this.enterDungeon("bossRush")
+      );
+      y += 52;
+    }
+
     // ── Challenge Mode Buttons ──
     const challengeIcons: Record<string, string> = { speedrun: "\u26A1", noItems: "\uD83D\uDEAB", solo: "\uD83D\uDC64" };
     for (const ch of CHALLENGE_MODES) {
@@ -242,8 +253,8 @@ export class HubScene extends Phaser.Scene {
     const tierGroups: { tier: typeof TIER_DEFS[0]; dungeons: DungeonDef[] }[] = TIER_DEFS.map(t => ({ tier: t, dungeons: [] }));
 
     for (const dg of allDungeons) {
-      // Special case: Endless Dungeon and Daily Dungeon are shown as separate buttons above the tier list
-      if (dg.id === "endlessDungeon" || dg.id === "dailyDungeon") continue;
+      // Special case: Endless Dungeon, Daily Dungeon, and Boss Rush are shown as separate buttons above the tier list
+      if (dg.id === "endlessDungeon" || dg.id === "dailyDungeon" || dg.id === "bossRush") continue;
       // Special case: Destiny Tower always goes to the "Special" tier
       if (dg.id === "destinyTower") {
         tierGroups[tierGroups.length - 1].dungeons.push(dg);
@@ -502,7 +513,7 @@ export class HubScene extends Phaser.Scene {
   private enterChallengeMode(challengeId: string) {
     // Pick a random unlocked dungeon (excluding endless and destiny tower)
     const unlocked = getUnlockedDungeons(this.meta.totalClears)
-      .filter(d => d.id !== "endlessDungeon" && d.id !== "destinyTower" && d.id !== "dailyDungeon");
+      .filter(d => d.id !== "endlessDungeon" && d.id !== "destinyTower" && d.id !== "dailyDungeon" && d.id !== "bossRush");
     if (unlocked.length === 0) return;
     const pick = unlocked[Math.floor(Math.random() * unlocked.length)];
     this.enterDungeonWithChallenge(pick.id, challengeId);

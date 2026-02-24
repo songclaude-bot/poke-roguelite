@@ -337,6 +337,8 @@ const DUNGEON_BGM_MAP: Record<string, string> = {
   endlessDungeon: "dungeon-dark",
   // Daily Dungeon — uses mystery/psychic theme
   dailyDungeon: "dungeon-psychic",
+  // Boss Rush — uses dark/boss theme
+  bossRush: "dungeon-dark",
 };
 
 function getDungeonBgmFile(dungeonId: string): string {

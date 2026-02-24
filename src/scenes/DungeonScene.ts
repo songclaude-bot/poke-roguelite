@@ -198,6 +198,10 @@ export class DungeonScene extends Phaser.Scene {
 
   // Challenge mode state
   private challengeMode: string | null = null;
+
+  // Boss Rush state
+  private isBossRush = false;
+  private bossesDefeated = 0;
   private challengeTurnLimit = 0; // speedrun: max turns allowed
   private challengeBadgeText: Phaser.GameObjects.Text | null = null;
 
@@ -263,6 +267,14 @@ export class DungeonScene extends Phaser.Scene {
         }
       }
     }
+
+    // Boss Rush: flag and shallow copy
+    this.isBossRush = this.dungeonDef.id === "bossRush";
+    this.bossesDefeated = 0;
+    if (this.isBossRush) {
+      this.dungeonDef = { ...this.dungeonDef };
+    }
+
     this.persistentHp = data?.hp ?? (50 + hpBonus + heldHpBonus);
     this.persistentMaxHp = data?.maxHp ?? (50 + hpBonus + heldHpBonus);
     this.persistentSkills = data?.skills ?? null;
@@ -328,9 +340,10 @@ export class DungeonScene extends Phaser.Scene {
       this.persistentDef = Math.floor(this.persistentDef * 1.3);
     }
 
-    // ── Dungeon Modifiers (regular dungeons only, not endless/daily/challenge) ──
+    // ── Dungeon Modifiers (regular dungeons only, not endless/daily/challenge/bossRush) ──
     const isRegularDungeon = this.dungeonDef.id !== "endlessDungeon"
       && this.dungeonDef.id !== "dailyDungeon"
+      && this.dungeonDef.id !== "bossRush"
       && !this.challengeMode;
 
     if (data?.modifiers && data.modifiers.length > 0) {
@@ -783,65 +796,67 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // ── Spawn enemies (dungeon + floor specific) ──
+    // ── Spawn enemies (dungeon + floor specific) — skip for Boss Rush (boss only) ──
     const rooms = this.dungeon.rooms;
-    const floorSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
-      ? this.getEndlessEnemies(this.currentFloor)
-      : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
-    const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
-    if (floorSpecies.length === 0) floorSpecies.push(SPECIES.zubat);
+    if (!this.isBossRush) {
+      const floorSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
+        ? this.getEndlessEnemies(this.currentFloor)
+        : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
+      const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
+      if (floorSpecies.length === 0) floorSpecies.push(SPECIES.zubat);
 
-    for (let i = 1; i < rooms.length; i++) {
-      const room = rooms[i];
-      const enemyCount = this.modifierEffects.doubleEnemies ? enemiesPerRoom(this.currentFloor) * 2 : enemiesPerRoom(this.currentFloor);
-      for (let e = 0; e < enemyCount; e++) {
-        const ex = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
-        const ey = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
-        if (terrain[ey][ex] !== TerrainType.GROUND) continue;
-        if (ex === stairsPos.x && ey === stairsPos.y) continue;
+      for (let i = 1; i < rooms.length; i++) {
+        const room = rooms[i];
+        const enemyCount = this.modifierEffects.doubleEnemies ? enemiesPerRoom(this.currentFloor) * 2 : enemiesPerRoom(this.currentFloor);
+        for (let e = 0; e < enemyCount; e++) {
+          const ex = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
+          const ey = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
+          if (terrain[ey][ex] !== TerrainType.GROUND) continue;
+          if (ex === stairsPos.x && ey === stairsPos.y) continue;
 
-        // Pick random species from floor pool
-        const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
-        const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
+          // Pick random species from floor pool
+          const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
+          const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
 
-        // Apply enemyHpMult modifier
-        if (this.modifierEffects.enemyHpMult !== 1) {
-          enemyStats.hp = Math.floor(enemyStats.hp * this.modifierEffects.enemyHpMult);
-          enemyStats.maxHp = Math.floor(enemyStats.maxHp * this.modifierEffects.enemyHpMult);
+          // Apply enemyHpMult modifier
+          if (this.modifierEffects.enemyHpMult !== 1) {
+            enemyStats.hp = Math.floor(enemyStats.hp * this.modifierEffects.enemyHpMult);
+            enemyStats.maxHp = Math.floor(enemyStats.maxHp * this.modifierEffects.enemyHpMult);
+          }
+
+          const enemy: Entity = {
+            tileX: ex, tileY: ey,
+            facing: Direction.Down,
+            stats: { ...enemyStats },
+            alive: true,
+            spriteKey: sp.spriteKey,
+            name: sp.name,
+            types: sp.types,
+            attackType: sp.attackType,
+            skills: createSpeciesSkills(sp),
+            statusEffects: [],
+            speciesId: sp.spriteKey, // for recruitment
+            ability: SPECIES_ABILITIES[sp.spriteKey],
+          };
+          const eTex = `${sp.spriteKey}-idle`;
+          if (this.textures.exists(eTex)) {
+            enemy.sprite = this.add.sprite(
+              this.tileToPixelX(ex), this.tileToPixelY(ey), eTex
+            );
+            enemy.sprite.setScale(TILE_SCALE).setDepth(9);
+            const eAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+            if (this.anims.exists(eAnim)) enemy.sprite.play(eAnim);
+          }
+          this.enemies.push(enemy);
+          this.allEntities.push(enemy);
+          this.seenSpecies.add(sp.id); // Pokedex tracking
         }
-
-        const enemy: Entity = {
-          tileX: ex, tileY: ey,
-          facing: Direction.Down,
-          stats: { ...enemyStats },
-          alive: true,
-          spriteKey: sp.spriteKey,
-          name: sp.name,
-          types: sp.types,
-          attackType: sp.attackType,
-          skills: createSpeciesSkills(sp),
-          statusEffects: [],
-          speciesId: sp.spriteKey, // for recruitment
-          ability: SPECIES_ABILITIES[sp.spriteKey],
-        };
-        const eTex = `${sp.spriteKey}-idle`;
-        if (this.textures.exists(eTex)) {
-          enemy.sprite = this.add.sprite(
-            this.tileToPixelX(ex), this.tileToPixelY(ey), eTex
-          );
-          enemy.sprite.setScale(TILE_SCALE).setDepth(9);
-          const eAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
-          if (this.anims.exists(eAnim)) enemy.sprite.play(eAnim);
-        }
-        this.enemies.push(enemy);
-        this.allEntities.push(enemy);
-        this.seenSpecies.add(sp.id); // Pokedex tracking
       }
     }
 
     // ── Monster House (15% chance, not on floor 1 or boss floors) ──
     const isEndlessBossFloor = this.dungeonDef.id === "endlessDungeon" && this.currentFloor % 10 === 0;
-    const isLastFloor = (this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors) || isEndlessBossFloor;
+    const isLastFloor = (this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors) || isEndlessBossFloor || this.isBossRush;
     if (!isLastFloor && this.currentFloor > 1 && Math.random() < 0.15 && rooms.length > 2) {
       const mhCandidates = rooms.filter((r, idx) =>
         idx > 0 && // Not player's room
@@ -965,6 +980,68 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Boss Rush: spawn a boss on every floor ──
+    if (this.isBossRush) {
+      const allSpecies = Object.keys(SPECIES);
+      const bossSpeciesId = allSpecies[Math.floor(Math.random() * allSpecies.length)];
+      const sp = SPECIES[bossSpeciesId];
+      if (sp) {
+        const bossRoom = rooms.slice(1).reduce((best, r) =>
+          (r.w * r.h > best.w * best.h) ? r : best, rooms[1]);
+        const bx = bossRoom.x + Math.floor(bossRoom.w / 2);
+        const by = bossRoom.y + Math.floor(bossRoom.h / 2);
+
+        // Boss multiplier scales with floor: floor 1 = 4.5x, floor 10 = 18x
+        const bossMultiplier = 3.0 + this.currentFloor * 1.5;
+        const baseStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
+        const bossStats = {
+          hp: Math.floor(baseStats.hp * bossMultiplier),
+          maxHp: Math.floor(baseStats.hp * bossMultiplier),
+          atk: Math.floor(baseStats.atk * bossMultiplier),
+          def: Math.floor(baseStats.def * bossMultiplier),
+          level: baseStats.level + 5 + this.currentFloor,
+        };
+
+        // Roman numerals for floor labels
+        const romanNumerals = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+        const floorLabel = romanNumerals[this.currentFloor - 1] ?? `${this.currentFloor}`;
+        const bossName = `${sp.name} Overlord ${floorLabel}`;
+
+        const boss: Entity = {
+          tileX: bx, tileY: by,
+          facing: Direction.Down,
+          stats: bossStats,
+          alive: true,
+          spriteKey: sp.spriteKey,
+          name: bossName,
+          types: sp.types,
+          attackType: sp.attackType,
+          skills: createSpeciesSkills(sp),
+          statusEffects: [],
+          speciesId: sp.spriteKey,
+          isBoss: true,
+          ability: SPECIES_ABILITIES[sp.spriteKey],
+        };
+        const bossTex = `${sp.spriteKey}-idle`;
+        if (this.textures.exists(bossTex)) {
+          boss.sprite = this.add.sprite(
+            this.tileToPixelX(bx), this.tileToPixelY(by), bossTex
+          );
+          boss.sprite.setScale(TILE_SCALE * 1.5).setDepth(11);
+          const bossAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+          if (this.anims.exists(bossAnim)) boss.sprite.play(bossAnim);
+        }
+        // Crimson tint aura for Boss Rush bosses
+        if (boss.sprite) boss.sprite.setTint(0xff2222);
+        this.time.delayedCall(800, () => { if (boss.sprite) boss.sprite.clearTint(); });
+
+        this.bossEntity = boss;
+        this.enemies.push(boss);
+        this.allEntities.push(boss);
+        this.seenSpecies.add(sp.id); // Pokedex tracking
+      }
+    }
+
     // ── Spawn floor items ──
     this.inventory = this.persistentInventory ?? [];
     for (let i = 0; i < this.dungeonDef.itemsPerFloor; i++) {
@@ -1004,7 +1081,7 @@ export class DungeonScene extends Phaser.Scene {
     );
 
     // ── Kecleon Shop (20% chance, not on boss floors) ──
-    const isBossFloor = this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors;
+    const isBossFloor = (this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors) || this.isBossRush;
     if (!isBossFloor && shouldSpawnShop() && rooms.length > 2) {
       // Pick a room that isn't the player's or stairs room
       const shopCandidates = rooms.filter(r =>
@@ -3228,13 +3305,14 @@ export class DungeonScene extends Phaser.Scene {
     sfxVictory();
     clearDungeonSave();
 
-    // Boss bonus: +50% gold if dungeon has a boss
+    // Boss bonus: +50% gold if dungeon has a boss; Boss Rush always counts as boss dungeon
     const baseGold = goldFromRun(this.currentFloor, this.enemiesDefeated, true);
     const ngGoldBonus = 1 + this.ngPlusLevel * 0.15; // +15% gold per NG+ level
     const challengeGoldMultiplier = this.challengeMode === "speedrun" ? 2 : 1; // Speed Run = 2x gold
     const modGoldMult = this.modifierEffects.goldMult; // Dungeon modifier gold multiplier
     const clearHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
-    const gold = Math.floor((this.dungeonDef.boss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult);
+    const hasBoss = this.dungeonDef.boss || this.isBossRush;
+    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -3289,6 +3367,7 @@ export class DungeonScene extends Phaser.Scene {
       this.ngPlusLevel > 0 ? `NG+${this.ngPlusLevel}` : "",
       this.challengeMode === "speedrun" ? "Speed Run Bonus: 2x Gold!" : "",
       this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
+      this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
     ].filter(Boolean).join("\n");
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 38, clearStats, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
@@ -3368,6 +3447,7 @@ export class DungeonScene extends Phaser.Scene {
     const goStats = [
       `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
       this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
+      this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
     ].filter(Boolean).join("\n");
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 38, goStats, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
@@ -4077,6 +4157,8 @@ export class DungeonScene extends Phaser.Scene {
         this.showLog(`★ BOSS DEFEATED! ${entity.name} fell! +${expGain} EXP ★`);
         this.bossEntity = null;
         this.cameras.main.flash(300, 255, 255, 200);
+        // Track bosses defeated for Boss Rush
+        if (this.isBossRush) this.bossesDefeated++;
       } else {
         this.showLog(`${entity.name} fainted! +${expGain} EXP`);
       }
