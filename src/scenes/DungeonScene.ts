@@ -289,6 +289,9 @@ export class DungeonScene extends Phaser.Scene {
       cryogonal: "0615", cubchoo: "0613",
       sandile: "0551", inkay: "0686",
       spritzee: "0682", swirlix: "0684",
+      goomy: "0704", jangmoo: "0782",
+      noibat: "0714", vullaby: "0629",
+      stufful: "0759", furfrou: "0676",
     };
 
     // Load player + all enemy species + ally species for this dungeon

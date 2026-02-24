@@ -1610,6 +1610,69 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["drainingKiss", "moonlight", "dazzlingGleam"],
     floors: [],
   },
+  // ── Phase 87 Dragon 3rd ──
+  goomy: {
+    id: "goomy", name: "Goomy", spriteKey: "goomy",
+    types: [PokemonType.Dragon], attackType: PokemonType.Dragon,
+    baseStats: { hp: 28, atk: 8, def: 10 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 6, idleFrames: 3,
+    skillIds: ["outrage", "dragonBreath", "dragonClaw"],
+    floors: [],
+  },
+  jangmoo: {
+    id: "jangmoo", name: "Jangmo-o", spriteKey: "jangmoo",
+    types: [PokemonType.Dragon], attackType: PokemonType.Dragon,
+    baseStats: { hp: 24, atk: 12, def: 10 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["dragonClaw", "outrage", "headbutt"],
+    floors: [],
+  },
+  // ── Phase 88 Flying 3rd ──
+  noibat: {
+    id: "noibat", name: "Noibat", spriteKey: "noibat",
+    types: [PokemonType.Flying, PokemonType.Dragon], attackType: PokemonType.Flying,
+    baseStats: { hp: 22, atk: 12, def: 6 },
+    walkFrameWidth: 32, walkFrameHeight: 72,
+    idleFrameWidth: 32, idleFrameHeight: 72,
+    walkFrames: 8, idleFrames: 10,
+    skillIds: ["aerialAce", "airSlash", "dragonBreath"],
+    floors: [],
+  },
+  vullaby: {
+    id: "vullaby", name: "Vullaby", spriteKey: "vullaby",
+    types: [PokemonType.Flying, PokemonType.Dark], attackType: PokemonType.Flying,
+    baseStats: { hp: 28, atk: 8, def: 12 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["airSlash", "aerialAce", "knockOff"],
+    floors: [],
+  },
+  // ── Phase 89 Normal 3rd ──
+  stufful: {
+    id: "stufful", name: "Stufful", spriteKey: "stufful",
+    types: [PokemonType.Normal, PokemonType.Fighting], attackType: PokemonType.Normal,
+    baseStats: { hp: 28, atk: 12, def: 8 },
+    walkFrameWidth: 24, walkFrameHeight: 24,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["workUp", "bodySlam", "headbutt"],
+    floors: [],
+  },
+  furfrou: {
+    id: "furfrou", name: "Furfrou", spriteKey: "furfrou",
+    types: [PokemonType.Normal], attackType: PokemonType.Normal,
+    baseStats: { hp: 26, atk: 10, def: 10 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["headbutt", "workUp", "hyperVoice"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1754,6 +1817,12 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   inkay: { 7: "knockOff", 10: "psybeam" },
   spritzee: { 7: "moonlight", 10: "dazzlingGleam" },
   swirlix: { 7: "moonlight", 10: "dazzlingGleam" },
+  goomy: { 7: "outrage", 10: "dragonClaw" },
+  jangmoo: { 7: "outrage", 10: "dragonClaw" },
+  noibat: { 7: "aerialAce", 10: "airSlash" },
+  vullaby: { 7: "aerialAce", 10: "airSlash" },
+  stufful: { 7: "workUp", 10: "bodySlam" },
+  furfrou: { 7: "workUp", 10: "hyperVoice" },
 };
 
 /** Check if a species learns a new skill at this level */

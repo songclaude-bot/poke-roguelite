@@ -1491,6 +1491,44 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     effectChance: 100,
     description: "Restores HP by bathing in moonlight.",
   },
+
+  // ── Phase 87 Dragon Skills ──
+  outrage: {
+    id: "outrage",
+    name: "Outrage",
+    type: PokemonType.Dragon,
+    power: 20,
+    pp: 6,
+    range: SkillRange.Around,
+    accuracy: 85,
+    description: "Rampages with draconic fury, hitting everything nearby.",
+  },
+
+  // ── Phase 88 Flying Skills ──
+  aerialAce: {
+    id: "aerialAce",
+    name: "Aerial Ace",
+    type: PokemonType.Flying,
+    power: 10,
+    pp: 16,
+    range: SkillRange.Front2,
+    accuracy: 100,
+    description: "An unavoidable aerial slash.",
+  },
+
+  // ── Phase 89 Normal Skills ──
+  workUp: {
+    id: "workUp",
+    name: "Work Up",
+    type: PokemonType.Normal,
+    power: 0,
+    pp: 10,
+    range: SkillRange.Self,
+    accuracy: 100,
+    effect: SkillEffect.AtkUp,
+    effectChance: 100,
+    description: "Raises Attack by getting pumped up.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

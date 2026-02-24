@@ -136,6 +136,9 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     frostbiteChasm: [WeatherType.Hail],
     midnightAlley: [WeatherType.Sandstorm, WeatherType.Hail],
     pixieHollow: [WeatherType.Rain],
+    drakeNest: [WeatherType.Sandstorm, WeatherType.Hail],
+    stormyNest: [WeatherType.Rain, WeatherType.Sandstorm],
+    cozyBurrow: [WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 
