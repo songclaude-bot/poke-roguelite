@@ -280,6 +280,9 @@ export class DungeonScene extends Phaser.Scene {
       joltik: "0595", tynamo: "0602",
       trubbish: "0568", skorupi: "0451",
       mudbray: "0749", hippopotas: "0449",
+      dwebble: "0557", binacle: "0688",
+      nincada: "0290", venipede: "0543",
+      mienfoo: "0619", timburr: "0532",
     };
 
     // Load player + all enemy species + ally species for this dungeon

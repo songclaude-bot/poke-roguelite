@@ -1381,6 +1381,42 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 85,
     description: "Charges with tremendous force.",
   },
+
+  // ── Phase 75 Rock Skills ──
+  smackDown: {
+    id: "smackDown",
+    name: "Smack Down",
+    type: PokemonType.Rock,
+    power: 14,
+    pp: 14,
+    range: SkillRange.Front2,
+    accuracy: 95,
+    description: "Hurls a rock to knock the target down.",
+  },
+
+  // ── Phase 76 Bug Skills ──
+  megahorn: {
+    id: "megahorn",
+    name: "Megahorn",
+    type: PokemonType.Bug,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Front2,
+    accuracy: 80,
+    description: "Rams with a massive horn.",
+  },
+
+  // ── Phase 77 Fighting Skills ──
+  superpower: {
+    id: "superpower",
+    name: "Superpower",
+    type: PokemonType.Fighting,
+    power: 20,
+    pp: 6,
+    range: SkillRange.Front1,
+    accuracy: 85,
+    description: "Attacks with tremendous power.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

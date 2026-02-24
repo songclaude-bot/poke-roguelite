@@ -114,6 +114,12 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "skorupi", to: "drapion", level: 14, newName: "Drapion", hpBonus: 12, atkBonus: 10, defBonus: 6, newSkillId: "sludgeBomb" },
   { from: "mudbray", to: "mudsdale", level: 14, newName: "Mudsdale", hpBonus: 14, atkBonus: 10, defBonus: 6, newSkillId: "highHorsepower" },
   { from: "hippopotas", to: "hippowdon", level: 14, newName: "Hippowdon", hpBonus: 16, atkBonus: 8, defBonus: 8, newSkillId: "earthPower" },
+  { from: "dwebble", to: "crustle", level: 14, newName: "Crustle", hpBonus: 12, atkBonus: 8, defBonus: 10, newSkillId: "rockWrecker" },
+  { from: "binacle", to: "barbaracle", level: 14, newName: "Barbaracle", hpBonus: 10, atkBonus: 12, defBonus: 6, newSkillId: "stoneEdge" },
+  { from: "nincada", to: "ninjask", level: 14, newName: "Ninjask", hpBonus: 8, atkBonus: 12, defBonus: 4, newSkillId: "megahorn" },
+  { from: "venipede", to: "whirlipede", level: 14, newName: "Whirlipede", hpBonus: 12, atkBonus: 8, defBonus: 8, newSkillId: "sludgeBomb" },
+  { from: "mienfoo", to: "mienshao", level: 14, newName: "Mienshao", hpBonus: 10, atkBonus: 12, defBonus: 4, newSkillId: "superpower" },
+  { from: "timburr", to: "gurdurr", level: 14, newName: "Gurdurr", hpBonus: 14, atkBonus: 10, defBonus: 6, newSkillId: "superpower" },
 ];
 
 /** Check if a species can evolve at a given level */

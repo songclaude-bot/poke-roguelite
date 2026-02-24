@@ -205,4 +205,10 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   skorupi: AbilityId.ShieldDust,
   mudbray: AbilityId.Guts,
   hippopotas: AbilityId.RockHead,
+  dwebble: AbilityId.Sturdy,
+  binacle: AbilityId.Guts,
+  nincada: AbilityId.RockHead,
+  venipede: AbilityId.ShieldDust,
+  mienfoo: AbilityId.PurePower,
+  timburr: AbilityId.Guts,
 };

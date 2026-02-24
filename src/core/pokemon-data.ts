@@ -1415,6 +1415,72 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["earthPower", "highHorsepower", "sandTomb"],
     floors: [],
   },
+
+  // ── Phase 75 Rock 3rd ──
+  dwebble: {
+    id: "dwebble", name: "Dwebble", spriteKey: "dwebble",
+    types: [PokemonType.Rock, PokemonType.Bug], attackType: PokemonType.Rock,
+    baseStats: { hp: 26, atk: 12, def: 10 },
+    walkFrameWidth: 24, walkFrameHeight: 24,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["smackDown", "rockSlide", "xScissor"],
+    floors: [],
+  },
+  binacle: {
+    id: "binacle", name: "Binacle", spriteKey: "binacle",
+    types: [PokemonType.Rock, PokemonType.Water], attackType: PokemonType.Rock,
+    baseStats: { hp: 24, atk: 14, def: 8 },
+    walkFrameWidth: 48, walkFrameHeight: 56,
+    idleFrameWidth: 32, idleFrameHeight: 56,
+    walkFrames: 8, idleFrames: 5,
+    skillIds: ["rockSlide", "smackDown", "waterPulse"],
+    floors: [],
+  },
+
+  // ── Phase 76 Bug 3rd ──
+  nincada: {
+    id: "nincada", name: "Nincada", spriteKey: "nincada",
+    types: [PokemonType.Bug, PokemonType.Ground], attackType: PokemonType.Bug,
+    baseStats: { hp: 22, atk: 10, def: 10 },
+    walkFrameWidth: 24, walkFrameHeight: 24,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 4, idleFrames: 5,
+    skillIds: ["megahorn", "xScissor", "bulldoze"],
+    floors: [],
+  },
+  venipede: {
+    id: "venipede", name: "Venipede", spriteKey: "venipede",
+    types: [PokemonType.Bug, PokemonType.Poison], attackType: PokemonType.Bug,
+    baseStats: { hp: 24, atk: 12, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 24,
+    idleFrameWidth: 32, idleFrameHeight: 24,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["megahorn", "venoshock", "signalBeam"],
+    floors: [],
+  },
+
+  // ── Phase 77 Fighting 3rd ──
+  mienfoo: {
+    id: "mienfoo", name: "Mienfoo", spriteKey: "mienfoo",
+    types: [PokemonType.Fighting], attackType: PokemonType.Fighting,
+    baseStats: { hp: 24, atk: 14, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["superpower", "drainPunch", "closeCombat"],
+    floors: [],
+  },
+  timburr: {
+    id: "timburr", name: "Timburr", spriteKey: "timburr",
+    types: [PokemonType.Fighting], attackType: PokemonType.Fighting,
+    baseStats: { hp: 28, atk: 14, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 2,
+    skillIds: ["hammerArm", "superpower", "rockSlide"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1541,6 +1607,12 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   skorupi: { 7: "gunkShot", 10: "venoshock" },
   mudbray: { 7: "highHorsepower", 10: "earthPower" },
   hippopotas: { 7: "earthPower", 10: "highHorsepower" },
+  dwebble: { 7: "smackDown", 10: "rockSlide" },
+  binacle: { 7: "smackDown", 10: "rockSlide" },
+  nincada: { 7: "megahorn", 10: "xScissor" },
+  venipede: { 7: "megahorn", 10: "venoshock" },
+  mienfoo: { 7: "superpower", 10: "drainPunch" },
+  timburr: { 7: "superpower", 10: "hammerArm" },
 };
 
 /** Check if a species learns a new skill at this level */
