@@ -891,3 +891,33 @@
 - **21개 업적** 시스템 + 상세 통계
 - **포켓몬 도감**: 540종+ 추적
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 14: 게임플레이 심화
+
+### 14-1. 팀 콤보 공격 (Phase 214)
+- 날짜: 2026-02-24
+- 플레이어와 동료가 같은 적 인접 시 25% 확률 콤보
+- 콤보 데미지 = 동료 ATK × 50%
+- 카메라 흔들림 + COMBO! 팝업 효과
+
+### 14-2. 데일리 던전 (Phase 215)
+- 날짜: 2026-02-24
+- 매일 시드 기반 랜덤 던전 생성
+- 15-25층, 난이도 3.0-7.0, 1-2개 모디파이어
+- 하루 1회 도전, 점수 localStorage 저장 (30일분)
+- 5클리어 이상 해금
+
+### 14-3. 던전 모디파이어 (Phase 216)
+- 날짜: 2026-02-24
+- 일반 던전 진입 시 30% 확률로 1-2개 모디파이어 적용
+- 긍정: Gold Rush, Power Surge, Iron Will, EXP Boost, Restoration, Bounty
+- 부정(보상): Hard Mode, Famine, Swarm, Lone Wolf, Fragile, Tank Enemies
+- 모디파이어 배지 HUD 표시 + 인트로 오버레이
+
+### v2.2.0 마일스톤
+- **팀 콤보 공격**: 동료와의 연계 공격 시스템
+- **데일리 던전**: 매일 바뀌는 시드 기반 던전
+- **던전 모디파이어**: 12종 랜덤 버프/디버프
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
