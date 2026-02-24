@@ -1173,6 +1173,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["psybeam", "psyshock", "zenHeadbutt"],
     floors: [],
   },
+
+  // ── Phase 60 Dark 2nd ──
+  stunky: {
+    id: "stunky", name: "Stunky", spriteKey: "stunky",
+    types: [PokemonType.Dark, PokemonType.Poison], attackType: PokemonType.Dark,
+    baseStats: { hp: 28, atk: 12, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 6,
+    skillIds: ["foulPlay", "bite", "sludgeBomb"],
+    floors: [],
+  },
+  purrloin: {
+    id: "purrloin", name: "Purrloin", spriteKey: "purrloin",
+    types: [PokemonType.Dark], attackType: PokemonType.Dark,
+    baseStats: { hp: 24, atk: 14, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 3,
+    skillIds: ["nightSlash", "foulPlay", "pursuit"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1277,6 +1299,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   snover: { 7: "iceHammer", 10: "iceBeam" },
   bergmite: { 7: "avalanche", 10: "iceHammer" },
   spoink: { 7: "psyshock", 10: "psychic" },
+  stunky: { 7: "foulPlay", 10: "darkPulse" },
+  purrloin: { 7: "nightSlash", 10: "foulPlay" },
 };
 
 /** Check if a species learns a new skill at this level */

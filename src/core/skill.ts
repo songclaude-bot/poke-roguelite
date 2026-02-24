@@ -1247,6 +1247,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Materializes psychic power into a shockwave.",
   },
+
+  // ── Phase 60 Dark Skills ──
+  foulPlay: {
+    id: "foulPlay",
+    name: "Foul Play",
+    type: PokemonType.Dark,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Front1,
+    accuracy: 90,
+    description: "Turns the foe's power against it.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

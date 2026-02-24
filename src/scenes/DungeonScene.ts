@@ -269,6 +269,7 @@ export class DungeonScene extends Phaser.Scene {
       snubbull: "0209", togepi: "0175",
       snover: "0459", bergmite: "0712",
       spoink: "0325",
+      stunky: "0434", purrloin: "0509",
     };
 
     // Load player + all enemy species + ally species for this dungeon

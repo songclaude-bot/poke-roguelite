@@ -183,4 +183,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   snover: AbilityId.Sturdy,
   bergmite: AbilityId.Sturdy,
   spoink: AbilityId.ShieldDust,
+  stunky: AbilityId.ShieldDust,
+  purrloin: AbilityId.NoGuard,
 };

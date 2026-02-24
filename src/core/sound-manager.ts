@@ -429,6 +429,11 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [220, 220, 262, 262, 330, 330, 262, 262, 220, 220, 175, 175, 220, 220, 262, 262],
     tempo: 0.33, melodyType: "sine", bassType: "sine",
   },
+  shadowAlley: {
+    melody: [175, 196, 220, 196, 175, 165, 147, 165, 175, 196, 220, 247, 220, 196, 175, 165],
+    bass: [88, 88, 98, 98, 110, 110, 98, 98, 88, 88, 82, 82, 88, 88, 98, 98],
+    tempo: 0.35, melodyType: "sawtooth", bassType: "triangle",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],
