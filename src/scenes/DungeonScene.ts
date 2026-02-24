@@ -1134,6 +1134,9 @@ export class DungeonScene extends Phaser.Scene {
     const goldStr = this.gold > 0 ? ` ${this.gold}G` : "";
     this.turnText.setText(`Lv.${p.level} Belly:${this.belly}${bellyColor}${goldStr} T${this.turnManager.turn}${abilityStr}${buffStr}`);
 
+    // Status effect visual tint on player sprite
+    this.updateStatusTint(this.player);
+
     // Boss HP bar update
     if (this.bossEntity && this.bossHpBar) {
       this.bossHpBar.clear();
@@ -1520,6 +1523,49 @@ export class DungeonScene extends Phaser.Scene {
     this.showLog("Game saved!");
   }
 
+  /** Silent auto-save (no log message) */
+  private autoSave() {
+    if (this.gameOver) return;
+    saveDungeon({
+      version: 1,
+      timestamp: Date.now(),
+      floor: this.currentFloor,
+      dungeonId: this.dungeonDef.id,
+      hp: this.player.stats.hp,
+      maxHp: this.player.stats.maxHp,
+      level: this.player.stats.level,
+      atk: this.player.stats.atk,
+      def: this.player.stats.def,
+      totalExp: this.totalExp,
+      skills: serializeSkills(this.player.skills),
+      inventory: serializeInventory(this.inventory),
+      starter: this.starterId,
+    });
+  }
+
+  /** Apply persistent status effect tint to entity sprite */
+  private updateStatusTint(entity: { sprite?: Phaser.GameObjects.Sprite; statusEffects: StatusEffect[] }) {
+    if (!entity.sprite) return;
+    const hasBurn = entity.statusEffects.some(s => s.type === SkillEffect.Burn);
+    const hasPara = entity.statusEffects.some(s => s.type === SkillEffect.Paralyze);
+    const hasAtkUp = entity.statusEffects.some(s => s.type === SkillEffect.AtkUp);
+    const hasDefUp = entity.statusEffects.some(s => s.type === SkillEffect.DefUp);
+
+    if (hasBurn) {
+      entity.sprite.setTint(0xff8844); // Orange-red for burn
+    } else if (hasPara) {
+      entity.sprite.setTint(0xffff44); // Yellow for paralysis
+    } else if (hasAtkUp && hasDefUp) {
+      entity.sprite.setTint(0x44ffff); // Cyan for both buffs
+    } else if (hasAtkUp) {
+      entity.sprite.setTint(0xff4444); // Red for ATK up
+    } else if (hasDefUp) {
+      entity.sprite.setTint(0x4444ff); // Blue for DEF up
+    } else {
+      entity.sprite.clearTint();
+    }
+  }
+
   // ── Stairs ──
 
   // ── Traps ──
@@ -1872,6 +1918,9 @@ export class DungeonScene extends Phaser.Scene {
       this.showDungeonClear();
       return;
     }
+
+    // Auto-save before advancing floor
+    this.autoSave();
 
     this.gameOver = true;
     sfxStairs();
