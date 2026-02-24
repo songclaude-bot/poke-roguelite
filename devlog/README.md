@@ -1011,3 +1011,28 @@
 - **튜토리얼**: 11섹션 도움말 + 첫 플레이 팁
 - **6종 신규 SFX**: 콤보, 크리티컬, 회피, 아이템, 버프, 날씨
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 18: 몬스터 하우스 + 상태이상
+
+### 18-1. 몬스터 하우스 개편 (Phase 230)
+- 날짜: 2026-02-24
+- 3종 몬스터 하우스: Standard(빨강), Treasure(금색), Ambush(보라)
+- Standard: 3-5적, 클리어 시 아이템 1개
+- Treasure: 5-8적, 클리어 시 아이템 3-5개 + 2배 골드
+- Ambush: 4-6적 투명→페이드인, 클리어 시 아이템 2개 + EXP 보너스
+- 경고 팝업 + 카메라 흔들림, 클리어 감지 시스템
+
+### 18-2. 상태이상 개선 (Phase 231)
+- 날짜: 2026-02-24
+- 상태 지속턴: Burn 5턴, Paralyze 3턴, AtkUp/DefUp 10턴
+- HUD 상태 배지: BRN(빨강)/PAR(노랑)/ATK↑(주황)/DEF↑(파랑) + 남은 턴수
+- Burn 틱 데미지 (5HP/턴), 상태 해제 메시지
+- 주기적 Burn/Paralyze 시각 효과 (오렌지/노랑 플래시)
+
+### v2.6.0 마일스톤
+- **몬스터 하우스 3종**: Standard/Treasure/Ambush + 보상 시스템
+- **상태 지속턴**: 번/마비/버프 카운트다운 + HUD 표시
+- **상태 시각효과**: 주기적 플래시, 틱 데미지
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
