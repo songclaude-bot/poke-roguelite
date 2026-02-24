@@ -718,3 +718,33 @@
 - **395종+ 포켓몬** (진화 포함)
 - **230종+ 기술**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 9: 9th Tier Dungeons
+
+### 9-1. Water/Fire/Grass/Electric/Poison/Ground (Phase 168-170)
+- 날짜: 2026-02-24
+- Gyarados, Kingdra, Blaziken, Typhlosion, Venusaur, Sceptile, Jolteon, Ampharos, Nidoking, Crobat, Krookodile, Nidoqueen
+- Leviathan Trench (Water), Infernal Summit (Fire), World Tree Canopy (Grass)
+- Thunder God Spire (Electric), Venomous Abyss (Poison), Tectonic Throne (Ground)
+
+### 9-2. Rock/Bug/Fighting/Steel/Ghost/Psychic (Phase 171-173)
+- 날짜: 2026-02-24
+- Tyranitar, Aerodactyl, Yanmega, Scolipede, Conkeldurr, Machamp, Magnezone, Empoleon, Dusknoir, Cofagrigus, Reuniclus, Gothitelle
+- Ancient Monolith (Rock), Predator Hive (Bug), Wargod's Temple (Fighting)
+- Magnetar Core (Steel), Spectral Throne (Ghost), Cognition Spire (Psychic)
+
+### 9-3. Ice/Dark/Fairy/Dragon/Flying/Normal (Phase 174-176)
+- 날짜: 2026-02-24
+- Mamoswine, Walrein, Darkrai, Hydreigon, Sylveon, Hatterene, Haxorus, Goodra, Pidgeot, Noivern, Blissey, Porygon-Z
+- Absolute Zero Peak (Ice), Eternal Night (Dark), Celestial Blossom (Fairy)
+- Dragon's Sovereignty (Dragon), Zenith Stormfront (Flying), Infinity Hall (Normal)
+
+### v1.7.0 마일스톤
+- **전 18타입 × 9개 던전 = 162개 던전** + Destiny Tower = 총 163개 던전!
+- **신규 포켓몬 36종** (Phases 168-176)
+- **313종 스타터** (전체)
+- **430종+ 포켓몬** (진화 포함)
+- **250종+ 기술**
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/

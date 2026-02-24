@@ -112,7 +112,7 @@ export class HubScene extends Phaser.Scene {
       )
     );
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.6.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.7.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
@@ -606,6 +606,43 @@ export class HubScene extends Phaser.Scene {
       { id: "braviary", name: "Braviary", unlock: 19 },
       { id: "snorlax", name: "Snorlax", unlock: 20 },
       { id: "zangoose", name: "Zangoose", unlock: 19 },
+      // 9th dungeon starters
+      { id: "gyarados", name: "Gyarados", unlock: 22 },
+      { id: "kingdra", name: "Kingdra", unlock: 21 },
+      { id: "blaziken", name: "Blaziken", unlock: 22 },
+      { id: "typhlosion", name: "Typhlosion", unlock: 21 },
+      { id: "venusaur", name: "Venusaur", unlock: 22 },
+      { id: "sceptile", name: "Sceptile", unlock: 21 },
+      { id: "jolteon", name: "Jolteon", unlock: 22 },
+      { id: "ampharos", name: "Ampharos", unlock: 21 },
+      { id: "nidoking", name: "Nidoking", unlock: 22 },
+      { id: "crobat", name: "Crobat", unlock: 21 },
+      { id: "krookodile", name: "Krookodile", unlock: 22 },
+      { id: "nidoqueen", name: "Nidoqueen", unlock: 21 },
+      { id: "tyranitar", name: "Tyranitar", unlock: 22 },
+      { id: "aerodactyl", name: "Aerodactyl", unlock: 21 },
+      { id: "yanmega", name: "Yanmega", unlock: 22 },
+      { id: "scolipede", name: "Scolipede", unlock: 21 },
+      { id: "conkeldurr", name: "Conkeldurr", unlock: 22 },
+      { id: "machamp", name: "Machamp", unlock: 21 },
+      { id: "magnezone", name: "Magnezone", unlock: 22 },
+      { id: "empoleon", name: "Empoleon", unlock: 21 },
+      { id: "dusknoir", name: "Dusknoir", unlock: 22 },
+      { id: "cofagrigus", name: "Cofagrigus", unlock: 21 },
+      { id: "reuniclus", name: "Reuniclus", unlock: 22 },
+      { id: "gothitelle", name: "Gothitelle", unlock: 21 },
+      { id: "mamoswine", name: "Mamoswine", unlock: 22 },
+      { id: "walrein", name: "Walrein", unlock: 21 },
+      { id: "darkrai", name: "Darkrai", unlock: 22 },
+      { id: "hydreigon", name: "Hydreigon", unlock: 21 },
+      { id: "sylveon", name: "Sylveon", unlock: 22 },
+      { id: "hatterene", name: "Hatterene", unlock: 21 },
+      { id: "haxorus", name: "Haxorus", unlock: 22 },
+      { id: "goodra", name: "Goodra", unlock: 21 },
+      { id: "pidgeot", name: "Pidgeot", unlock: 22 },
+      { id: "noivern", name: "Noivern", unlock: 21 },
+      { id: "blissey", name: "Blissey", unlock: 22 },
+      { id: "porygonZ", name: "Porygon-Z", unlock: 21 },
     ];
 
     const current = this.meta.starter ?? "mudkip";
