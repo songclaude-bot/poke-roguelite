@@ -87,72 +87,117 @@ export class HubScene extends Phaser.Scene {
       y += 52;
     }
 
-    // Dungeon list
-    this.add.text(15, y, "── Dungeons ──", {
-      fontSize: "10px", color: "#94a3b8", fontFamily: "monospace",
-    });
-    y += 20;
-
-    for (const dg of Object.values(DUNGEONS)) {
-      const isUnlocked = dg.unlockClears <= this.meta.totalClears;
-      const color = isUnlocked ? "#e0e0e0" : "#444460";
-      const desc = isUnlocked ? dg.description : `Unlock: ${dg.unlockClears} clears needed`;
-
-      this.createButton(GAME_WIDTH / 2, y, btnW, 42,
-        dg.name,
-        desc,
-        color,
-        isUnlocked ? () => this.enterDungeon(dg.id) : undefined
-      );
-      y += 52;
-    }
-
-    // ── Bottom Buttons ──
-    y += 5;
-
-    // Starter selection
+    // ── Bottom fixed buttons ──
     const currentStarter = this.meta.starter ?? "mudkip";
     const starterName = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
-    this.createButton(GAME_WIDTH / 2, y, btnW, 38,
+
+    const fixedY = GAME_HEIGHT - 110;
+    this.createButton(GAME_WIDTH / 2, fixedY, btnW, 32,
       `Starter: ${starterName}`,
-      "Tap to change your starting Pokemon",
+      "Tap to change",
       "#f472b6",
       () => this.showStarterSelect()
     );
-    y += 48;
-
-    this.createButton(GAME_WIDTH / 2, y, btnW, 38,
+    this.createButton(GAME_WIDTH / 2, fixedY + 38, btnW, 32,
       "Upgrade Shop",
       `Gold: ${this.meta.gold}`,
       "#fbbf24",
       () => this.scene.start("UpgradeScene")
     );
-    y += 48;
-
-    this.createButton(GAME_WIDTH / 2, y, btnW, 38,
+    this.createButton(GAME_WIDTH / 2, fixedY + 76, btnW, 32,
       "Records",
-      `Best: B${this.meta.bestFloor}F  Total Gold: ${this.meta.totalGold}`,
+      `Clears: ${this.meta.totalClears}  Best: B${this.meta.bestFloor}F`,
       "#60a5fa",
       () => this.showNotice(
         `Total Runs: ${this.meta.totalRuns}\nClears: ${this.meta.totalClears}\nBest Floor: B${this.meta.bestFloor}F\nTotal Gold: ${this.meta.totalGold}`
       )
     );
 
-    // Version
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 15, "v0.20.0", {
-      fontSize: "9px", color: "#444460", fontFamily: "monospace",
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v0.20.0", {
+      fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    // Starter sprite (show current)
-    const starterSpriteKey = `${currentStarter}-idle`;
-    if (this.textures.exists(starterSpriteKey)) {
-      const sprite = this.add.sprite(GAME_WIDTH / 2, GAME_HEIGHT - 110, starterSpriteKey);
-      sprite.setScale(2.5);
-      const animKey = `${currentStarter}-idle-0`;
-      if (this.anims.exists(animKey)) sprite.play(animKey);
-      this.tweens.add({
-        targets: sprite, y: sprite.y - 3,
-        duration: 1200, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
+    // ── Scrollable dungeon list ──
+    const scrollTop = y;
+    const scrollBottom = fixedY - 10;
+    const scrollH = scrollBottom - scrollTop;
+
+    // Container for all dungeon buttons
+    const container = this.add.container(0, 0);
+    let cy2 = scrollTop;
+
+    this.add.text(15, cy2, "── Dungeons ──", {
+      fontSize: "10px", color: "#94a3b8", fontFamily: "monospace",
+    });
+    cy2 += 18;
+
+    for (const dg of Object.values(DUNGEONS)) {
+      const isUnlocked = dg.unlockClears <= this.meta.totalClears;
+      const color = isUnlocked ? "#e0e0e0" : "#444460";
+      const desc = isUnlocked ? dg.description : `Unlock: ${dg.unlockClears} clears needed`;
+
+      const bg = this.add.rectangle(GAME_WIDTH / 2, cy2, btnW, 38, 0x1a1a2e, 0.9)
+        .setStrokeStyle(1, isUnlocked ? 0x334155 : 0x222233);
+      container.add(bg);
+
+      if (isUnlocked) {
+        const dgId = dg.id;
+        bg.setInteractive({ useHandCursor: true });
+        bg.on("pointerover", () => bg.setFillStyle(0x2a2a4e, 1));
+        bg.on("pointerout", () => bg.setFillStyle(0x1a1a2e, 0.9));
+        bg.on("pointerdown", () => this.enterDungeon(dgId));
+      }
+
+      const t1 = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 10, cy2 - 9, dg.name, {
+        fontSize: "11px", color, fontFamily: "monospace", fontStyle: "bold",
+      });
+      const t2 = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 10, cy2 + 5, desc, {
+        fontSize: "8px", color: "#666680", fontFamily: "monospace",
+      });
+      container.add([t1, t2]);
+      cy2 += 44;
+    }
+
+    const contentH = cy2 - scrollTop;
+    const maxScroll = Math.max(0, contentH - scrollH);
+
+    // Mask for scrollable area
+    const maskShape = this.make.graphics({ x: 0, y: 0 });
+    maskShape.fillRect(0, scrollTop, GAME_WIDTH, scrollH);
+    const mask = maskShape.createGeometryMask();
+    container.setMask(mask);
+
+    // Touch/mouse scroll
+    if (maxScroll > 0) {
+      let dragStartY = 0;
+      let scrollOffset = 0;
+
+      this.input.on("pointerdown", (ptr: Phaser.Input.Pointer) => {
+        if (ptr.y >= scrollTop && ptr.y <= scrollBottom) {
+          dragStartY = ptr.y;
+        }
+      });
+
+      this.input.on("pointermove", (ptr: Phaser.Input.Pointer) => {
+        if (!ptr.isDown || ptr.y < scrollTop || ptr.y > scrollBottom) return;
+        const dy = ptr.y - dragStartY;
+        dragStartY = ptr.y;
+        scrollOffset = Math.max(-maxScroll, Math.min(0, scrollOffset + dy));
+        container.y = scrollOffset;
+      });
+
+      // Scroll indicator
+      const indicatorH = Math.max(20, (scrollH / contentH) * scrollH);
+      const indicator = this.add.rectangle(
+        GAME_WIDTH - 4, scrollTop, 3, indicatorH, 0x667eea, 0.5
+      ).setOrigin(0.5, 0);
+
+      this.time.addEvent({
+        delay: 50, loop: true,
+        callback: () => {
+          const ratio = -scrollOffset / maxScroll;
+          indicator.y = scrollTop + ratio * (scrollH - indicatorH);
+        },
       });
     }
   }
