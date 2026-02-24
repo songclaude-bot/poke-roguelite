@@ -120,6 +120,12 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "venipede", to: "whirlipede", level: 14, newName: "Whirlipede", hpBonus: 12, atkBonus: 8, defBonus: 8, newSkillId: "sludgeBomb" },
   { from: "mienfoo", to: "mienshao", level: 14, newName: "Mienshao", hpBonus: 10, atkBonus: 12, defBonus: 4, newSkillId: "superpower" },
   { from: "timburr", to: "gurdurr", level: 14, newName: "Gurdurr", hpBonus: 14, atkBonus: 10, defBonus: 6, newSkillId: "superpower" },
+  { from: "klink", to: "klang", level: 14, newName: "Klang", hpBonus: 12, atkBonus: 8, defBonus: 8, newSkillId: "gearGrind" },
+  { from: "ferroseed", to: "ferrothorn", level: 14, newName: "Ferrothorn", hpBonus: 14, atkBonus: 6, defBonus: 12, newSkillId: "flashCannon" },
+  { from: "phantump", to: "trevenant", level: 14, newName: "Trevenant", hpBonus: 14, atkBonus: 10, defBonus: 6, newSkillId: "phantomForce" },
+  { from: "honedge", to: "doublade", level: 14, newName: "Doublade", hpBonus: 10, atkBonus: 12, defBonus: 8, newSkillId: "shadowBall" },
+  { from: "solosis", to: "duosion", level: 14, newName: "Duosion", hpBonus: 12, atkBonus: 10, defBonus: 4, newSkillId: "futuresight" },
+  { from: "elgyem", to: "beheeyem", level: 14, newName: "Beheeyem", hpBonus: 14, atkBonus: 8, defBonus: 8, newSkillId: "futuresight" },
 ];
 
 /** Check if a species can evolve at a given level */

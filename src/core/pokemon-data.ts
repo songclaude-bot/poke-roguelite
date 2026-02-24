@@ -1481,6 +1481,72 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["hammerArm", "superpower", "rockSlide"],
     floors: [],
   },
+
+  // ── Phase 79 Steel 3rd ──
+  klink: {
+    id: "klink", name: "Klink", spriteKey: "klink",
+    types: [PokemonType.Steel], attackType: PokemonType.Steel,
+    baseStats: { hp: 26, atk: 12, def: 10 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 10, idleFrames: 10,
+    skillIds: ["gearGrind", "flashCannon", "gyroBall"],
+    floors: [],
+  },
+  ferroseed: {
+    id: "ferroseed", name: "Ferroseed", spriteKey: "ferroseed",
+    types: [PokemonType.Steel, PokemonType.Grass], attackType: PokemonType.Steel,
+    baseStats: { hp: 28, atk: 8, def: 14 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 8, idleFrames: 9,
+    skillIds: ["ironHead", "gearGrind", "energyBall"],
+    floors: [],
+  },
+
+  // ── Phase 80 Ghost 3rd ──
+  phantump: {
+    id: "phantump", name: "Phantump", spriteKey: "phantump",
+    types: [PokemonType.Ghost, PokemonType.Grass], attackType: PokemonType.Ghost,
+    baseStats: { hp: 24, atk: 12, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 6, idleFrames: 6,
+    skillIds: ["phantomForce", "shadowBall", "energyBall"],
+    floors: [],
+  },
+  honedge: {
+    id: "honedge", name: "Honedge", spriteKey: "honedge",
+    types: [PokemonType.Ghost, PokemonType.Steel], attackType: PokemonType.Ghost,
+    baseStats: { hp: 22, atk: 14, def: 10 },
+    walkFrameWidth: 32, walkFrameHeight: 56,
+    idleFrameWidth: 32, idleFrameHeight: 56,
+    walkFrames: 8, idleFrames: 8,
+    skillIds: ["phantomForce", "shadowSneak", "ironHead"],
+    floors: [],
+  },
+
+  // ── Phase 81 Psychic 3rd ──
+  solosis: {
+    id: "solosis", name: "Solosis", spriteKey: "solosis",
+    types: [PokemonType.Psychic], attackType: PokemonType.Psychic,
+    baseStats: { hp: 24, atk: 12, def: 6 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 10, idleFrames: 4,
+    skillIds: ["futuresight", "psychic", "psyshock"],
+    floors: [],
+  },
+  elgyem: {
+    id: "elgyem", name: "Elgyem", spriteKey: "elgyem",
+    types: [PokemonType.Psychic], attackType: PokemonType.Psychic,
+    baseStats: { hp: 26, atk: 10, def: 10 },
+    walkFrameWidth: 24, walkFrameHeight: 56,
+    idleFrameWidth: 24, idleFrameHeight: 56,
+    walkFrames: 8, idleFrames: 8,
+    skillIds: ["psybeam", "futuresight", "psyshock"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1613,6 +1679,12 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   venipede: { 7: "megahorn", 10: "venoshock" },
   mienfoo: { 7: "superpower", 10: "drainPunch" },
   timburr: { 7: "superpower", 10: "hammerArm" },
+  klink: { 7: "gearGrind", 10: "flashCannon" },
+  ferroseed: { 7: "gearGrind", 10: "ironHead" },
+  phantump: { 7: "phantomForce", 10: "shadowBall" },
+  honedge: { 7: "phantomForce", 10: "ironHead" },
+  solosis: { 7: "futuresight", 10: "psychic" },
+  elgyem: { 7: "futuresight", 10: "psybeam" },
 };
 
 /** Check if a species learns a new skill at this level */

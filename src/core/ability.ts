@@ -211,4 +211,10 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   venipede: AbilityId.ShieldDust,
   mienfoo: AbilityId.PurePower,
   timburr: AbilityId.Guts,
+  klink: AbilityId.Sturdy,
+  ferroseed: AbilityId.Sturdy,
+  phantump: AbilityId.Levitate,
+  honedge: AbilityId.NoGuard,
+  solosis: AbilityId.ShieldDust,
+  elgyem: AbilityId.ShieldDust,
 };

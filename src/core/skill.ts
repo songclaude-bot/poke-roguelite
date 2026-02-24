@@ -1417,6 +1417,42 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 85,
     description: "Attacks with tremendous power.",
   },
+
+  // ── Phase 79 Steel Skills ──
+  gearGrind: {
+    id: "gearGrind",
+    name: "Gear Grind",
+    type: PokemonType.Steel,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Front2,
+    accuracy: 85,
+    description: "Grinds gears into the target twice.",
+  },
+
+  // ── Phase 80 Ghost Skills ──
+  phantomForce: {
+    id: "phantomForce",
+    name: "Phantom Force",
+    type: PokemonType.Ghost,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Vanishes and strikes from the shadows.",
+  },
+
+  // ── Phase 81 Psychic Skills ──
+  futuresight: {
+    id: "futuresight",
+    name: "Future Sight",
+    type: PokemonType.Psychic,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Room,
+    accuracy: 80,
+    description: "Foresees an attack that strikes all in the room.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
