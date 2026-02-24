@@ -256,6 +256,7 @@ export class DungeonScene extends Phaser.Scene {
       larvitar: "0246", nosepass: "0299",
       swinub: "0220", spheal: "0363",
       zigzagoon: "0263", whismur: "0293",
+      oddish: "0043", budew: "0406",
     };
 
     // Load player + all enemy species + ally species for this dungeon

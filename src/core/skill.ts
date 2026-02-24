@@ -1064,6 +1064,28 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Loud shout damages all around.",
   },
+
+  // ── Additional Grass Skills ──
+  petalDance: {
+    id: "petalDance",
+    name: "Petal Dance",
+    type: PokemonType.Grass,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Around,
+    accuracy: 85,
+    description: "Scatters petals that hit all around.",
+  },
+  energyBall: {
+    id: "energyBall",
+    name: "Energy Ball",
+    type: PokemonType.Grass,
+    power: 16,
+    pp: 10,
+    range: SkillRange.FrontLine,
+    accuracy: 90,
+    description: "Launches a ball of natural energy.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

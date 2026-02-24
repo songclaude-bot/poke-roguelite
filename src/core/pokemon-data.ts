@@ -860,6 +860,33 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["hyperVoice", "tackle", "headbutt"],
     floors: [],
   },
+  // ── Petal Garden ──
+  oddish: {
+    id: "oddish",
+    name: "Oddish",
+    spriteKey: "oddish",
+    types: [PokemonType.Grass, PokemonType.Poison],
+    attackType: PokemonType.Grass,
+    baseStats: { hp: 28, atk: 10, def: 7 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 8, idleFrames: 4,
+    skillIds: ["absorb", "petalDance", "poisonSting"],
+    floors: [],
+  },
+  budew: {
+    id: "budew",
+    name: "Budew",
+    spriteKey: "budew",
+    types: [PokemonType.Grass, PokemonType.Poison],
+    attackType: PokemonType.Grass,
+    baseStats: { hp: 24, atk: 11, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 6, idleFrames: 4,
+    skillIds: ["energyBall", "absorb", "poisonSting"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -939,6 +966,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   spheal: { 7: "icyWind", 10: "iceBeam" },
   zigzagoon: { 7: "headbutt", 10: "hyperVoice" },
   whismur: { 7: "hyperVoice", 10: "headbutt" },
+  oddish: { 7: "petalDance", 10: "sleepPowder" },
+  budew: { 7: "energyBall", 10: "petalDance" },
 };
 
 /** Check if a species learns a new skill at this level */
