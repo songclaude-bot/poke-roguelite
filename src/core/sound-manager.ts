@@ -998,6 +998,42 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [98, 98, 110, 110, 131, 131, 98, 98, 82, 82, 131, 131, 165, 165, 110, 98],
     tempo: 0.26, melodyType: "sawtooth", bassType: "square",
   },
+  // Crystal Vein — crystalline, echoing, deep
+  crystalVein: {
+    melody: [523, 587, 659, 784, 659, 587, 523, 440, 523, 587, 659, 784, 880, 784, 659, 587],
+    bass: [262, 262, 294, 294, 330, 330, 262, 262, 220, 220, 294, 294, 392, 392, 330, 262],
+    tempo: 0.28, melodyType: "sine", bassType: "triangle",
+  },
+  // Hive Mind — buzzing, relentless, swarming
+  hiveMind: {
+    melody: [330, 349, 392, 440, 392, 349, 330, 294, 330, 349, 392, 440, 494, 440, 392, 349],
+    bass: [165, 165, 175, 175, 196, 196, 165, 165, 147, 147, 175, 175, 220, 220, 196, 165],
+    tempo: 0.20, melodyType: "sawtooth", bassType: "sine",
+  },
+  // Grand Arena — triumphant, intense, martial
+  grandArena: {
+    melody: [392, 440, 523, 587, 523, 440, 392, 330, 392, 440, 523, 659, 587, 523, 440, 392],
+    bass: [196, 196, 220, 220, 262, 262, 196, 196, 165, 165, 220, 220, 330, 330, 262, 196],
+    tempo: 0.22, melodyType: "square", bassType: "triangle",
+  },
+  // Adamantine Chamber — metallic, reverberant, heavy
+  adamantineChamber: {
+    melody: [262, 294, 330, 392, 330, 294, 262, 220, 262, 330, 392, 440, 392, 330, 294, 262],
+    bass: [131, 131, 147, 147, 165, 165, 131, 131, 110, 110, 165, 165, 220, 220, 165, 131],
+    tempo: 0.26, melodyType: "square", bassType: "square",
+  },
+  // Void Breach — spectral, eerie, otherworldly
+  voidBreach: {
+    melody: [220, 262, 294, 330, 294, 262, 220, 196, 220, 262, 330, 392, 330, 294, 262, 220],
+    bass: [110, 110, 131, 131, 147, 147, 110, 110, 98, 98, 131, 131, 165, 165, 131, 110],
+    tempo: 0.32, melodyType: "sine", bassType: "sine",
+  },
+  // Ethereal Nexus — psychic, flowing, transcendent
+  etherealNexus: {
+    melody: [440, 494, 523, 587, 659, 587, 523, 494, 440, 392, 440, 494, 523, 587, 523, 440],
+    bass: [220, 220, 247, 247, 262, 262, 220, 220, 196, 196, 247, 247, 294, 294, 262, 220],
+    tempo: 0.30, melodyType: "sine", bassType: "triangle",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

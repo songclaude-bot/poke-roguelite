@@ -228,6 +228,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     teslaSpire: [WeatherType.Rain, WeatherType.Sandstorm],
     bileswamp: [WeatherType.Rain, WeatherType.Sandstorm],
     tectonicAbyss: [WeatherType.Sandstorm],
+    // Phase 161-163: 8th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+    crystalVein: [WeatherType.Sandstorm],
+    hiveMind: [WeatherType.Rain],
+    grandArena: [WeatherType.Sandstorm, WeatherType.Rain],
+    adamantineChamber: [WeatherType.Sandstorm, WeatherType.Hail],
+    voidBreach: [WeatherType.Hail],
+    etherealNexus: [WeatherType.Rain, WeatherType.Hail],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

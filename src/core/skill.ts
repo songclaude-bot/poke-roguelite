@@ -2131,6 +2131,49 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 85,
     description: "Summons blades of earth from below.",
   },
+
+  // ── Phase 161-163: 8th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic Skills ──
+  diamondStorm: {
+    id: "diamondStorm",
+    name: "Diamond Storm",
+    type: PokemonType.Rock,
+    power: 18,
+    pp: 6,
+    range: SkillRange.Around,
+    accuracy: 95,
+    effect: SkillEffect.DefUp,
+    description: "Scatters diamonds that boost defense.",
+  },
+  meteorMash: {
+    id: "meteorMash",
+    name: "Meteor Mash",
+    type: PokemonType.Steel,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Front1,
+    accuracy: 90,
+    description: "Strikes with a meteor-like fist.",
+  },
+  shadowClaw: {
+    id: "shadowClaw",
+    name: "Shadow Claw",
+    type: PokemonType.Ghost,
+    power: 14,
+    pp: 12,
+    range: SkillRange.Front1,
+    accuracy: 100,
+    description: "Slashes with a shadowy claw.",
+  },
+  psychoCut: {
+    id: "psychoCut",
+    name: "Psycho Cut",
+    type: PokemonType.Psychic,
+    power: 14,
+    pp: 12,
+    range: SkillRange.FrontLine,
+    accuracy: 100,
+    description: "Cuts foes with psychic blades.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

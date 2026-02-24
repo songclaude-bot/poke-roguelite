@@ -385,6 +385,13 @@ export class DungeonScene extends Phaser.Scene {
       pichu: "0172", chinchou: "0170",
       weedle: "0013", qwilfish: "0211",
       donphan: "0232", marowak: "0105",
+      // Phase 161-163: 8th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+      onix: "0095", omanyte: "0138",
+      scyther: "0123", pinsir: "0127",
+      medicham: "0308", lucario: "0448",
+      metang: "0375", lairon: "0305",
+      gengar: "0094", chandelure: "0609",
+      alakazam: "0065", gardevoir: "0282",
     };
 
     // Load player + all enemy species + ally species for this dungeon

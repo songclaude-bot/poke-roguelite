@@ -254,6 +254,12 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "pichu", to: "pikachu", level: 16, newName: "Pikachu", hpBonus: 12, atkBonus: 12, defBonus: 8, newSkillId: "thunderCage" },
   { from: "chinchou", to: "lanturn", level: 27, newName: "Lanturn", hpBonus: 20, atkBonus: 12, defBonus: 12, newSkillId: "thunderCage" },
   { from: "weedle", to: "kakuna", level: 7, newName: "Kakuna", hpBonus: 10, atkBonus: 6, defBonus: 10, newSkillId: "toxicThread" },
+  // Phase 161-163: 8th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
+  { from: "onix", to: "steelix", level: 36, newName: "Steelix", hpBonus: 20, atkBonus: 10, defBonus: 16, newSkillId: "heavySlam" },
+  { from: "omanyte", to: "omastar", level: 40, newName: "Omastar", hpBonus: 18, atkBonus: 14, defBonus: 12, newSkillId: "headSmash" },
+  { from: "scyther", to: "scizor", level: 36, newName: "Scizor", hpBonus: 16, atkBonus: 14, defBonus: 12, newSkillId: "bulletPunch" },
+  { from: "metang", to: "metagross", level: 45, newName: "Metagross", hpBonus: 20, atkBonus: 16, defBonus: 14, newSkillId: "meteorMash" },
+  { from: "lairon", to: "aggron", level: 42, newName: "Aggron", hpBonus: 20, atkBonus: 14, defBonus: 16, newSkillId: "heavySlam" },
 ];
 
 /** Check if a species can evolve at a given level */

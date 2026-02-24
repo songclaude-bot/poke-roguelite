@@ -396,4 +396,20 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   qwilfish: AbilityId.Guts, // Intimidate equivalent
   donphan: AbilityId.Sturdy,
   marowak: AbilityId.RockHead, // Lightning Rod equivalent
+  // Phase 161-163: 8th Tier
+  onix: AbilityId.Sturdy,
+  omanyte: AbilityId.SwiftSwim,
+  scyther: AbilityId.Guts,
+  pinsir: AbilityId.Guts,
+  medicham: AbilityId.PurePower,
+  lucario: AbilityId.Guts,
+  metang: AbilityId.Sturdy,
+  lairon: AbilityId.Sturdy,
+  gengar: AbilityId.Levitate,
+  chandelure: AbilityId.FlameBody,
+  alakazam: AbilityId.ShieldDust,
+  gardevoir: AbilityId.ShieldDust,
+  omastar: AbilityId.SwiftSwim,
+  metagross: AbilityId.Sturdy,
+  aggron: AbilityId.Sturdy,
 };
