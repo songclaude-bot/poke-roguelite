@@ -2248,6 +2248,7 @@ export class DungeonScene extends Phaser.Scene {
       this.flashEntity(defender, effectiveness);
       if (defender.sprite) {
         this.showDamagePopup(defender.sprite.x, defender.sprite.y, dmg, effectiveness);
+        if (defender !== this.player) this.showEnemyHpBar(defender);
       }
 
       let logMsg = `${attacker.name} attacks ${defender.name}! ${dmg} dmg!`;
@@ -2342,6 +2343,7 @@ export class DungeonScene extends Phaser.Scene {
           this.flashEntity(target, effectiveness);
           if (target.sprite) {
             this.showDamagePopup(target.sprite.x, target.sprite.y, dmg, effectiveness);
+            if (target !== this.player) this.showEnemyHpBar(target);
           }
 
           let logMsg = `${user.name}'s ${skill.name} hit ${target.name}! ${dmg} dmg!`;
@@ -2501,6 +2503,31 @@ export class DungeonScene extends Phaser.Scene {
       duration: 800,
       ease: "Quad.easeOut",
       onComplete: () => popup.destroy(),
+    });
+  }
+
+  /** Show temporary HP bar above an entity */
+  private showEnemyHpBar(entity: { sprite?: Phaser.GameObjects.Sprite; stats: { hp: number; maxHp: number } }) {
+    if (!entity.sprite || entity.stats.hp <= 0) return;
+    const x = entity.sprite.x;
+    const y = entity.sprite.y - 18;
+    const barW = 24;
+    const barH = 3;
+    const ratio = Math.max(0, entity.stats.hp / entity.stats.maxHp);
+
+    const bar = this.add.graphics().setDepth(51);
+    bar.fillStyle(0x000000, 0.7);
+    bar.fillRect(x - barW / 2 - 1, y - 1, barW + 2, barH + 2);
+    const barColor = ratio > 0.5 ? 0x22cc44 : ratio > 0.25 ? 0xcccc22 : 0xcc2222;
+    bar.fillStyle(barColor, 1);
+    bar.fillRect(x - barW / 2, y, barW * ratio, barH);
+
+    this.tweens.add({
+      targets: bar,
+      alpha: { from: 1, to: 0 },
+      delay: 1200,
+      duration: 600,
+      onComplete: () => bar.destroy(),
     });
   }
 
