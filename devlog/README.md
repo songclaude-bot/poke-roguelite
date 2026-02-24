@@ -551,3 +551,28 @@
 - Champion Dojo (Fighting): Pancham(0674)/Hawlucha(0701), skyUppercut 스킬, 16층
 
 - **신규 포켓몬 18종**, 115종 스타터, 4th 던전 난이도 3.5, 보스 7.5x
+
+## Phase 106-114: 4th Dungeons Batch 2-3 (v1.1.0 → v1.2.0)
+
+### Steel/Ghost/Psychic 4th 던전
+- Forge Mountain (Steel): Durant(0632)/Togedemaru(0777), autotomize 스킬, 16층
+- Haunted Manor (Ghost): Drifloon(0425)/Golett(0622), shadowPunch 스킬, 16층
+- Dream Temple (Psychic): Hatenna(0856)/Indeedee(0876), expandingForce 스킬, 16층
+
+### Ice/Dark/Fairy 4th 던전
+- Permafrost Peak (Ice): Vanillite(0582)/Snom(0872), auroraBeam(기존) 스킬, 16층
+- Thief's Den (Dark): Nickit(0827)/Impidimp(0859), throatChop 스킬, 16층
+- Sugar Garden (Fairy): Milcery(0868)/Comfey(0764), sweetKiss 스킬, 16층
+
+### Dragon/Flying/Normal 4th 던전
+- Draconic Spire (Dragon): Turtonator(0776)/Drampa(0780), dragonDance 스킬, 16층
+- Sky High Nest (Flying): Rookidee(0821)/Archen(0566), pluck 스킬, 16층
+- Pastoral Plains (Normal): Wooloo(0831)/Skwovet(0819), facade 스킬, 16층
+
+### v1.2.0 마일스톤
+- **전 18타입 × 4개 던전 = 72개 던전** + Destiny Tower = 총 73개 던전!
+- **신규 포켓몬 36종** (Phases 96-114)
+- **133종 스타터** (전체)
+- **200종+ 포켓몬** (진화 포함)
+- **160종+ 기술**
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/

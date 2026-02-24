@@ -112,7 +112,7 @@ export class HubScene extends Phaser.Scene {
       )
     );
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.1.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.2.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
@@ -437,6 +437,27 @@ export class HubScene extends Phaser.Scene {
       { id: "sizzlipede", name: "Sizzlipede", unlock: 14 },
       { id: "pancham", name: "Pancham", unlock: 15 },
       { id: "hawlucha", name: "Hawlucha", unlock: 14 },
+      // Phase 106-108 starters
+      { id: "durant", name: "Durant", unlock: 16 },
+      { id: "togedemaru", name: "Togedemaru", unlock: 15 },
+      { id: "drifloon", name: "Drifloon", unlock: 14 },
+      { id: "golett", name: "Golett", unlock: 15 },
+      { id: "hatenna", name: "Hatenna", unlock: 16 },
+      { id: "indeedee", name: "Indeedee", unlock: 15 },
+      // Phase 109-111 starters
+      { id: "vanillite", name: "Vanillite", unlock: 16 },
+      { id: "snom", name: "Snom", unlock: 15 },
+      { id: "nickit", name: "Nickit", unlock: 14 },
+      { id: "impidimp", name: "Impidimp", unlock: 15 },
+      { id: "milcery", name: "Milcery", unlock: 16 },
+      { id: "comfey", name: "Comfey", unlock: 15 },
+      // Phase 112-114 starters
+      { id: "turtonator", name: "Turtonator", unlock: 16 },
+      { id: "drampa", name: "Drampa", unlock: 15 },
+      { id: "rookidee", name: "Rookidee", unlock: 14 },
+      { id: "archen", name: "Archen", unlock: 15 },
+      { id: "wooloo", name: "Wooloo", unlock: 14 },
+      { id: "skwovet", name: "Skwovet", unlock: 15 },
     ];
 
     const current = this.meta.starter ?? "mudkip";
