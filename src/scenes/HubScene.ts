@@ -112,7 +112,7 @@ export class HubScene extends Phaser.Scene {
       )
     );
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v0.20.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v0.21.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 

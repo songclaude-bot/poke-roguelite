@@ -132,4 +132,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   bagon: AbilityId.RockHead,
   gible: AbilityId.RockHead,
   poochyena: AbilityId.RunAway,
+  beldum: AbilityId.RockHead,
+  skarmory: AbilityId.ShieldDust,
 };

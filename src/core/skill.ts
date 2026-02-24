@@ -800,6 +800,40 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Whips up a vicious twister around self.",
   },
+
+  // ── Steel Skills ──
+  ironHead: {
+    id: "ironHead",
+    name: "Iron Head",
+    type: PokemonType.Steel,
+    power: 16,
+    pp: 15,
+    range: SkillRange.Front1,
+    accuracy: 90,
+    effect: SkillEffect.Paralyze,
+    effectChance: 30,
+    description: "Rams with a steel-hard head. May paralyze.",
+  },
+  flashCannon: {
+    id: "flashCannon",
+    name: "Flash Cannon",
+    type: PokemonType.Steel,
+    power: 16,
+    pp: 12,
+    range: SkillRange.FrontLine,
+    accuracy: 90,
+    description: "Fires a flash of light energy in a line.",
+  },
+  bulletPunch: {
+    id: "bulletPunch",
+    name: "Bullet Punch",
+    type: PokemonType.Steel,
+    power: 10,
+    pp: 22,
+    range: SkillRange.Front2,
+    accuracy: 100,
+    description: "Strikes with a quick punch of steel.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

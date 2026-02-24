@@ -173,6 +173,32 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["metalClaw", "headbutt", "ironDefense"],
     floors: [],
   },
+  beldum: {
+    id: "beldum",
+    name: "Beldum",
+    spriteKey: "beldum",
+    types: [PokemonType.Steel, PokemonType.Psychic],
+    attackType: PokemonType.Steel,
+    baseStats: { hp: 26, atk: 10, def: 11 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 8, idleFrames: 8,
+    skillIds: ["ironHead", "bulletPunch", "ironDefense"],
+    floors: [],
+  },
+  skarmory: {
+    id: "skarmory",
+    name: "Skarmory",
+    spriteKey: "skarmory",
+    types: [PokemonType.Steel, PokemonType.Flying],
+    attackType: PokemonType.Steel,
+    baseStats: { hp: 28, atk: 9, def: 12 },
+    walkFrameWidth: 40, walkFrameHeight: 72,
+    idleFrameWidth: 40, idleFrameHeight: 64,
+    walkFrames: 9, idleFrames: 7,
+    skillIds: ["metalClaw", "airSlash", "ironDefense"],
+    floors: [],
+  },
   meditite: {
     id: "meditite",
     name: "Meditite",
@@ -569,6 +595,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   bagon: { 7: "dragonBreath", 10: "dragonPulse" },
   gible: { 7: "dragonBreath", 10: "dracoMeteor" },
   poochyena: { 7: "snarl", 10: "darkPulse" },
+  beldum: { 8: "bulletPunch", 11: "flashCannon" },
+  skarmory: { 8: "ironHead", 11: "flashCannon" },
 };
 
 /** Check if a species learns a new skill at this level */
