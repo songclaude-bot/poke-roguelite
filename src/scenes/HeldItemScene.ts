@@ -2,10 +2,15 @@ import Phaser from "phaser";
 import { GAME_WIDTH, GAME_HEIGHT } from "../config";
 import { loadMeta, saveMeta, MetaSaveData } from "../core/save-system";
 import { HELD_ITEMS, HeldItem, getHeldItem } from "../core/held-items";
+import {
+  getAvailableEnchantments, getEquippedEnchantment, Enchantment,
+  enchantmentTierColor, enchantmentTierLabel,
+} from "../core/enchantments";
 
 /**
- * HeldItemScene — buy and equip held items.
+ * HeldItemScene — buy and equip held items + enchantment system.
  * The player can own multiple held items but equip only one at a time.
+ * Each equipped held item can have one enchantment applied.
  */
 export class HeldItemScene extends Phaser.Scene {
   private meta!: MetaSaveData;
@@ -37,13 +42,19 @@ export class HeldItemScene extends Phaser.Scene {
       fontSize: "13px", color: "#fde68a", fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    // Currently equipped item
+    // Currently equipped item + enchantment
     const equippedItem = this.meta.equippedHeldItem ? getHeldItem(this.meta.equippedHeldItem) : undefined;
-    this.equippedText = this.add.text(GAME_WIDTH / 2, 70, equippedItem
-      ? `Equipped: ${equippedItem.name}`
-      : "Equipped: None",
-    {
-      fontSize: "11px", color: equippedItem ? "#4ade80" : "#666680", fontFamily: "monospace",
+    const enchantment = getEquippedEnchantment(this.meta);
+    let equippedLabel = "Equipped: None";
+    let equippedColor = "#666680";
+    if (equippedItem) {
+      equippedLabel = enchantment
+        ? `Equipped: ${equippedItem.name} [${enchantment.name}]`
+        : `Equipped: ${equippedItem.name}`;
+      equippedColor = enchantment ? enchantmentTierColor(enchantment.tier) : "#4ade80";
+    }
+    this.equippedText = this.add.text(GAME_WIDTH / 2, 70, equippedLabel, {
+      fontSize: "11px", color: equippedColor, fontFamily: "monospace",
     }).setOrigin(0.5);
 
     // Separator
@@ -134,6 +145,18 @@ export class HeldItemScene extends Phaser.Scene {
       h += shopItems.length * 56;
     }
 
+    // Enchantment section
+    h += 15; // gap before enchantment section
+    h += 20; // "Enchantments" header
+    const available = getAvailableEnchantments(this.meta.totalClears);
+    h += available.length * 56;
+    // Show locked count hint if there are more
+    const totalEnchantments = 10;
+    if (available.length < totalEnchantments) {
+      h += 20; // locked hint row
+    }
+    h += 20; // bottom padding
+
     return h;
   }
 
@@ -175,6 +198,10 @@ export class HeldItemScene extends Phaser.Scene {
         y += 56;
       }
     }
+
+    // ── Enchantments ──
+    y += 15;
+    this.renderEnchantmentSection(y);
   }
 
   private renderOwnedItem(item: HeldItem, y: number, isEquipped: boolean) {
@@ -183,10 +210,12 @@ export class HeldItemScene extends Phaser.Scene {
       .setStrokeStyle(1, isEquipped ? 0x4ade80 : 0x334155);
     this.listContainer.add(bg);
 
-    // Item name
+    // Item name (show enchantment on equipped item)
     const nameColor = isEquipped ? "#4ade80" : "#e0e0e0";
     const namePrefix = isEquipped ? "* " : "";
-    const nameText = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 12, y + 8, `${namePrefix}${item.name}`, {
+    const enchantment = isEquipped ? getEquippedEnchantment(this.meta) : null;
+    const enchantSuffix = enchantment ? ` [${enchantment.name}]` : "";
+    const nameText = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 12, y + 8, `${namePrefix}${item.name}${enchantSuffix}`, {
       fontSize: "12px", color: nameColor, fontFamily: "monospace", fontStyle: "bold",
     });
     this.listContainer.add(nameText);
@@ -278,6 +307,115 @@ export class HeldItemScene extends Phaser.Scene {
         this.purchaseItem(item);
       });
     }
+  }
+
+  // ── Enchantment Section ──
+
+  private renderEnchantmentSection(startY: number) {
+    let y = startY;
+    const btnW = 320;
+
+    // Section header
+    const header = this.add.text(15, y, "── Enchantments ──", {
+      fontSize: "10px", color: "#c084fc", fontFamily: "monospace",
+    });
+    this.listContainer.add(header);
+    y += 20;
+
+    const hasEquippedItem = !!this.meta.equippedHeldItem;
+    const currentEnchantment = getEquippedEnchantment(this.meta);
+    const available = getAvailableEnchantments(this.meta.totalClears);
+
+    for (const ench of available) {
+      const isCurrentEnchant = currentEnchantment?.id === ench.id;
+      const canAfford = this.meta.gold >= ench.goldCost;
+      const tierColor = enchantmentTierColor(ench.tier);
+      const tierLabel = enchantmentTierLabel(ench.tier);
+
+      // Background card
+      const bg = this.add.rectangle(GAME_WIDTH / 2, y + 20, btnW, 50, 0x1a1a2e, 0.9)
+        .setStrokeStyle(1, isCurrentEnchant ? 0xc084fc : 0x2a2a3e);
+      this.listContainer.add(bg);
+
+      // Enchantment name with tier stars
+      const nameLabel = `${tierLabel} ${ench.name}`;
+      const nameText = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 12, y + 8, nameLabel, {
+        fontSize: "12px", color: isCurrentEnchant ? "#c084fc" : tierColor, fontFamily: "monospace", fontStyle: "bold",
+      });
+      this.listContainer.add(nameText);
+
+      // Description + cost
+      const costLabel = isCurrentEnchant ? "(Active)" : `${ench.goldCost}G`;
+      const descLabel = `${ench.description}  |  ${costLabel}`;
+      const descColor = isCurrentEnchant ? "#a78bfa" : (canAfford && hasEquippedItem ? "#888898" : "#554444");
+      const descText = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 12, y + 24, descLabel, {
+        fontSize: "9px", color: descColor, fontFamily: "monospace",
+      });
+      this.listContainer.add(descText);
+
+      // Enchant button
+      if (isCurrentEnchant) {
+        // Show "Applied" badge instead of button
+        const appliedBtn = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 12, y + 16, "[Active]", {
+          fontSize: "10px", color: "#c084fc", fontFamily: "monospace",
+          backgroundColor: "#2a1a3e",
+          padding: { x: 6, y: 4 },
+        }).setOrigin(1, 0);
+        this.listContainer.add(appliedBtn);
+      } else {
+        // Determine if button should be enabled
+        const canEnchant = hasEquippedItem && canAfford;
+        let btnLabel = "[Enchant]";
+        let btnColor = "#c084fc";
+        let btnBg = "#2a1a3e";
+
+        if (!hasEquippedItem) {
+          btnLabel = "[No Item]";
+          btnColor = "#444460";
+          btnBg = "#1a1a1a";
+        } else if (!canAfford) {
+          btnColor = "#444460";
+          btnBg = "#1a1a1a";
+        }
+
+        const enchantBtn = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 12, y + 16, btnLabel, {
+          fontSize: "10px", color: btnColor, fontFamily: "monospace",
+          backgroundColor: btnBg,
+          padding: { x: 6, y: 4 },
+        }).setOrigin(1, 0);
+        this.listContainer.add(enchantBtn);
+
+        if (canEnchant) {
+          enchantBtn.setInteractive();
+          enchantBtn.on("pointerdown", () => {
+            this.applyEnchantment(ench);
+          });
+        }
+      }
+
+      y += 56;
+    }
+
+    // Locked enchantment hint
+    const totalEnchantments = 10;
+    const lockedCount = totalEnchantments - available.length;
+    if (lockedCount > 0) {
+      const lockHint = this.add.text(GAME_WIDTH / 2, y + 5,
+        `${lockedCount} more enchantment${lockedCount > 1 ? "s" : ""} unlock with more clears...`, {
+        fontSize: "9px", color: "#444460", fontFamily: "monospace",
+      }).setOrigin(0.5, 0);
+      this.listContainer.add(lockHint);
+    }
+  }
+
+  private applyEnchantment(ench: Enchantment) {
+    if (this.meta.gold < ench.goldCost) return;
+    if (!this.meta.equippedHeldItem) return;
+
+    this.meta.gold -= ench.goldCost;
+    this.meta.enchantmentId = ench.id;
+    saveMeta(this.meta);
+    this.scene.restart();
   }
 
   private purchaseItem(item: HeldItem) {

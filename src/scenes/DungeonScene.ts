@@ -41,6 +41,7 @@ import { WeatherType, WEATHERS, weatherDamageMultiplier, isWeatherImmune, rollFl
 import { ShopItem, generateShopItems, shouldSpawnShop } from "../core/shop";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
 import { HeldItemEffect, getHeldItem } from "../core/held-items";
+import { getEquippedEnchantment, Enchantment } from "../core/enchantments";
 import { getDailyConfig, calculateDailyScore, saveDailyScore } from "../core/daily-dungeon";
 import { calculateScore, saveRunScore } from "../core/leaderboard";
 import {
@@ -266,6 +267,10 @@ export class DungeonScene extends Phaser.Scene {
   // Held item effect (loaded from meta at init)
   private heldItemEffect: HeldItemEffect = {};
 
+  // Enchantment on held item (loaded from meta at init)
+  private enchantment: Enchantment | null = null;
+  private phoenixUsed = false;  // Phoenix enchantment: one revive per run
+
   // Auto-Explore state
   private autoExploring = false;
   private autoExploreTimer: Phaser.Time.TimerEvent | null = null;
@@ -318,6 +323,24 @@ export class DungeonScene extends Phaser.Scene {
     const heldAtkBonus = this.heldItemEffect.atkBonus ?? 0;
     const heldDefBonus = this.heldItemEffect.defBonus ?? 0;
 
+    // Load enchantment on held item
+    this.enchantment = equippedId ? getEquippedEnchantment(meta) : null;
+    this.phoenixUsed = false;
+    // Enchantment stat bonuses
+    let enchHpBonus = 0;
+    let enchAtkBonus = 0;
+    let enchDefBonus = 0;
+    if (this.enchantment) {
+      switch (this.enchantment.id) {
+        case "sharpness": enchAtkBonus = 3; break;
+        case "resilience": enchDefBonus = 3; break;
+        case "vitality":  enchHpBonus = 10; break;
+        case "overlord":
+          // +5% to all stats — applied after base stat calc below
+          break;
+      }
+    }
+
     this.dungeonDef = getDungeon(data?.dungeonId ?? "beachCave");
     const isNewRun = (data?.floor ?? 1) === 1 && !data?.hp;
     this.currentFloor = data?.floor ?? 1;
@@ -355,9 +378,11 @@ export class DungeonScene extends Phaser.Scene {
     const ngHpMult = 1 + (this.ngPlusBonuses.hpPercent + this.ngPlusBonuses.allStatsPercent) / 100;
     const ngAtkMult = 1 + (this.ngPlusBonuses.atkPercent + this.ngPlusBonuses.allStatsPercent) / 100;
     const ngDefMult = 1 + this.ngPlusBonuses.allStatsPercent / 100;
-    const baseHp = Math.floor((50 + hpBonus + heldHpBonus) * ngHpMult);
-    const baseAtk = Math.floor((12 + atkBonus + heldAtkBonus) * ngAtkMult);
-    const baseDef = Math.floor((6 + defBonus + heldDefBonus) * ngDefMult);
+    // Overlord enchantment: +5% to all stats (stacks multiplicatively with NG+)
+    const overlordMult = this.enchantment?.id === "overlord" ? 1.05 : 1.0;
+    const baseHp = Math.floor((50 + hpBonus + heldHpBonus + enchHpBonus) * ngHpMult * overlordMult);
+    const baseAtk = Math.floor((12 + atkBonus + heldAtkBonus + enchAtkBonus) * ngAtkMult * overlordMult);
+    const baseDef = Math.floor((6 + defBonus + heldDefBonus + enchDefBonus) * ngDefMult * overlordMult);
 
     this.persistentHp = data?.hp ?? baseHp;
     this.persistentMaxHp = data?.maxHp ?? baseHp;
@@ -1216,7 +1241,9 @@ export class DungeonScene extends Phaser.Scene {
       else this.inventory.push({ item: startItem, count: 1 });
     }
     const ngItemDropMult = 1 + this.ngPlusBonuses.itemDropPercent / 100;
-    const itemCount = Math.max(1, Math.floor(this.dungeonDef.itemsPerFloor * this.difficultyMods.itemDropMult * ngItemDropMult));
+    // Lucky enchantment: +5% item find chance
+    const enchItemMult = this.enchantment?.id === "lucky" ? 1.05 : 1.0;
+    const itemCount = Math.max(1, Math.floor(this.dungeonDef.itemsPerFloor * this.difficultyMods.itemDropMult * ngItemDropMult * enchItemMult));
     for (let i = 0; i < itemCount; i++) {
       const room = rooms[Math.floor(Math.random() * rooms.length)];
       const ix = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
@@ -2878,7 +2905,8 @@ export class DungeonScene extends Phaser.Scene {
         clearDungeonSave();
         const heldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
         const ngEscGoldMult = 1 + this.ngPlusBonuses.goldPercent / 100;
-        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult * this.difficultyMods.goldMult * ngEscGoldMult);
+        const enchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
+        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult * this.difficultyMods.goldMult * ngEscGoldMult * enchGoldMult);
         this.cameras.main.fadeOut(500);
         this.time.delayedCall(600, () => {
           this.scene.start("HubScene", {
@@ -3108,26 +3136,86 @@ export class DungeonScene extends Phaser.Scene {
     this.updateHUD();
   }
 
-  /** Check for revive seed on death */
+  /** Check for revive seed or Phoenix enchantment on death */
   private tryRevive(): boolean {
+    // 1. Revive Seed (item) — 50% HP
     const idx = this.inventory.findIndex(s => s.item.id === "reviveSeed");
-    if (idx === -1) return false;
+    if (idx !== -1) {
+      const stack = this.inventory[idx];
+      stack.count--;
+      if (stack.count <= 0) this.inventory.splice(idx, 1);
 
-    const stack = this.inventory[idx];
-    stack.count--;
-    if (stack.count <= 0) this.inventory.splice(idx, 1);
-
-    this.player.stats.hp = Math.floor(this.player.stats.maxHp * 0.5);
-    this.player.alive = true;
-    if (this.player.sprite) {
-      this.player.sprite.setAlpha(1);
-      this.player.sprite.setTint(0x44ff44);
-      this.time.delayedCall(500, () => {
-        if (this.player.sprite) this.player.sprite.clearTint();
-      });
+      this.player.stats.hp = Math.floor(this.player.stats.maxHp * 0.5);
+      this.player.alive = true;
+      if (this.player.sprite) {
+        this.player.sprite.setAlpha(1);
+        this.player.sprite.setTint(0x44ff44);
+        this.time.delayedCall(500, () => {
+          if (this.player.sprite) this.player.sprite.clearTint();
+        });
+      }
+      this.showLog("Revive Seed activated! Restored to 50% HP!");
+      return true;
     }
-    this.showLog("Revive Seed activated! Restored to 50% HP!");
-    return true;
+
+    // 2. Phoenix enchantment — auto-revive once per run at 25% HP
+    if (this.enchantment?.id === "phoenix" && !this.phoenixUsed) {
+      this.phoenixUsed = true;
+      this.player.stats.hp = Math.floor(this.player.stats.maxHp * 0.25);
+      this.player.alive = true;
+
+      // Dramatic phoenix animation
+      if (this.player.sprite) {
+        this.player.sprite.setAlpha(1);
+
+        // Screen flash (golden)
+        this.cameras.main.flash(600, 255, 180, 50);
+        // Screen shake
+        this.cameras.main.shake(400, 0.015);
+
+        // Fire-like color cycle on player sprite
+        this.player.sprite.setTint(0xff4400);
+        this.time.delayedCall(150, () => {
+          if (this.player.sprite) this.player.sprite.setTint(0xff8800);
+        });
+        this.time.delayedCall(300, () => {
+          if (this.player.sprite) this.player.sprite.setTint(0xffcc00);
+        });
+        this.time.delayedCall(500, () => {
+          if (this.player.sprite) this.player.sprite.setTint(0xffffff);
+        });
+        this.time.delayedCall(700, () => {
+          if (this.player.sprite) this.player.sprite.clearTint();
+        });
+
+        // Rising "PHOENIX!" text popup
+        const px = this.player.sprite.x;
+        const py = this.player.sprite.y;
+        const phoenixText = this.add.text(px, py - 10, "PHOENIX!", {
+          fontSize: "16px",
+          color: "#ff8800",
+          fontFamily: "monospace",
+          fontStyle: "bold",
+          stroke: "#000000",
+          strokeThickness: 4,
+        }).setOrigin(0.5).setDepth(310);
+
+        this.tweens.add({
+          targets: phoenixText,
+          y: py - 60,
+          alpha: { from: 1, to: 0 },
+          scaleX: { from: 1.3, to: 0.8 },
+          scaleY: { from: 1.3, to: 0.8 },
+          duration: 1200,
+          onComplete: () => phoenixText.destroy(),
+        });
+      }
+
+      this.showLog("Phoenix enchantment activated! Revived at 25% HP!");
+      return true;
+    }
+
+    return false;
   }
 
   // ── Save ──
@@ -4561,8 +4649,9 @@ export class DungeonScene extends Phaser.Scene {
     const challengeGoldMultiplier = this.challengeMode === "speedrun" ? 2 : 1; // Speed Run = 2x gold
     const modGoldMult = this.modifierEffects.goldMult; // Dungeon modifier gold multiplier
     const clearHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
+    const clearEnchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
     const hasBoss = this.dungeonDef.boss || this.isBossRush;
-    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * this.difficultyMods.goldMult);
+    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * this.difficultyMods.goldMult * clearEnchGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -4685,7 +4774,8 @@ export class DungeonScene extends Phaser.Scene {
 
     const goHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
     const ngGoGoldMult = 1 + this.ngPlusBonuses.goldPercent / 100;
-    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult * ngGoGoldMult);
+    const goEnchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
+    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult * ngGoGoldMult * goEnchGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -4876,6 +4966,13 @@ export class DungeonScene extends Phaser.Scene {
     if (this.comboSpeedBoost) {
       this.comboSpeedBoost = false;
       // Don't tick belly/weather/status for the bonus turn — just allow another action
+      this.updateHUD();
+      return;
+    }
+
+    // Haste enchantment: 15% chance to act twice (extra turn without enemies moving)
+    if (this.enchantment?.id === "haste" && Math.random() < 0.15) {
+      this.showLog("Haste! Extra action!");
       this.updateHUD();
       return;
     }
@@ -5150,6 +5247,17 @@ export class DungeonScene extends Phaser.Scene {
         }
       }
 
+      // Thorns enchantment: reflect 10% damage back to attacker when player is hit
+      if (this.enchantment?.id === "thorns" && defender === this.player && attacker.alive && dmg > 0) {
+        const thornsDmg = Math.max(1, Math.floor(dmg * 0.1));
+        attacker.stats.hp = Math.max(0, attacker.stats.hp - thornsDmg);
+        if (attacker.sprite) {
+          this.showDamagePopup(attacker.sprite.x, attacker.sprite.y, thornsDmg, 1.0, `${thornsDmg} Thorns`);
+        }
+        this.showLog(`Thorns reflected ${thornsDmg} damage!`);
+        this.checkDeath(attacker);
+      }
+
       this.updateHUD();
       this.checkDeath(defender);
       this.time.delayedCall(250, resolve);
@@ -5251,6 +5359,18 @@ export class DungeonScene extends Phaser.Scene {
           if (effText) logMsg += ` ${effText}`;
           if (wMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
           this.showLog(logMsg);
+
+          // Thorns enchantment: reflect 10% damage back when player is hit by skill
+          if (this.enchantment?.id === "thorns" && target === this.player && user.alive && dmg > 0) {
+            const skillThornsDmg = Math.max(1, Math.floor(dmg * 0.1));
+            user.stats.hp = Math.max(0, user.stats.hp - skillThornsDmg);
+            if (user.sprite) {
+              this.showDamagePopup(user.sprite.x, user.sprite.y, skillThornsDmg, 1.0, `${skillThornsDmg} Thorns`);
+            }
+            this.showLog(`Thorns reflected ${skillThornsDmg} damage!`);
+            this.checkDeath(user);
+          }
+
           totalHits++;
         }
 
@@ -5587,6 +5707,13 @@ export class DungeonScene extends Phaser.Scene {
     } else {
       // Enemy defeated — track for gold
       this.enemiesDefeated++;
+
+      // Vampiric enchantment: heal 1 HP per enemy defeated
+      if (this.enchantment?.id === "vampiric" && this.player.alive && this.player.stats.hp < this.player.stats.maxHp) {
+        this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + 1);
+        this.showLog("Vampiric: Drained 1 HP!");
+      }
+
       const isBossKill = entity.isBoss;
       // Grant EXP (boss gives 5x, apply modifier expMult)
       const baseExp = expFromEnemy(entity.stats.level, this.currentFloor);
