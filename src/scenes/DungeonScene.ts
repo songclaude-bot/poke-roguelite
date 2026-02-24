@@ -55,7 +55,7 @@ const MOVE_DURATION = 150; // ms per tile movement
 function enemiesPerRoom(floor: number): number {
   return Math.min(3, 1 + Math.floor((floor - 1) / 3)); // 1→2→3
 }
-const MAX_ALLIES = 2; // max party members (excluding player)
+const MAX_ALLIES = 3; // max party members (excluding player)
 
 // Per-floor enemy scaling (uses species base stats + dungeon difficulty + NG+ bonus)
 function getEnemyStats(floor: number, difficulty: number, species?: PokemonSpecies, ngPlusBonus = 0) {
@@ -1438,6 +1438,46 @@ export class DungeonScene extends Phaser.Scene {
       case "maxElixir": {
         for (const sk of this.player.skills) { sk.currentPp = sk.pp; }
         this.showLog("Used Max Elixir! All PP restored!");
+        break;
+      }
+      case "warpSeed": {
+        const pt = this.findWalkableTile();
+        if (pt) {
+          this.player.tileX = pt.x; this.player.tileY = pt.y;
+          if (this.player.sprite) this.player.sprite.setPosition(this.tileToPixelX(pt.x), this.tileToPixelY(pt.y));
+          this.showLog("Used Warp Seed! Warped to a new location!");
+        } else {
+          this.showLog("Warp Seed fizzled...");
+        }
+        break;
+      }
+      case "stunSeed": {
+        const dx = DIR_DX[this.player.facing];
+        const dy = DIR_DY[this.player.facing];
+        const tx = this.player.tileX + dx;
+        const ty = this.player.tileY + dy;
+        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
+        if (target) {
+          target.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 3 });
+          this.showLog(`Stun Seed hit ${target.name}! Stunned for 3 turns!`);
+        } else {
+          this.showLog("Stun Seed missed! No enemy in front.");
+        }
+        break;
+      }
+      case "healSeed": {
+        this.player.statusEffects = [];
+        const heal = Math.min(20, this.player.stats.maxHp - this.player.stats.hp);
+        this.player.stats.hp += heal;
+        this.showLog(`Used Heal Seed! Status cleared, restored ${heal} HP.`);
+        if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
+        break;
+      }
+      case "vanishOrb": {
+        // Make player invisible for 10 turns — enemies won't target
+        this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
+        if (this.player.sprite) this.player.sprite.setAlpha(0.3);
+        this.showLog("Used Vanish Orb! You became invisible for 10 turns!");
         break;
       }
       default: {
