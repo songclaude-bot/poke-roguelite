@@ -444,6 +444,11 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [131, 131, 165, 165, 196, 196, 165, 165, 131, 131, 165, 165, 220, 220, 165, 165],
     tempo: 0.28, melodyType: "square", bassType: "square",
   },
+  boulderPass: {
+    melody: [196, 220, 247, 262, 247, 220, 196, 175, 165, 175, 196, 220, 262, 294, 262, 220],
+    bass: [98, 98, 123, 123, 131, 131, 123, 123, 98, 98, 88, 88, 98, 98, 131, 131],
+    tempo: 0.34, melodyType: "sawtooth", bassType: "triangle",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

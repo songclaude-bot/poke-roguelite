@@ -119,6 +119,7 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     shadowAlley: [WeatherType.Sandstorm, WeatherType.Hail],
     galeCliffs: [WeatherType.Rain, WeatherType.Sandstorm],
     brawlDojo: [WeatherType.Sandstorm],
+    boulderPass: [WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

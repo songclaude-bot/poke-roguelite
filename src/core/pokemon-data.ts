@@ -1239,6 +1239,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["drainPunch", "hammerArm", "closeCombat"],
     floors: [],
   },
+
+  // ── Phase 64 Rock 2nd ──
+  roggenrola: {
+    id: "roggenrola", name: "Roggenrola", spriteKey: "roggenrola",
+    types: [PokemonType.Rock], attackType: PokemonType.Rock,
+    baseStats: { hp: 28, atk: 12, def: 10 },
+    walkFrameWidth: 24, walkFrameHeight: 32,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["rockSlide", "rockWrecker", "stoneEdge"],
+    floors: [],
+  },
+  rockruff: {
+    id: "rockruff", name: "Rockruff", spriteKey: "rockruff",
+    types: [PokemonType.Rock], attackType: PokemonType.Rock,
+    baseStats: { hp: 26, atk: 14, def: 6 },
+    walkFrameWidth: 40, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 48,
+    walkFrames: 6, idleFrames: 4,
+    skillIds: ["stoneEdge", "rockWrecker", "bite"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1349,6 +1371,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   rufflet: { 7: "bravebird", 10: "hurricane" },
   tyrogue: { 7: "hammerArm", 10: "closeCombat" },
   crabrawler: { 7: "drainPunch", 10: "hammerArm" },
+  roggenrola: { 7: "rockWrecker", 10: "stoneEdge" },
+  rockruff: { 7: "stoneEdge", 10: "rockWrecker" },
 };
 
 /** Check if a species learns a new skill at this level */

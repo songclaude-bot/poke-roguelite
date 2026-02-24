@@ -1283,6 +1283,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 85,
     description: "Smashes down with a heavy fist.",
   },
+
+  // ── Phase 64 Rock Skills ──
+  rockWrecker: {
+    id: "rockWrecker",
+    name: "Rock Wrecker",
+    type: PokemonType.Rock,
+    power: 20,
+    pp: 6,
+    range: SkillRange.Front2,
+    accuracy: 80,
+    description: "Hurls a massive boulder at the foe.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
