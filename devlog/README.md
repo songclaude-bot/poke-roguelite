@@ -406,12 +406,36 @@
 
 ---
 
-## 현재 게임 규모 (v0.65.0)
+## Phase 67: Fungal Marsh
+
+### 67. Grass 3차 던전
+- 날짜: 2026-02-24
+- 핵심: Foongus/Petilil, grassKnot 스킬, Fungal Marsh 13층, Spore Lord Amoonguss 보스
+
+---
+
+## Phase 68: Abyssal Trench
+
+### 68. Water 3차 던전
+- 날짜: 2026-02-24
+- 핵심: Feebas/Wailmer, dive 스킬, Abyssal Trench 14층, Leviathan Wailord 보스
+
+---
+
+## Phase 69: Inferno Pit
+
+### 69. Fire 3차 던전
+- 날짜: 2026-02-24
+- 핵심: Litwick/Growlithe, heatWave 스킬, Inferno Pit 14층, Infernal Arcanine 보스
+
+---
+
+## 현재 게임 규모 (v0.70.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **50개 던전**: Beach Cave → Tranquil Grove + Destiny Tower
-- **117종+ 포켓몬** (진화 포함 135종+)
-- **128종+ 기술**
+- **53개 던전**: Beach Cave → Inferno Pit + Destiny Tower
+- **123종+ 포켓몬** (진화 포함 141종+)
+- **131종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **61종 스타터** (클리어 수로 해금)
-- **96종+ 진화 경로**
+- **67종 스타터** (클리어 수로 해금)
+- **102종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
