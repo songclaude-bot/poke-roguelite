@@ -116,4 +116,7 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   numel: AbilityId.RockHead,
   slugma: AbilityId.FlameBody,
   torkoal: AbilityId.Sturdy,
+  murkrow: AbilityId.RunAway,
+  sableye: AbilityId.Pickup,
+  absol: AbilityId.PurePower,
 };

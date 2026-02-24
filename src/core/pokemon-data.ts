@@ -306,6 +306,46 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["flamethrower", "bodySlam", "ironDefense"],
     floors: [],
   },
+  // ── Sinister Woods ──
+  murkrow: {
+    id: "murkrow",
+    name: "Murkrow",
+    spriteKey: "murkrow",
+    types: [PokemonType.Dark, PokemonType.Flying],
+    attackType: PokemonType.Dark,
+    baseStats: { hp: 28, atk: 13, def: 4 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 6, idleFrames: 3,
+    skillIds: ["feintAttack", "pursuit", "wingAttack"],
+    floors: [],
+  },
+  sableye: {
+    id: "sableye",
+    name: "Sableye",
+    spriteKey: "sableye",
+    types: [PokemonType.Dark, PokemonType.Ghost],
+    attackType: PokemonType.Dark,
+    baseStats: { hp: 30, atk: 11, def: 7 },
+    walkFrameWidth: 24, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 4, idleFrames: 2,
+    skillIds: ["nightSlash", "lick", "snarl"],
+    floors: [],
+  },
+  absol: {
+    id: "absol",
+    name: "Absol",
+    spriteKey: "absol",
+    types: [PokemonType.Dark],
+    attackType: PokemonType.Dark,
+    baseStats: { hp: 35, atk: 15, def: 5 },
+    walkFrameWidth: 40, walkFrameHeight: 48,
+    idleFrameWidth: 40, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 2,
+    skillIds: ["nightSlash", "darkPulse", "quickAttack"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -343,6 +383,9 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   numel: { 7: "mudShot", 10: "earthPower" },
   slugma: { 7: "ember", 10: "flamethrower" },
   torkoal: { 8: "fireBlast", 12: "lavaSurf" },
+  murkrow: { 7: "pursuit", 10: "darkPulse" },
+  sableye: { 7: "snarl", 10: "nightSlash" },
+  absol: { 7: "nightSlash", 10: "darkPulse" },
 };
 
 /** Check if a species learns a new skill at this level */

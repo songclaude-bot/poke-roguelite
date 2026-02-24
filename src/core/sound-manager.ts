@@ -247,6 +247,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [165, 165, 196, 196, 220, 220, 175, 175, 165, 165, 220, 220, 247, 247, 196, 165],
     tempo: 0.20, melodyType: "sawtooth", bassType: "square",
   },
+  // Sinister Woods — dark, ominous
+  sinisterWoods: {
+    melody: [262, 247, 220, 196, 220, 247, 262, 294, 262, 247, 220, 175, 196, 220, 247, 220],
+    bass: [131, 131, 110, 110, 98, 98, 131, 131, 147, 147, 110, 110, 98, 98, 110, 110],
+    tempo: 0.30, melodyType: "sawtooth", bassType: "triangle",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

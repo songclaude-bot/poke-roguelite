@@ -132,3 +132,10 @@
 - 날짜: 2026-02-23
 - [상세 기록](./20-sound-magmacavern.md)
 - 핵심: 던전별 BGM, 20종 SFX 통합, Magma Cavern 12층, Numel/Slugma/Torkoal, Flame Body 능력
+
+## Phase 15: Dark 타입 + Sinister Woods
+
+### 15-1. Dark 타입 + 8번째 던전
+- 날짜: 2026-02-24
+- [상세 기록](./21-dark-sinisterwoods.md)
+- 핵심: Dark 타입 + 5종 스킬, Murkrow/Sableye/Absol, Sinister Woods 14층, D-Pad Wait 버튼

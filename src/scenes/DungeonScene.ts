@@ -238,6 +238,7 @@ export class DungeonScene extends Phaser.Scene {
       gastly: "0092", drowzee: "0096", snorunt: "0361",
       charmander: "0004", eevee: "0133",
       numel: "0322", slugma: "0218", torkoal: "0324",
+      murkrow: "0198", sableye: "0302", absol: "0359",
     };
 
     // Load player + all enemy species + ally species for this dungeon
@@ -653,20 +654,16 @@ export class DungeonScene extends Phaser.Scene {
     // ── Skill Buttons (bottom-right, 2x2 grid) ──
     this.createSkillButtons();
 
-    // ── Menu icon buttons (center-bottom) ──
+    // ── Action buttons (center-bottom): Pickup + Wait only ──
     const menuCX = GAME_WIDTH / 2;
     const menuCY = GAME_HEIGHT - 55;
     const iconStyle = { fontSize: "18px", color: "#aab0c8", fontFamily: "monospace", backgroundColor: "#1a1a2ecc", padding: { x: 6, y: 4 } };
 
-    this.add.text(menuCX - 22, menuCY - 25, "🎒", iconStyle)
-      .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
-      .on("pointerdown", () => this.toggleBag());
-
-    this.add.text(menuCX + 22, menuCY - 25, "⬇", iconStyle)
+    this.add.text(menuCX - 22, menuCY - 5, "⬇", iconStyle)
       .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
       .on("pointerdown", () => this.pickupItem());
 
-    this.add.text(menuCX - 22, menuCY + 15, "⏳", iconStyle)
+    this.add.text(menuCX + 22, menuCY - 5, "⏳", iconStyle)
       .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
       .on("pointerdown", () => {
         if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
@@ -682,29 +679,14 @@ export class DungeonScene extends Phaser.Scene {
         });
       });
 
-    this.add.text(menuCX + 22, menuCY + 15, "💾", iconStyle)
-      .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
-      .on("pointerdown", () => this.saveGame());
-
-    // Shop button (only visible when shop exists on floor)
-    if (this.shopRoom) {
-      this.add.text(menuCX + 65, menuCY - 5, "🛒", iconStyle)
-        .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
-        .on("pointerdown", () => {
-          if (!this.shopRoom || this.shopItems.length === 0) {
-            this.showLog("No shop here!");
-            return;
-          }
-          // Check if player is in shop room
-          const r = this.shopRoom;
-          if (this.player.tileX >= r.x && this.player.tileX < r.x + r.w &&
-              this.player.tileY >= r.y && this.player.tileY < r.y + r.h) {
-            this.openShopUI();
-          } else {
-            this.showLog("Go to the shop room first!");
-          }
-        });
-    }
+    // ── Hamburger menu button (under minimap, top-right) ──
+    const hamX = this.MINIMAP_X + 30;
+    const hamY = this.MINIMAP_Y + 70;
+    this.add.text(hamX, hamY, "☰", {
+      fontSize: "20px", color: "#aab0c8", fontFamily: "monospace",
+      backgroundColor: "#1a1a2ecc", padding: { x: 6, y: 2 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
+      .on("pointerdown", () => this.openHamburgerMenu());
 
     // ── Boss HP Bar (fixed UI, hidden until boss floor) ──
     if (this.bossEntity) {
@@ -780,13 +762,13 @@ export class DungeonScene extends Phaser.Scene {
 
     const dirs: { dir: Direction; label: string; dx: number; dy: number }[] = [
       { dir: Direction.Up, label: "▲", dx: 0, dy: -1 },
-      { dir: Direction.UpRight, label: "◣", dx: 0.7, dy: -0.7 },
+      { dir: Direction.UpRight, label: "◥", dx: 0.7, dy: -0.7 },
       { dir: Direction.Right, label: "▶", dx: 1, dy: 0 },
-      { dir: Direction.DownRight, label: "◤", dx: 0.7, dy: 0.7 },
+      { dir: Direction.DownRight, label: "◢", dx: 0.7, dy: 0.7 },
       { dir: Direction.Down, label: "▼", dx: 0, dy: 1 },
-      { dir: Direction.DownLeft, label: "◥", dx: -0.7, dy: 0.7 },
+      { dir: Direction.DownLeft, label: "◣", dx: -0.7, dy: 0.7 },
       { dir: Direction.Left, label: "◀", dx: -1, dy: 0 },
-      { dir: Direction.UpLeft, label: "◢", dx: -0.7, dy: -0.7 },
+      { dir: Direction.UpLeft, label: "◤", dx: -0.7, dy: -0.7 },
     ];
 
     for (const d of dirs) {
@@ -805,6 +787,29 @@ export class DungeonScene extends Phaser.Scene {
         this.handlePlayerAction(d.dir);
       });
     }
+
+    // Wait button (center of D-Pad) — skip turn
+    const waitBtn = this.add.circle(cx, cy, 14, 0x334155, 0.8)
+      .setScrollFactor(0).setDepth(109).setInteractive();
+    const waitTxt = this.add.text(cx, cy, "⏳", {
+      fontSize: "10px", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(110);
+
+    waitBtn.on("pointerdown", () => {
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen) return;
+      waitTxt.setAlpha(0.5);
+      this.time.delayedCall(150, () => waitTxt.setAlpha(1));
+      this.turnManager.executeTurn(
+        () => Promise.resolve(),
+        [...this.getAllyActions(), ...this.getEnemyActions()]
+      ).then(() => {
+        this.recoverPP(this.player);
+        this.tickBelly();
+        this.tickWeather();
+        tickStatusEffects(this.player);
+        this.updateHUD();
+      });
+    });
   }
 
   // ── Skill Buttons (bottom-right, 2x2 grid) ──
@@ -841,11 +846,83 @@ export class DungeonScene extends Phaser.Scene {
           this.showLog("No PP left!");
           return;
         }
-        this.handleSkillUse(i, this.player.facing);
+        this.showSkillPreview(i);
       });
 
       this.skillButtons.push(btn);
     }
+  }
+
+  // Skill preview state
+  private skillPreviewUI: Phaser.GameObjects.GameObject[] = [];
+  private skillPreviewActive = false;
+
+  private showSkillPreview(skillIndex: number) {
+    this.clearSkillPreview();
+    const skill = this.player.skills[skillIndex];
+    if (!skill) return;
+    this.skillPreviewActive = true;
+
+    const dir = this.player.facing;
+    const tiles = getSkillTargetTiles(
+      skill.range, this.player.tileX, this.player.tileY, dir,
+      this.dungeon.terrain, this.dungeon.width, this.dungeon.height
+    );
+
+    // Highlight target tiles
+    for (const t of tiles) {
+      const px = t.x * TILE_DISPLAY + TILE_DISPLAY / 2;
+      const py = t.y * TILE_DISPLAY + TILE_DISPLAY / 2;
+      const highlight = this.add.rectangle(px, py, TILE_DISPLAY - 2, TILE_DISPLAY - 2, 0xfbbf24, 0.35)
+        .setDepth(8);
+      this.skillPreviewUI.push(highlight);
+      this.tweens.add({
+        targets: highlight, alpha: { from: 0.35, to: 0.15 },
+        duration: 500, yoyo: true, repeat: -1,
+      });
+    }
+
+    // Show info text
+    const infoText = this.add.text(GAME_WIDTH / 2, 42, `${skill.name} (${skill.type}) Pow:${skill.power} PP:${skill.currentPp}/${skill.pp}`, {
+      fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", backgroundColor: "#000000cc",
+      padding: { x: 6, y: 3 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+    this.skillPreviewUI.push(infoText);
+
+    // Replace skill buttons with Confirm/Cancel
+    const baseX = GAME_WIDTH - 120;
+    const baseY = GAME_HEIGHT - 95;
+
+    // Hide existing skill buttons
+    for (const btn of this.skillButtons) btn.setVisible(false);
+
+    const confirmBtn = this.add.text(baseX, baseY + 8, "  OK  ", {
+      fontSize: "14px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+      backgroundColor: "#1a3a2e", padding: { x: 8, y: 8 },
+    }).setScrollFactor(0).setDepth(210).setInteractive();
+
+    const cancelBtn = this.add.text(baseX + 60, baseY + 8, "Cancel", {
+      fontSize: "14px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
+      backgroundColor: "#3a1a1e", padding: { x: 8, y: 8 },
+    }).setScrollFactor(0).setDepth(210).setInteractive();
+
+    this.skillPreviewUI.push(confirmBtn, cancelBtn);
+
+    confirmBtn.on("pointerdown", () => {
+      this.clearSkillPreview();
+      this.handleSkillUse(skillIndex, this.player.facing);
+    });
+
+    cancelBtn.on("pointerdown", () => {
+      this.clearSkillPreview();
+    });
+  }
+
+  private clearSkillPreview() {
+    for (const obj of this.skillPreviewUI) obj.destroy();
+    this.skillPreviewUI = [];
+    this.skillPreviewActive = false;
+    for (const btn of this.skillButtons) btn.setVisible(true);
   }
 
   private updateSkillButtons() {
@@ -1709,7 +1786,17 @@ export class DungeonScene extends Phaser.Scene {
       fontSize: "13px", color: "#fde68a", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, "[Return to Town]", {
+    // Stats summary
+    const clearStats = [
+      `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
+      this.allies.length > 0 ? `Team: ${this.allies.filter(a => a.alive).map(a => a.name).join(", ")}` : "",
+      this.ngPlusLevel > 0 ? `NG+${this.ngPlusLevel}` : "",
+    ].filter(Boolean).join("\n");
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 38, clearStats, {
+      fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 75, "[Return to Town]", {
       fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
@@ -1750,7 +1837,13 @@ export class DungeonScene extends Phaser.Scene {
       fontSize: "11px", color: "#fde68a", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 55, "[Return to Town]", {
+    // Stats summary
+    const goStats = `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`;
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 38, goStats, {
+      fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 60, "[Return to Town]", {
       fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
@@ -1777,15 +1870,26 @@ export class DungeonScene extends Phaser.Scene {
         [...this.getAllyActions(), ...this.getEnemyActions()]
       );
     } else {
-      const canMove = this.canEntityMove(this.player, dir);
-      if (!canMove) {
-        this.player.sprite!.play(`${this.player.spriteKey}-idle-${dir}`);
-        return;
-      }
-      await this.turnManager.executeTurn(
-        () => this.moveEntity(this.player, dir),
-        [...this.getAllyActions(), ...this.getEnemyActions()]
+      // Check if ally is at target → swap positions
+      const allyAtTarget = this.allies.find(
+        a => a.alive && a.tileX === targetX && a.tileY === targetY
       );
+      if (allyAtTarget) {
+        await this.turnManager.executeTurn(
+          () => this.swapWithAlly(this.player, allyAtTarget, dir),
+          [...this.getAllyActions(), ...this.getEnemyActions()]
+        );
+      } else {
+        const canMove = this.canEntityMove(this.player, dir);
+        if (!canMove) {
+          this.player.sprite!.play(`${this.player.spriteKey}-idle-${dir}`);
+          return;
+        }
+        await this.turnManager.executeTurn(
+          () => this.moveEntity(this.player, dir),
+          [...this.getAllyActions(), ...this.getEnemyActions()]
+        );
+      }
 
       // PP recovery: 1 PP for a random depleted skill on movement
       this.recoverPP(this.player);
@@ -1869,6 +1973,47 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
+  /** Swap positions with an ally (player walks into ally's tile) */
+  private swapWithAlly(player: Entity, ally: Entity, dir: Direction): Promise<void> {
+    return new Promise((resolve) => {
+      const oldPx = player.tileX, oldPy = player.tileY;
+      const oldAx = ally.tileX, oldAy = ally.tileY;
+
+      player.facing = dir;
+      player.tileX = oldAx;
+      player.tileY = oldAy;
+      ally.tileX = oldPx;
+      ally.tileY = oldPy;
+
+      player.sprite!.play(`${player.spriteKey}-walk-${dir}`);
+
+      let done = 0;
+      const checkDone = () => { if (++done >= 2) resolve(); };
+
+      this.tweens.add({
+        targets: player.sprite,
+        x: this.tileToPixelX(player.tileX),
+        y: this.tileToPixelY(player.tileY),
+        duration: MOVE_DURATION, ease: "Linear",
+        onComplete: () => {
+          player.sprite!.play(`${player.spriteKey}-idle-${dir}`);
+          checkDone();
+        },
+      });
+
+      this.tweens.add({
+        targets: ally.sprite,
+        x: this.tileToPixelX(ally.tileX),
+        y: this.tileToPixelY(ally.tileY),
+        duration: MOVE_DURATION, ease: "Linear",
+        onComplete: () => {
+          if (ally.sprite) ally.sprite.play(`${ally.spriteKey}-idle-${ally.facing}`);
+          checkDone();
+        },
+      });
+    });
+  }
+
   /** PP recovery: on move, recover 1 PP on a random depleted skill */
   private recoverPP(entity: Entity) {
     const depleted = entity.skills.filter(s => s.currentPp < s.pp);
@@ -1938,6 +2083,7 @@ export class DungeonScene extends Phaser.Scene {
         }
       }
 
+      this.updateHUD();
       this.checkDeath(defender);
       this.time.delayedCall(250, resolve);
     });
@@ -2018,6 +2164,7 @@ export class DungeonScene extends Phaser.Scene {
 
         // Apply effect
         this.applySkillEffect(user, target, skill);
+        this.updateHUD();
         this.checkDeath(target);
       }
 
@@ -2025,6 +2172,7 @@ export class DungeonScene extends Phaser.Scene {
         this.showLog(`${user.name} used ${skill.name}!`);
       }
 
+      this.updateHUD();
       this.time.delayedCall(300, resolve);
     });
   }
@@ -2115,6 +2263,7 @@ export class DungeonScene extends Phaser.Scene {
       Ghost: { color: 0x7c3aed, symbol: "👻" },
       Psychic: { color: 0xec4899, symbol: "🔮" },
       Ice: { color: 0x67e8f9, symbol: "❄" },
+      Dark: { color: 0x6b21a8, symbol: "🌑" },
       Normal: { color: 0xd1d5db, symbol: "✦" },
     };
     const tc = typeColors[skill.type] ?? typeColors.Normal;
@@ -2241,12 +2390,11 @@ export class DungeonScene extends Phaser.Scene {
       }
 
       // Check level up
-      const { results } = processLevelUp(
+      const levelResult = processLevelUp(
         this.player.stats, expGain, this.totalExp
       );
-      this.totalExp = results.length > 0
-        ? this.totalExp
-        : this.totalExp;
+      this.totalExp = levelResult.totalExp;
+      const results = levelResult.results;
 
       for (const r of results) {
         this.time.delayedCall(500, () => {
