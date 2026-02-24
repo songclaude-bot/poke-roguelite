@@ -28,10 +28,7 @@ function saveAudioSettings() {
 export function getBgmVolume(): number { return masterVolume; }
 export function getSfxVolume(): number { return sfxVolume; }
 
-export function setBgmVolume(v: number) {
-  masterVolume = Math.max(0, Math.min(1, v));
-  saveAudioSettings();
-}
+// setBgmVolume is defined below (near startBgm) so it can update bgmAudio.volume
 
 export function setSfxVolume(v: number) {
   sfxVolume = Math.max(0, Math.min(1, v));
@@ -329,9 +326,9 @@ function getDungeonBgmFile(dungeonId: string): string {
   return "dungeon-normal";
 }
 
-const BGM_PATTERNS: Record<string, BgmPattern> = {
-  // Beach Cave — calm, watery C major
-  beachCave: {
+// Legacy BGM patterns kept as type reference only — unused, OGG files replace them
+const _LEGACY_BGM_UNUSED = {
+  _beachCave: {
     melody: [262, 294, 330, 262, 294, 349, 330, 294, 262, 294, 330, 392, 349, 330, 294, 262],
     bass: [131, 131, 165, 165, 147, 147, 131, 131, 131, 131, 165, 165, 175, 165, 147, 131],
     tempo: 0.28, melodyType: "triangle", bassType: "sine",
@@ -1387,7 +1384,7 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
   },
 };
 
-/** Start BGM with dungeon-specific melody */
+/** Start BGM — plays OGG file from public/audio/bgm/ */
 export function startBgm(dungeonId?: string) {
   const id = dungeonId ?? "beachCave";
   if (bgmPlaying && currentBgmId === id) return;
@@ -1395,51 +1392,45 @@ export function startBgm(dungeonId?: string) {
   stopBgm();
   bgmPlaying = true;
   currentBgmId = id;
-  bgmNoteIdx = 0;
 
-  const pattern = BGM_PATTERNS[id] ?? BGM_PATTERNS.beachCave;
-
-  bgmTimer = setInterval(() => {
-    if (!bgmPlaying) return;
-    try {
-      const c = getCtx();
-
-      // Melody
-      const melOsc = c.createOscillator();
-      const melGain = c.createGain();
-      melOsc.type = pattern.melodyType;
-      melOsc.frequency.setValueAtTime(pattern.melody[bgmNoteIdx % pattern.melody.length], c.currentTime);
-      melGain.gain.setValueAtTime(masterVolume * 0.12, c.currentTime);
-      melGain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + pattern.tempo * 0.9);
-      melOsc.connect(melGain);
-      melGain.connect(c.destination);
-      melOsc.start(c.currentTime);
-      melOsc.stop(c.currentTime + pattern.tempo);
-
-      // Bass
-      const bassOsc = c.createOscillator();
-      const bassGain = c.createGain();
-      bassOsc.type = pattern.bassType;
-      bassOsc.frequency.setValueAtTime(pattern.bass[bgmNoteIdx % pattern.bass.length], c.currentTime);
-      bassGain.gain.setValueAtTime(masterVolume * 0.08, c.currentTime);
-      bassGain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + pattern.tempo * 0.9);
-      bassOsc.connect(bassGain);
-      bassGain.connect(c.destination);
-      bassOsc.start(c.currentTime);
-      bassOsc.stop(c.currentTime + pattern.tempo);
-
-      bgmNoteIdx++;
-    } catch { /* ignore */ }
-  }, pattern.tempo * 1000);
+  const bgmFile = getDungeonBgmFile(id);
+  try {
+    bgmAudio = new Audio(`audio/bgm/${bgmFile}.ogg`);
+    bgmAudio.loop = true;
+    bgmAudio.volume = masterVolume;
+    bgmAudio.play().catch(() => {
+      // Autoplay blocked — will play on next user interaction
+      const resumeOnClick = () => {
+        if (bgmAudio && bgmPlaying) {
+          bgmAudio.volume = masterVolume;
+          bgmAudio.play().catch(() => {});
+        }
+        document.removeEventListener("pointerdown", resumeOnClick);
+      };
+      document.addEventListener("pointerdown", resumeOnClick, { once: true });
+    });
+  } catch { /* ignore audio errors */ }
 }
 
 export function stopBgm() {
   bgmPlaying = false;
   currentBgmId = "";
+  if (bgmAudio) {
+    bgmAudio.pause();
+    bgmAudio.src = "";
+    bgmAudio = null;
+  }
   if (bgmTimer) {
     clearInterval(bgmTimer);
     bgmTimer = null;
   }
+}
+
+/** Update BGM volume in real-time (called when user changes volume slider) */
+export function setBgmVolume(v: number) {
+  masterVolume = Math.max(0, Math.min(1, v));
+  if (bgmAudio) bgmAudio.volume = masterVolume;
+  saveAudioSettings();
 }
 
 /** Initialize audio on first user interaction */
