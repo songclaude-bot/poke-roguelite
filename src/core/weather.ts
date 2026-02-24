@@ -125,6 +125,7 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     abyssalTrench: [WeatherType.Rain],
     infernoPit: [WeatherType.Sandstorm],
     voltageSpire: [WeatherType.Rain, WeatherType.Sandstorm],
+    corrosiveSewer: [WeatherType.Rain, WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

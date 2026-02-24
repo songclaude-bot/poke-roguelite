@@ -201,4 +201,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   growlithe: AbilityId.FlameBody,
   joltik: AbilityId.Static,
   tynamo: AbilityId.Levitate,
+  trubbish: AbilityId.Guts,
+  skorupi: AbilityId.ShieldDust,
 };

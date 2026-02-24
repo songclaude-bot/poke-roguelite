@@ -1371,6 +1371,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["thunderbolt", "voltSwitch", "tackle"],
     floors: [],
   },
+
+  // ── Phase 72 Poison 3rd ──
+  trubbish: {
+    id: "trubbish", name: "Trubbish", spriteKey: "trubbish",
+    types: [PokemonType.Poison], attackType: PokemonType.Poison,
+    baseStats: { hp: 28, atk: 10, def: 10 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 5, idleFrames: 5,
+    skillIds: ["gunkShot", "sludgeBomb", "toxicSpikes"],
+    floors: [],
+  },
+  skorupi: {
+    id: "skorupi", name: "Skorupi", spriteKey: "skorupi",
+    types: [PokemonType.Poison, PokemonType.Bug], attackType: PokemonType.Poison,
+    baseStats: { hp: 26, atk: 12, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 32,
+    idleFrameWidth: 32, idleFrameHeight: 32,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["venoshock", "gunkShot", "bite"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1493,6 +1515,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   growlithe: { 7: "heatWave", 10: "flameWheel" },
   joltik: { 7: "voltSwitch", 10: "thunderbolt" },
   tynamo: { 7: "voltSwitch", 10: "thunderbolt" },
+  trubbish: { 7: "gunkShot", 10: "sludgeBomb" },
+  skorupi: { 7: "gunkShot", 10: "venoshock" },
 };
 
 /** Check if a species learns a new skill at this level */

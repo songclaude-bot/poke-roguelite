@@ -1355,6 +1355,20 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 95,
     description: "Zaps the target with an electric jolt.",
   },
+
+  // ── Phase 72 Poison Skills ──
+  gunkShot: {
+    id: "gunkShot",
+    name: "Gunk Shot",
+    type: PokemonType.Poison,
+    power: 18,
+    pp: 8,
+    range: SkillRange.Front2,
+    accuracy: 80,
+    effect: SkillEffect.Burn,
+    effectChance: 30,
+    description: "Hurls filthy garbage at the target.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
