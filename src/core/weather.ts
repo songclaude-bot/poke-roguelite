@@ -256,6 +256,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     magnetarCore: [WeatherType.Sandstorm, WeatherType.Hail],
     spectralThrone: [WeatherType.Hail],
     cognitionSpire: [WeatherType.Rain, WeatherType.Hail],
+    // Phase 174-176: 9th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+    absoluteZeroPeak: [WeatherType.Hail],
+    eternalNight: [WeatherType.Sandstorm, WeatherType.Hail],
+    celestialBlossom: [WeatherType.Rain],
+    dragonsSovereignty: [WeatherType.Sandstorm, WeatherType.Hail],
+    zenithStormfront: [WeatherType.Rain, WeatherType.Sandstorm],
+    infinityHall: [WeatherType.Rain, WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

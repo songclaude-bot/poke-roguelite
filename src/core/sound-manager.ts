@@ -11,6 +11,33 @@ let bgmTimer: ReturnType<typeof setInterval> | null = null;
 let bgmNoteIdx = 0;
 let currentBgmId = "";
 
+// Load saved volumes from localStorage
+try {
+  const saved = localStorage.getItem("poke-roguelite-audio");
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    if (typeof parsed.bgm === "number") masterVolume = parsed.bgm;
+    if (typeof parsed.sfx === "number") sfxVolume = parsed.sfx;
+  }
+} catch { /* ignore */ }
+
+function saveAudioSettings() {
+  try { localStorage.setItem("poke-roguelite-audio", JSON.stringify({ bgm: masterVolume, sfx: sfxVolume })); } catch { /* ignore */ }
+}
+
+export function getBgmVolume(): number { return masterVolume; }
+export function getSfxVolume(): number { return sfxVolume; }
+
+export function setBgmVolume(v: number) {
+  masterVolume = Math.max(0, Math.min(1, v));
+  saveAudioSettings();
+}
+
+export function setSfxVolume(v: number) {
+  sfxVolume = Math.max(0, Math.min(1, v));
+  saveAudioSettings();
+}
+
 function getCtx(): AudioContext {
   if (!ctx) {
     ctx = new AudioContext();
@@ -1142,6 +1169,43 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     melody: [392, 440, 523, 587, 523, 440, 392, 349, 392, 494, 587, 659, 587, 494, 440, 392],
     bass: [196, 196, 262, 262, 294, 294, 196, 196, 175, 175, 247, 247, 330, 330, 262, 196],
     tempo: 0.26, melodyType: "triangle", bassType: "sine",
+  },
+  // Phase 174-176: 9th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+  // Absolute Zero Peak — frozen, desolate
+  absoluteZeroPeak: {
+    melody: [262, 247, 220, 196, 175, 196, 220, 262, 294, 262, 220, 196, 175, 165, 175, 196],
+    bass: [131, 131, 110, 110, 88, 88, 110, 110, 147, 147, 110, 110, 88, 88, 82, 98],
+    tempo: 0.32, melodyType: "sine", bassType: "triangle",
+  },
+  // Eternal Night — dark, ominous
+  eternalNight: {
+    melody: [196, 220, 247, 220, 196, 175, 165, 175, 196, 247, 294, 262, 220, 196, 175, 165],
+    bass: [98, 98, 123, 123, 98, 98, 82, 82, 98, 98, 147, 147, 110, 110, 88, 82],
+    tempo: 0.28, melodyType: "sawtooth", bassType: "triangle",
+  },
+  // Celestial Blossom — magical, enchanting
+  celestialBlossom: {
+    melody: [523, 587, 659, 784, 659, 587, 523, 494, 440, 494, 523, 659, 784, 880, 784, 659],
+    bass: [262, 262, 330, 330, 294, 294, 262, 262, 220, 220, 262, 262, 392, 392, 330, 330],
+    tempo: 0.30, melodyType: "sine", bassType: "sine",
+  },
+  // Dragon's Sovereignty — epic, thunderous
+  dragonsSovereignty: {
+    melody: [196, 262, 330, 392, 330, 262, 196, 175, 220, 294, 392, 440, 392, 294, 220, 196],
+    bass: [98, 98, 165, 165, 196, 196, 98, 98, 110, 110, 196, 196, 220, 220, 147, 98],
+    tempo: 0.20, melodyType: "sawtooth", bassType: "square",
+  },
+  // Zenith Stormfront — windswept, intense
+  zenithStormfront: {
+    melody: [440, 494, 587, 659, 587, 494, 440, 392, 349, 392, 494, 587, 659, 784, 659, 494],
+    bass: [220, 220, 294, 294, 330, 330, 220, 220, 175, 175, 247, 247, 330, 330, 294, 247],
+    tempo: 0.22, melodyType: "square", bassType: "sawtooth",
+  },
+  // Infinity Hall — digital, pulsing
+  infinityHall: {
+    melody: [330, 392, 440, 523, 440, 392, 330, 294, 330, 440, 523, 587, 523, 440, 392, 330],
+    bass: [165, 165, 220, 220, 262, 262, 165, 165, 147, 147, 220, 220, 294, 294, 220, 165],
+    tempo: 0.24, melodyType: "square", bassType: "square",
   },
   // Hub — peaceful town
   hub: {

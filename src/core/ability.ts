@@ -451,4 +451,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   cofagrigus: AbilityId.FlameBody, // Mummy equivalent (burns on contact)
   reuniclus: AbilityId.ShieldDust, // Magic Guard equivalent
   gothitelle: AbilityId.ShieldDust, // Shadow Tag equivalent
+  // Phase 174-176: 9th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+  mamoswine: AbilityId.RockHead, // Thick Fat equivalent
+  walrein: AbilityId.Sturdy, // Thick Fat equivalent
+  darkrai: AbilityId.PurePower, // Bad Dreams equivalent
+  hydreigon: AbilityId.Guts, // Levitate equivalent
+  sylveon: AbilityId.ShieldDust, // Cute Charm equivalent
+  hatterene: AbilityId.ShieldDust, // Magic Bounce equivalent
+  haxorus: AbilityId.PurePower, // Mold Breaker equivalent
+  goodra: AbilityId.Guts, // Sap Sipper equivalent
+  pidgeot: AbilityId.Guts, // Big Pecks equivalent
+  noivern: AbilityId.Levitate, // Infiltrator equivalent
+  blissey: AbilityId.Sturdy, // Natural Cure equivalent
+  porygonZ: AbilityId.PurePower, // Adaptability equivalent
 };

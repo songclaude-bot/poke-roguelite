@@ -40,6 +40,7 @@ import {
   sfxLevelUp, sfxRecruit, sfxStairs, sfxDeath, sfxBossDefeat,
   sfxHeal, sfxSkill, sfxMenuOpen, sfxMenuClose,
   sfxEvolution, sfxTrap, sfxVictory, sfxGameOver, sfxShop,
+  getBgmVolume, getSfxVolume, setBgmVolume, setSfxVolume,
 } from "../core/sound-manager";
 
 interface AllyData {
@@ -161,6 +162,18 @@ export class DungeonScene extends Phaser.Scene {
   private bossHpBg: Phaser.GameObjects.Graphics | null = null;
   private bossNameText: Phaser.GameObjects.Text | null = null;
 
+  // Hamburger dropdown menu state
+  private menuOpen = false;
+  private menuUI: Phaser.GameObjects.GameObject[] = [];
+
+  // Settings panel state
+  private settingsOpen = false;
+  private settingsUI: Phaser.GameObjects.GameObject[] = [];
+
+  // D-Pad references for left/right switching
+  private dpadUI: Phaser.GameObjects.GameObject[] = [];
+  private dpadSide: "right" | "left" = "right"; // default: right (국룰 UX)
+
   constructor() {
     super({ key: "DungeonScene" });
   }
@@ -168,6 +181,12 @@ export class DungeonScene extends Phaser.Scene {
   private persistentAllies: AllyData[] | null = null;
 
   init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string }) {
+    // Load D-Pad side preference
+    try {
+      const side = localStorage.getItem("poke-roguelite-dpadSide");
+      if (side === "left" || side === "right") this.dpadSide = side;
+    } catch { /* ignore */ }
+
     // Apply upgrade bonuses on fresh run start (floor 1 from hub)
     const meta = loadMeta();
     const hpBonus = getUpgradeBonus(meta, "maxHp") * 5;
@@ -413,6 +432,13 @@ export class DungeonScene extends Phaser.Scene {
       magnezone: "0462", empoleon: "0395",
       dusknoir: "0477", cofagrigus: "0563",
       reuniclus: "0579", gothitelle: "0576",
+      // Phase 174-176: 9th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+      mamoswine: "0473", walrein: "0365",
+      darkrai: "0491", hydreigon: "0635",
+      sylveon: "0700", hatterene: "0858",
+      haxorus: "0612", goodra: "0706",
+      pidgeot: "0018", noivern: "0715",
+      blissey: "0242", porygonZ: "0474",
     };
 
     // Load player + all enemy species + ally species for this dungeon
@@ -920,10 +946,15 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
-  // ── Virtual D-Pad (bottom-left) ──
+  // ── Virtual D-Pad (supports left/right placement) ──
 
   private createDPad() {
-    const cx = 70;
+    // Destroy old D-Pad if exists
+    this.dpadUI.forEach(obj => obj.destroy());
+    this.dpadUI = [];
+
+    const isRight = this.dpadSide === "right";
+    const cx = isRight ? GAME_WIDTH - 70 : 70;
     const cy = GAME_HEIGHT - 70;
     const r = 50;
     const btnR = 18;
@@ -933,6 +964,7 @@ export class DungeonScene extends Phaser.Scene {
     bg.fillCircle(cx, cy, r + 5);
     bg.lineStyle(2, 0x334155, 0.6);
     bg.strokeCircle(cx, cy, r + 5);
+    this.dpadUI.push(bg);
 
     const dirs: { dir: Direction; label: string; dx: number; dy: number }[] = [
       { dir: Direction.Up, label: "▲", dx: 0, dy: -1 },
@@ -955,11 +987,13 @@ export class DungeonScene extends Phaser.Scene {
       }).setOrigin(0.5).setScrollFactor(0).setDepth(110);
 
       btn.on("pointerdown", () => {
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen) return;
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen) return;
         txt.setColor("#fbbf24");
         this.time.delayedCall(150, () => txt.setColor("#8899bb"));
         this.handlePlayerAction(d.dir);
       });
+
+      this.dpadUI.push(btn, txt);
     }
 
     // Wait button (center of D-Pad) — skip turn
@@ -970,7 +1004,7 @@ export class DungeonScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(110);
 
     waitBtn.on("pointerdown", () => {
-      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen) return;
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen) return;
       waitTxt.setAlpha(0.5);
       this.time.delayedCall(150, () => waitTxt.setAlpha(1));
       this.turnManager.executeTurn(
@@ -984,12 +1018,16 @@ export class DungeonScene extends Phaser.Scene {
         this.updateHUD();
       });
     });
+
+    this.dpadUI.push(waitBtn, waitTxt);
   }
 
-  // ── Skill Buttons (bottom-right, 2x2 grid) ──
+  // ── Skill Buttons (opposite side of D-Pad, 2x2 grid) ──
 
   private createSkillButtons() {
-    const baseX = GAME_WIDTH - 120;
+    const isRight = this.dpadSide === "right";
+    // If D-Pad is right, skills go left; if D-Pad is left, skills go right
+    const baseX = isRight ? 10 : GAME_WIDTH - 120;
     const baseY = GAME_HEIGHT - 95;
     const cellW = 58;
     const cellH = 38;
@@ -1288,12 +1326,271 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private openHamburgerMenu() {
-    // Toggle bag/menu — reuse existing bag open/close
-    if (this.bagOpen) {
-      this.closeBag();
-    } else {
-      this.openBag();
+    if (this.menuOpen) {
+      this.closeMenu();
+      return;
     }
+    if (this.bagOpen || this.settingsOpen || this.shopOpen) return;
+
+    sfxMenuOpen();
+    this.menuOpen = true;
+
+    // Semi-transparent backdrop
+    const backdrop = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.5
+    ).setScrollFactor(0).setDepth(150).setInteractive();
+    backdrop.on("pointerdown", () => this.closeMenu());
+    this.menuUI.push(backdrop);
+
+    // Menu panel
+    const panelX = GAME_WIDTH - 130;
+    const panelY = 90;
+    const panelW = 120;
+    const panelH = 160;
+    const panel = this.add.graphics().setScrollFactor(0).setDepth(151);
+    panel.fillStyle(0x1a1a2e, 0.95);
+    panel.fillRoundedRect(panelX, panelY, panelW, panelH, 8);
+    panel.lineStyle(1, 0x334155);
+    panel.strokeRoundedRect(panelX, panelY, panelW, panelH, 8);
+    this.menuUI.push(panel);
+
+    const items: { label: string; icon: string; action: () => void }[] = [
+      { label: "Bag", icon: "🎒", action: () => { this.closeMenu(); this.openBag(); } },
+      { label: "Save", icon: "💾", action: () => { this.closeMenu(); this.saveGame(); } },
+      { label: "Give Up", icon: "🚪", action: () => { this.closeMenu(); this.confirmGiveUp(); } },
+      { label: "Settings", icon: "⚙", action: () => { this.closeMenu(); this.openSettings(); } },
+    ];
+
+    items.forEach((item, i) => {
+      const y = panelY + 14 + i * 36;
+      const btn = this.add.text(panelX + panelW / 2, y, `${item.icon} ${item.label}`, {
+        fontSize: "13px", color: "#e0e0e0", fontFamily: "monospace",
+        backgroundColor: "#2a2a4e", padding: { x: 10, y: 6 },
+        fixedWidth: panelW - 12, align: "center",
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(152).setInteractive();
+
+      btn.on("pointerover", () => btn.setColor("#fbbf24"));
+      btn.on("pointerout", () => btn.setColor("#e0e0e0"));
+      btn.on("pointerdown", () => item.action());
+      this.menuUI.push(btn);
+    });
+  }
+
+  private closeMenu() {
+    sfxMenuClose();
+    this.menuOpen = false;
+    this.menuUI.forEach(obj => obj.destroy());
+    this.menuUI = [];
+  }
+
+  private confirmGiveUp() {
+    if (this.gameOver) return;
+    sfxMenuOpen();
+
+    const uiElements: Phaser.GameObjects.GameObject[] = [];
+
+    const backdrop = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7
+    ).setScrollFactor(0).setDepth(160).setInteractive();
+    uiElements.push(backdrop);
+
+    const titleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, "Give Up?", {
+      fontSize: "18px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(161);
+    uiElements.push(titleText);
+
+    const warnText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, "All items & progress\nfrom this run will be lost!", {
+      fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", align: "center",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(161);
+    uiElements.push(warnText);
+
+    const yesBtn = this.add.text(GAME_WIDTH / 2 - 50, GAME_HEIGHT / 2 + 25, "[Yes]", {
+      fontSize: "14px", color: "#ef4444", fontFamily: "monospace",
+      backgroundColor: "#1a1a2ecc", padding: { x: 12, y: 6 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(161).setInteractive();
+
+    const noBtn = this.add.text(GAME_WIDTH / 2 + 50, GAME_HEIGHT / 2 + 25, "[No]", {
+      fontSize: "14px", color: "#4ade80", fontFamily: "monospace",
+      backgroundColor: "#1a1a2ecc", padding: { x: 12, y: 6 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(161).setInteractive();
+
+    uiElements.push(yesBtn, noBtn);
+
+    const cleanup = () => { uiElements.forEach(o => o.destroy()); };
+
+    noBtn.on("pointerdown", () => { sfxMenuClose(); cleanup(); });
+
+    yesBtn.on("pointerdown", () => {
+      cleanup();
+      this.gameOver = true;
+      stopBgm();
+      clearDungeonSave();
+      this.cameras.main.fadeOut(500);
+      this.time.delayedCall(600, () => {
+        this.scene.start("HubScene", { gold: 0, cleared: false, bestFloor: this.currentFloor });
+      });
+    });
+  }
+
+  // ── Settings Panel ──
+
+  private openSettings() {
+    if (this.settingsOpen) return;
+    sfxMenuOpen();
+    this.settingsOpen = true;
+
+    // Dark overlay
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.85
+    ).setScrollFactor(0).setDepth(150).setInteractive();
+    this.settingsUI.push(overlay);
+
+    const title = this.add.text(GAME_WIDTH / 2, 35, "⚙ Settings", {
+      fontSize: "16px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(151);
+    this.settingsUI.push(title);
+
+    let yPos = 80;
+
+    // ── BGM Volume ──
+    const bgmLabel = this.add.text(GAME_WIDTH / 2, yPos, `♪ BGM Volume: ${Math.round(getBgmVolume() * 100)}%`, {
+      fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(151);
+    this.settingsUI.push(bgmLabel);
+    yPos += 28;
+
+    // BGM slider bar
+    const bgmBarX = 60;
+    const bgmBarW = GAME_WIDTH - 120;
+    const bgmBarY = yPos;
+    const bgmBarBg = this.add.graphics().setScrollFactor(0).setDepth(151);
+    bgmBarBg.fillStyle(0x334155, 1);
+    bgmBarBg.fillRoundedRect(bgmBarX, bgmBarY, bgmBarW, 20, 4);
+    this.settingsUI.push(bgmBarBg);
+
+    const bgmFill = this.add.graphics().setScrollFactor(0).setDepth(152);
+    const drawBgmFill = () => {
+      bgmFill.clear();
+      bgmFill.fillStyle(0x667eea, 1);
+      bgmFill.fillRoundedRect(bgmBarX, bgmBarY, bgmBarW * getBgmVolume(), 20, 4);
+    };
+    drawBgmFill();
+    this.settingsUI.push(bgmFill);
+
+    const bgmHitArea = this.add.rectangle(bgmBarX + bgmBarW / 2, bgmBarY + 10, bgmBarW, 20, 0x000000, 0)
+      .setScrollFactor(0).setDepth(153).setInteractive();
+    bgmHitArea.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      const ratio = Math.max(0, Math.min(1, (p.x - bgmBarX) / bgmBarW));
+      setBgmVolume(ratio);
+      bgmLabel.setText(`♪ BGM Volume: ${Math.round(ratio * 100)}%`);
+      drawBgmFill();
+    });
+    this.settingsUI.push(bgmHitArea);
+    yPos += 40;
+
+    // ── SFX Volume ──
+    const sfxLabel = this.add.text(GAME_WIDTH / 2, yPos, `🔊 SFX Volume: ${Math.round(getSfxVolume() * 100)}%`, {
+      fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(151);
+    this.settingsUI.push(sfxLabel);
+    yPos += 28;
+
+    const sfxBarX = 60;
+    const sfxBarW = GAME_WIDTH - 120;
+    const sfxBarY = yPos;
+    const sfxBarBg = this.add.graphics().setScrollFactor(0).setDepth(151);
+    sfxBarBg.fillStyle(0x334155, 1);
+    sfxBarBg.fillRoundedRect(sfxBarX, sfxBarY, sfxBarW, 20, 4);
+    this.settingsUI.push(sfxBarBg);
+
+    const sfxFill = this.add.graphics().setScrollFactor(0).setDepth(152);
+    const drawSfxFill = () => {
+      sfxFill.clear();
+      sfxFill.fillStyle(0x4ade80, 1);
+      sfxFill.fillRoundedRect(sfxBarX, sfxBarY, sfxBarW * getSfxVolume(), 20, 4);
+    };
+    drawSfxFill();
+    this.settingsUI.push(sfxFill);
+
+    const sfxHitArea = this.add.rectangle(sfxBarX + sfxBarW / 2, sfxBarY + 10, sfxBarW, 20, 0x000000, 0)
+      .setScrollFactor(0).setDepth(153).setInteractive();
+    sfxHitArea.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      const ratio = Math.max(0, Math.min(1, (p.x - sfxBarX) / sfxBarW));
+      setSfxVolume(ratio);
+      sfxLabel.setText(`🔊 SFX Volume: ${Math.round(ratio * 100)}%`);
+      drawSfxFill();
+    });
+    this.settingsUI.push(sfxHitArea);
+    yPos += 50;
+
+    // ── D-Pad Side ──
+    const dpadLabel = this.add.text(GAME_WIDTH / 2, yPos, "D-Pad Position", {
+      fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(151);
+    this.settingsUI.push(dpadLabel);
+    yPos += 28;
+
+    const leftColor = this.dpadSide === "left" ? "#fbbf24" : "#667eea";
+    const rightColor = this.dpadSide === "right" ? "#fbbf24" : "#667eea";
+
+    const leftBtn = this.add.text(GAME_WIDTH / 2 - 55, yPos, "◀ Left", {
+      fontSize: "12px", color: leftColor, fontFamily: "monospace",
+      backgroundColor: this.dpadSide === "left" ? "#3a3a5e" : "#1a1a2e",
+      padding: { x: 10, y: 6 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(152).setInteractive();
+
+    const rightBtn = this.add.text(GAME_WIDTH / 2 + 55, yPos, "Right ▶", {
+      fontSize: "12px", color: rightColor, fontFamily: "monospace",
+      backgroundColor: this.dpadSide === "right" ? "#3a3a5e" : "#1a1a2e",
+      padding: { x: 10, y: 6 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(152).setInteractive();
+
+    const updateDpadBtns = () => {
+      leftBtn.setColor(this.dpadSide === "left" ? "#fbbf24" : "#667eea");
+      leftBtn.setBackgroundColor(this.dpadSide === "left" ? "#3a3a5e" : "#1a1a2e");
+      rightBtn.setColor(this.dpadSide === "right" ? "#fbbf24" : "#667eea");
+      rightBtn.setBackgroundColor(this.dpadSide === "right" ? "#3a3a5e" : "#1a1a2e");
+    };
+
+    leftBtn.on("pointerdown", () => {
+      this.dpadSide = "left";
+      try { localStorage.setItem("poke-roguelite-dpadSide", "left"); } catch { /* ignore */ }
+      updateDpadBtns();
+      this.rebuildControls();
+    });
+
+    rightBtn.on("pointerdown", () => {
+      this.dpadSide = "right";
+      try { localStorage.setItem("poke-roguelite-dpadSide", "right"); } catch { /* ignore */ }
+      updateDpadBtns();
+      this.rebuildControls();
+    });
+
+    this.settingsUI.push(leftBtn, rightBtn);
+    yPos += 50;
+
+    // ── Close button ──
+    const closeBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 60, "[Close]", {
+      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(151).setInteractive();
+    closeBtn.on("pointerdown", () => this.closeSettings());
+    this.settingsUI.push(closeBtn);
+  }
+
+  private closeSettings() {
+    sfxMenuClose();
+    this.settingsOpen = false;
+    this.settingsUI.forEach(obj => obj.destroy());
+    this.settingsUI = [];
+  }
+
+  private rebuildControls() {
+    // Rebuild D-Pad
+    this.createDPad();
+    // Rebuild skill buttons
+    this.skillButtons.forEach(btn => btn.destroy());
+    this.skillButtons = [];
+    this.createSkillButtons();
   }
 
   private showLog(msg: string) {
@@ -1345,7 +1642,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private openBag() {
-    if (this.turnManager.isBusy || this.gameOver) return;
+    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen) return;
     sfxMenuOpen();
     this.bagOpen = true;
 
