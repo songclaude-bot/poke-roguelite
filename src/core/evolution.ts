@@ -260,6 +260,11 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "scyther", to: "scizor", level: 36, newName: "Scizor", hpBonus: 16, atkBonus: 14, defBonus: 12, newSkillId: "bulletPunch" },
   { from: "metang", to: "metagross", level: 45, newName: "Metagross", hpBonus: 20, atkBonus: 16, defBonus: 14, newSkillId: "meteorMash" },
   { from: "lairon", to: "aggron", level: 42, newName: "Aggron", hpBonus: 20, atkBonus: 14, defBonus: 16, newSkillId: "heavySlam" },
+  // Phase 164-166: 8th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+  { from: "murkrow", to: "honchkrow", level: 36, newName: "Honchkrow", hpBonus: 18, atkBonus: 14, defBonus: 10, newSkillId: "suckerPunch" },
+  { from: "dragonair", to: "dragonite", level: 55, newName: "Dragonite", hpBonus: 22, atkBonus: 16, defBonus: 12, newSkillId: "hurricane" },
+  { from: "vibrava", to: "flygon", level: 45, newName: "Flygon", hpBonus: 18, atkBonus: 14, defBonus: 10, newSkillId: "dragonRush" },
+  { from: "staravia", to: "staraptor", level: 34, newName: "Staraptor", hpBonus: 16, atkBonus: 14, defBonus: 8, newSkillId: "braveBird" },
 ];
 
 /** Check if a species can evolve at a given level */

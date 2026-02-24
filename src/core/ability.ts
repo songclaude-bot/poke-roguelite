@@ -412,4 +412,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   omastar: AbilityId.SwiftSwim,
   metagross: AbilityId.Sturdy,
   aggron: AbilityId.Sturdy,
+  // Phase 164-166: 8th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+  lapras: AbilityId.SwiftSwim, // Water Absorb equivalent
+  weavile: AbilityId.PurePower, // Pressure equivalent
+  honchkrow: AbilityId.Guts, // Super Luck equivalent
+  houndoom: AbilityId.FlameBody, // Flash Fire equivalent
+  florges: AbilityId.ShieldDust, // Flower Veil equivalent
+  mimikyu: AbilityId.Sturdy, // Disguise equivalent
+  dragonite: AbilityId.PurePower, // Inner Focus equivalent
+  flygon: AbilityId.Levitate,
+  staraptor: AbilityId.Guts, // Intimidate equivalent
+  braviary: AbilityId.Guts, // Sheer Force equivalent
+  snorlax: AbilityId.Sturdy, // Thick Fat equivalent
+  zangoose: AbilityId.Guts, // Immunity equivalent
 };

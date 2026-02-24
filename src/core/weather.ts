@@ -235,6 +235,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     adamantineChamber: [WeatherType.Sandstorm, WeatherType.Hail],
     voidBreach: [WeatherType.Hail],
     etherealNexus: [WeatherType.Rain, WeatherType.Hail],
+    // Phase 164-166: 8th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+    glacialTomb: [WeatherType.Hail],
+    abyssalShadow: [WeatherType.None, WeatherType.Sandstorm],
+    enchantedGrove: [WeatherType.None, WeatherType.Rain],
+    wyrmpeakSummit: [WeatherType.Sandstorm, WeatherType.Hail],
+    galeStronghold: [WeatherType.Rain, WeatherType.Hail],
+    apexArena: [WeatherType.None, WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

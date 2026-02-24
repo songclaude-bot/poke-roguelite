@@ -392,6 +392,13 @@ export class DungeonScene extends Phaser.Scene {
       metang: "0375", lairon: "0305",
       gengar: "0094", chandelure: "0609",
       alakazam: "0065", gardevoir: "0282",
+      // Phase 164-166: 8th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
+      lapras: "0131", weavile: "0461",
+      honchkrow: "0430", houndoom: "0229",
+      florges: "0671", mimikyu: "0778",
+      dragonite: "0149", flygon: "0330",
+      staraptor: "0398", braviary: "0628",
+      snorlax: "0143", zangoose: "0335",
     };
 
     // Load player + all enemy species + ally species for this dungeon

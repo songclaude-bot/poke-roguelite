@@ -1034,6 +1034,42 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [220, 220, 247, 247, 262, 262, 220, 220, 196, 196, 247, 247, 294, 294, 262, 220],
     tempo: 0.30, melodyType: "sine", bassType: "triangle",
   },
+  // Glacial Tomb — icy, crystalline, haunting
+  glacialTomb: {
+    melody: [330, 392, 440, 523, 440, 392, 330, 294, 330, 392, 494, 523, 494, 440, 392, 330],
+    bass: [165, 165, 196, 196, 220, 220, 165, 165, 147, 147, 196, 196, 262, 262, 196, 165],
+    tempo: 0.28, melodyType: "sine", bassType: "triangle",
+  },
+  // Abyssal Shadow — sinister, pulsing, menacing
+  abyssalShadow: {
+    melody: [196, 220, 262, 294, 262, 220, 196, 175, 196, 220, 294, 330, 294, 262, 220, 196],
+    bass: [98, 98, 110, 110, 131, 131, 98, 98, 88, 88, 110, 110, 147, 147, 110, 98],
+    tempo: 0.30, melodyType: "sawtooth", bassType: "square",
+  },
+  // Enchanted Grove — whimsical, delicate, magical
+  enchantedGrove: {
+    melody: [523, 587, 659, 698, 659, 587, 523, 494, 523, 587, 698, 784, 698, 659, 587, 523],
+    bass: [262, 262, 294, 294, 330, 330, 262, 262, 247, 247, 294, 294, 349, 349, 330, 262],
+    tempo: 0.28, melodyType: "triangle", bassType: "sine",
+  },
+  // Wyrmpeak Summit — epic, soaring, powerful
+  wyrmpeakSummit: {
+    melody: [294, 349, 392, 440, 523, 440, 392, 349, 294, 262, 294, 349, 440, 523, 440, 294],
+    bass: [147, 147, 175, 175, 196, 196, 147, 147, 131, 131, 175, 175, 220, 220, 196, 147],
+    tempo: 0.24, melodyType: "square", bassType: "triangle",
+  },
+  // Gale Stronghold — swift, soaring, turbulent
+  galeStronghold: {
+    melody: [440, 523, 587, 659, 587, 523, 440, 392, 440, 523, 659, 784, 659, 587, 523, 440],
+    bass: [220, 220, 262, 262, 294, 294, 220, 220, 196, 196, 262, 262, 330, 330, 294, 220],
+    tempo: 0.22, melodyType: "square", bassType: "triangle",
+  },
+  // Apex Arena — bold, triumphant, relentless
+  apexArena: {
+    melody: [349, 392, 440, 494, 440, 392, 349, 330, 349, 440, 494, 523, 494, 440, 392, 349],
+    bass: [175, 175, 196, 196, 220, 220, 175, 175, 165, 165, 196, 196, 262, 262, 220, 175],
+    tempo: 0.24, melodyType: "square", bassType: "square",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],
