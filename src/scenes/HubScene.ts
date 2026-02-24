@@ -256,6 +256,12 @@ export class HubScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(51).setInteractive({ useHandCursor: true });
     helpBtn.on("pointerdown", () => this.scene.start("HelpScene"));
 
+    // Hall of Fame button
+    const hofBtn = this.add.text(20, GAME_HEIGHT - 8, "[Hall of Fame]", {
+      fontSize: "8px", color: "#fbbf24", fontFamily: "monospace",
+    }).setOrigin(0, 0.5).setDepth(51).setInteractive({ useHandCursor: true });
+    hofBtn.on("pointerdown", () => this.scene.start("LeaderboardScene"));
+
     // ── Scrollable dungeon list with collapsible tiers ──
     const scrollTop = y;
     const scrollBottom = fixedY - 16;

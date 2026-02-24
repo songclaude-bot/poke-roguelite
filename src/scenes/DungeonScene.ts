@@ -41,6 +41,7 @@ import { ShopItem, generateShopItems, shouldSpawnShop } from "../core/shop";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
 import { HeldItemEffect, getHeldItem } from "../core/held-items";
 import { getDailyConfig, calculateDailyScore, saveDailyScore } from "../core/daily-dungeon";
+import { calculateScore, saveRunScore } from "../core/leaderboard";
 import {
   DungeonModifier, rollModifiers, modifiersFromIds, getModifierEffects, ModifierEffects,
 } from "../core/dungeon-modifiers";
@@ -3769,6 +3770,31 @@ export class DungeonScene extends Phaser.Scene {
       });
     }
 
+    // Leaderboard: calculate and save run score
+    const clearRunScore = calculateScore({
+      dungeonId: this.dungeonDef.id,
+      starter: this.starterId,
+      floorsCleared: this.dungeonDef.floors,
+      enemiesDefeated: this.enemiesDefeated,
+      turns: this.turnManager.turn,
+      goldEarned: gold,
+      cleared: true,
+      totalFloors: this.dungeonDef.floors,
+      challengeMode: this.challengeMode ?? undefined,
+    });
+    saveRunScore({
+      dungeonId: this.dungeonDef.id,
+      starter: this.starterId,
+      score: clearRunScore,
+      floorsCleared: this.dungeonDef.floors,
+      enemiesDefeated: this.enemiesDefeated,
+      turns: this.turnManager.turn,
+      goldEarned: gold,
+      cleared: true,
+      date: new Date().toISOString(),
+      challengeMode: this.challengeMode ?? undefined,
+    });
+
     // Stats summary
     const clearStats = [
       `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
@@ -3777,12 +3803,13 @@ export class DungeonScene extends Phaser.Scene {
       this.challengeMode === "speedrun" ? "Speed Run Bonus: 2x Gold!" : "",
       this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
       this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
+      `Score: ${clearRunScore}`,
     ].filter(Boolean).join("\n");
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 38, clearStats, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 75, "[Return to Town]", {
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 85, "[Return to Town]", {
       fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
@@ -3854,11 +3881,37 @@ export class DungeonScene extends Phaser.Scene {
       });
     }
 
+    // Leaderboard: calculate and save run score on game over
+    const goRunScore = calculateScore({
+      dungeonId: this.dungeonDef.id,
+      starter: this.starterId,
+      floorsCleared: this.currentFloor,
+      enemiesDefeated: this.enemiesDefeated,
+      turns: this.turnManager.turn,
+      goldEarned: gold,
+      cleared: false,
+      totalFloors: this.dungeonDef.floors,
+      challengeMode: this.challengeMode ?? undefined,
+    });
+    saveRunScore({
+      dungeonId: this.dungeonDef.id,
+      starter: this.starterId,
+      score: goRunScore,
+      floorsCleared: this.currentFloor,
+      enemiesDefeated: this.enemiesDefeated,
+      turns: this.turnManager.turn,
+      goldEarned: gold,
+      cleared: false,
+      date: new Date().toISOString(),
+      challengeMode: this.challengeMode ?? undefined,
+    });
+
     // Stats summary
     const goStats = [
       `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
       this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
       this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
+      `Score: ${goRunScore}`,
     ].filter(Boolean).join("\n");
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 38, goStats, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
