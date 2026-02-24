@@ -62,6 +62,9 @@ export interface MetaSaveData {
   pokemonUsed: string[];   // species IDs the player has used as starter
   // Move Tutor: custom skill loadouts per starter
   customSkills?: Record<string, string[]>; // starterId -> [skillId, skillId, ...]
+  // Held items
+  ownedHeldItems?: string[];    // array of held item IDs the player owns
+  equippedHeldItem?: string;    // currently equipped held item ID
 }
 
 const SAVE_VERSION = 1;
@@ -133,6 +136,8 @@ export function loadMeta(): MetaSaveData {
     if (data.pokemonSeen === undefined) data.pokemonSeen = [];
     if (data.pokemonUsed === undefined) data.pokemonUsed = [];
     if (data.customSkills === undefined) data.customSkills = {};
+    if (data.ownedHeldItems === undefined) data.ownedHeldItems = [];
+    if (data.equippedHeldItem === undefined) data.equippedHeldItem = undefined;
     return data;
   } catch {
     return defaultMeta();

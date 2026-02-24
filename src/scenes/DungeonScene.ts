@@ -34,6 +34,7 @@ import { AbilityId, SPECIES_ABILITIES, ABILITIES } from "../core/ability";
 import { WeatherType, WEATHERS, weatherDamageMultiplier, isWeatherImmune, rollFloorWeather } from "../core/weather";
 import { ShopItem, generateShopItems, shouldSpawnShop } from "../core/shop";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
+import { HeldItemEffect, getHeldItem } from "../core/held-items";
 import { getDailyConfig, calculateDailyScore, saveDailyScore } from "../core/daily-dungeon";
 import {
   DungeonModifier, rollModifiers, modifiersFromIds, getModifierEffects, ModifierEffects,
@@ -190,6 +191,9 @@ export class DungeonScene extends Phaser.Scene {
   // Pokedex tracking: species encountered this run
   private seenSpecies = new Set<string>();
 
+  // Held item effect (loaded from meta at init)
+  private heldItemEffect: HeldItemEffect = {};
+
   constructor() {
     super({ key: "DungeonScene" });
   }
@@ -208,6 +212,14 @@ export class DungeonScene extends Phaser.Scene {
     const hpBonus = getUpgradeBonus(meta, "maxHp") * 5;
     const atkBonus = getUpgradeBonus(meta, "atk");
     const defBonus = getUpgradeBonus(meta, "def");
+
+    // Load held item effect
+    const equippedId = meta.equippedHeldItem;
+    const heldItem = equippedId ? getHeldItem(equippedId) : undefined;
+    this.heldItemEffect = heldItem?.effect ?? {};
+    const heldHpBonus = this.heldItemEffect.hpBonus ?? 0;
+    const heldAtkBonus = this.heldItemEffect.atkBonus ?? 0;
+    const heldDefBonus = this.heldItemEffect.defBonus ?? 0;
 
     this.dungeonDef = getDungeon(data?.dungeonId ?? "beachCave");
     const isNewRun = (data?.floor ?? 1) === 1 && !data?.hp;
@@ -234,13 +246,13 @@ export class DungeonScene extends Phaser.Scene {
         }
       }
     }
-    this.persistentHp = data?.hp ?? (50 + hpBonus);
-    this.persistentMaxHp = data?.maxHp ?? (50 + hpBonus);
+    this.persistentHp = data?.hp ?? (50 + hpBonus + heldHpBonus);
+    this.persistentMaxHp = data?.maxHp ?? (50 + hpBonus + heldHpBonus);
     this.persistentSkills = data?.skills ?? null;
     this.persistentInventory = data?.inventory ?? null;
     this.persistentLevel = data?.level ?? 5;
-    this.persistentAtk = data?.atk ?? (12 + atkBonus);
-    this.persistentDef = data?.def ?? (6 + defBonus);
+    this.persistentAtk = data?.atk ?? (12 + atkBonus + heldAtkBonus);
+    this.persistentDef = data?.def ?? (6 + defBonus + heldDefBonus);
     this.totalExp = data?.exp ?? 0;
     this.enemies = [];
     this.allies = [];
@@ -2153,7 +2165,8 @@ export class DungeonScene extends Phaser.Scene {
         this.showLog("Used Escape Orb! Escaped the dungeon!");
         this.gameOver = true;
         clearDungeonSave();
-        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult);
+        const heldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
+        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult);
         this.cameras.main.fadeOut(500);
         this.time.delayedCall(600, () => {
           this.scene.start("HubScene", {
@@ -2827,6 +2840,13 @@ export class DungeonScene extends Phaser.Scene {
       this.player.stats.hp = this.player.stats.maxHp;
     }
 
+    // Held item: heal per floor
+    const healPerFloor = this.heldItemEffect.healPerFloor ?? 0;
+    if (healPerFloor > 0 && this.player.stats.hp < this.player.stats.maxHp) {
+      this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + healPerFloor);
+      this.showLog(`Held item healed ${healPerFloor} HP!`);
+    }
+
     // Auto-save before advancing floor
     this.autoSave();
 
@@ -2870,7 +2890,8 @@ export class DungeonScene extends Phaser.Scene {
     const ngGoldBonus = 1 + this.ngPlusLevel * 0.15; // +15% gold per NG+ level
     const challengeGoldMultiplier = this.challengeMode === "speedrun" ? 2 : 1; // Speed Run = 2x gold
     const modGoldMult = this.modifierEffects.goldMult; // Dungeon modifier gold multiplier
-    const gold = Math.floor((this.dungeonDef.boss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult);
+    const clearHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
+    const gold = Math.floor((this.dungeonDef.boss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -2961,7 +2982,8 @@ export class DungeonScene extends Phaser.Scene {
     sfxGameOver();
     clearDungeonSave();
 
-    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult);
+    const goHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
+    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -3209,6 +3231,19 @@ export class DungeonScene extends Phaser.Scene {
       attacker.facing = dir;
       attacker.sprite!.play(`${attacker.spriteKey}-idle-${dir}`);
 
+      // Held item: dodge chance (defender is player)
+      const dodgeChance = this.heldItemEffect.dodgeChance ?? 0;
+      if (defender === this.player && dodgeChance > 0 && Math.random() * 100 < dodgeChance) {
+        sfxMove();
+        this.showLog(`${defender.name} dodged ${attacker.name}'s attack!`);
+        if (defender.sprite) {
+          this.showDamagePopup(defender.sprite.x, defender.sprite.y, 0, 1, "Dodged!");
+        }
+        this.updateHUD();
+        this.time.delayedCall(250, resolve);
+        return;
+      }
+
       const effectiveness = getEffectiveness(attacker.attackType, defender.types);
       const effText = effectivenessText(effectiveness);
 
@@ -3223,7 +3258,11 @@ export class DungeonScene extends Phaser.Scene {
         abilityMult = 1.5;
       }
       const wMult = weatherDamageMultiplier(this.currentWeather, attacker.attackType);
-      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * wMult));
+      // Held item: crit chance (attacker is player)
+      const critChance = this.heldItemEffect.critChance ?? 0;
+      const isCrit = attacker === this.player && critChance > 0 && Math.random() * 100 < critChance;
+      const critMult = isCrit ? 1.5 : 1.0;
+      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * wMult * critMult));
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
       // Sound effects based on effectiveness
@@ -3238,6 +3277,7 @@ export class DungeonScene extends Phaser.Scene {
       }
 
       let logMsg = `${attacker.name} attacks ${defender.name}! ${dmg} dmg!`;
+      if (isCrit) logMsg += " Critical hit!";
       if (effText) logMsg += `\n${effText}`;
       if (abilityMult > 1) logMsg += " (Torrent!)";
       if (wMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
@@ -3317,13 +3357,28 @@ export class DungeonScene extends Phaser.Scene {
         }
 
         if (skill.power > 0) {
+          // Held item: dodge chance (target is player, attacker is enemy)
+          const skillDodge = this.heldItemEffect.dodgeChance ?? 0;
+          if (target === this.player && !user.isAlly && user !== this.player && skillDodge > 0 && Math.random() * 100 < skillDodge) {
+            sfxMove();
+            this.showLog(`${target.name} dodged ${user.name}'s ${skill.name}!`);
+            if (target.sprite) {
+              this.showDamagePopup(target.sprite.x, target.sprite.y, 0, 1, "Dodged!");
+            }
+            continue;
+          }
+
           const effectiveness = getEffectiveness(skill.type, target.types);
           const effText = effectivenessText(effectiveness);
           const atk = getEffectiveAtk(user);
           const def = getEffectiveDef(target);
           const baseDmg = Math.max(1, Math.floor(skill.power * atk / 10) - Math.floor(def / 2));
           const wMult = weatherDamageMultiplier(this.currentWeather, skill.type);
-          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * wMult));
+          // Held item: crit chance (user is player)
+          const skillCritChance = this.heldItemEffect.critChance ?? 0;
+          const skillIsCrit = user === this.player && skillCritChance > 0 && Math.random() * 100 < skillCritChance;
+          const skillCritMult = skillIsCrit ? 1.5 : 1.0;
+          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * wMult * skillCritMult));
           target.stats.hp = Math.max(0, target.stats.hp - dmg);
 
           this.flashEntity(target, effectiveness);
@@ -3333,6 +3388,7 @@ export class DungeonScene extends Phaser.Scene {
           }
 
           let logMsg = `${user.name}'s ${skill.name} hit ${target.name}! ${dmg} dmg!`;
+          if (skillIsCrit) logMsg += " Critical hit!";
           if (effText) logMsg += ` ${effText}`;
           if (wMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
           this.showLog(logMsg);
@@ -3543,10 +3599,10 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   /** Floating damage number popup */
-  private showDamagePopup(x: number, y: number, dmg: number, effectiveness: number) {
+  private showDamagePopup(x: number, y: number, dmg: number, effectiveness: number, overrideText?: string) {
     const color = effectiveness >= 2.0 ? "#ff4444" : effectiveness < 1.0 ? "#8888ff" : "#ffffff";
     const size = effectiveness >= 2.0 ? "14px" : "11px";
-    const popup = this.add.text(x, y - 10, `${dmg}`, {
+    const popup = this.add.text(x, y - 10, overrideText ?? `${dmg}`, {
       fontSize: size, color, fontFamily: "monospace", fontStyle: "bold",
       stroke: "#000000", strokeThickness: 3,
     }).setOrigin(0.5).setDepth(50);
@@ -3666,7 +3722,8 @@ export class DungeonScene extends Phaser.Scene {
       const isBossKill = entity.isBoss;
       // Grant EXP (boss gives 5x, apply modifier expMult)
       const baseExp = expFromEnemy(entity.stats.level, this.currentFloor);
-      const expGain = Math.floor((isBossKill ? baseExp * 5 : baseExp) * this.modifierEffects.expMult);
+      const heldExpMult = 1 + (this.heldItemEffect.expBonus ?? 0) / 100;
+      const expGain = Math.floor((isBossKill ? baseExp * 5 : baseExp) * this.modifierEffects.expMult * heldExpMult);
       this.totalExp += expGain;
 
       if (isBossKill) {

@@ -5,6 +5,7 @@ import {
   hasDungeonSave, deserializeSkills, deserializeInventory,
   MetaSaveData,
 } from "../core/save-system";
+import { getHeldItem } from "../core/held-items";
 import { DUNGEONS, DungeonDef, getUnlockedDungeons, CHALLENGE_MODES } from "../core/dungeon-data";
 import { initAudio, startBgm, stopBgm } from "../core/sound-manager";
 import { getDailyConfig, hasDailyAttempt, loadDailyScores } from "../core/daily-dungeon";
@@ -174,7 +175,7 @@ export class HubScene extends Phaser.Scene {
     const currentStarter = this.meta.starter ?? "mudkip";
     const starterName = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
 
-    const fixedY = GAME_HEIGHT - 186;
+    const fixedY = GAME_HEIGHT - 220;
     // Solid background behind fixed buttons — covers from scroll end to bottom
     const fixedBgTop = fixedY - 30;
     const fixedBgH = GAME_HEIGHT - fixedBgTop;
@@ -190,16 +191,22 @@ export class HubScene extends Phaser.Scene {
       "Upgrade Shop", `Gold: ${this.meta.gold}`, "#fbbf24",
       () => this.scene.start("UpgradeScene")
     );
+    const equippedHeldItem = this.meta.equippedHeldItem ? getHeldItem(this.meta.equippedHeldItem) : undefined;
+    const heldItemDesc = equippedHeldItem ? equippedHeldItem.name : "None equipped";
     this.createFixedButton(GAME_WIDTH / 2, fixedY + 68, btnW, 30,
+      "Held Items", heldItemDesc, "#f59e0b",
+      () => this.scene.start("HeldItemScene")
+    );
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + 102, btnW, 30,
       "Move Tutor", "Teach new skills!", "#a855f7",
       () => this.scene.start("MoveTutorScene")
     );
     const seenCount = (this.meta.pokemonSeen ?? []).length;
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + 102, btnW, 30,
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + 136, btnW, 30,
       "Pokedex", `Seen: ${seenCount} Pokemon`, "#e879f9",
       () => this.scene.start("PokedexScene")
     );
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + 136, btnW, 30,
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + 170, btnW, 30,
       "Records", `Clears: ${this.meta.totalClears}  Best: B${this.meta.bestFloor}F`, "#60a5fa",
       () => this.scene.start("AchievementScene")
     );
