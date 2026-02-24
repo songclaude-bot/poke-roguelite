@@ -301,6 +301,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [196, 196, 262, 262, 196, 196, 262, 262, 196, 196, 165, 165, 262, 262, 330, 262],
     tempo: 0.22, melodyType: "sawtooth", bassType: "square",
   },
+  // Verdant Forest — light, buzzy
+  verdantForest: {
+    melody: [330, 392, 440, 494, 440, 392, 330, 294, 330, 392, 440, 392, 330, 294, 262, 294],
+    bass: [165, 165, 196, 196, 220, 220, 196, 196, 165, 165, 147, 147, 165, 165, 131, 131],
+    tempo: 0.30, melodyType: "triangle", bassType: "sine",
+  },
   // Destiny Tower — grand, final
   destinyTower: {
     melody: [262, 330, 392, 523, 392, 330, 262, 196, 262, 392, 523, 659, 523, 392, 330, 262],

@@ -303,6 +303,32 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["thunderShock", "thunderWave", "tackle"],
     floors: [],
   },
+  wurmple: {
+    id: "wurmple",
+    name: "Wurmple",
+    spriteKey: "wurmple",
+    types: [PokemonType.Bug],
+    attackType: PokemonType.Bug,
+    baseStats: { hp: 20, atk: 8, def: 6 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 24, idleFrameHeight: 32,
+    walkFrames: 6, idleFrames: 8,
+    skillIds: ["stringShot", "bugBite", "pinMissile"],
+    floors: [],
+  },
+  spinarak: {
+    id: "spinarak",
+    name: "Spinarak",
+    spriteKey: "spinarak",
+    types: [PokemonType.Bug, PokemonType.Poison],
+    attackType: PokemonType.Bug,
+    baseStats: { hp: 24, atk: 10, def: 7 },
+    walkFrameWidth: 32, walkFrameHeight: 24,
+    idleFrameWidth: 24, idleFrameHeight: 24,
+    walkFrames: 3, idleFrames: 4,
+    skillIds: ["poisonSting", "signalBeam", "stringShot"],
+    floors: [],
+  },
   meditite: {
     id: "meditite",
     name: "Meditite",
@@ -709,6 +735,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   carvanha: { 7: "brine", 10: "darkPulse" },
   elekid: { 7: "thunderPunch", 10: "thunderbolt" },
   mareep: { 7: "spark", 10: "thunderbolt" },
+  wurmple: { 6: "pinMissile", 9: "signalBeam" },
+  spinarak: { 7: "signalBeam", 10: "pinMissile" },
 };
 
 /** Check if a species learns a new skill at this level */

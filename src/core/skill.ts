@@ -904,6 +904,28 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     effectChance: 20,
     description: "Punches with electrically charged fist.",
   },
+
+  // ── Additional Bug Skills ──
+  signalBeam: {
+    id: "signalBeam",
+    name: "Signal Beam",
+    type: PokemonType.Bug,
+    power: 15,
+    pp: 12,
+    range: SkillRange.FrontLine,
+    accuracy: 90,
+    description: "Fires a peculiar beam of light.",
+  },
+  pinMissile: {
+    id: "pinMissile",
+    name: "Pin Missile",
+    type: PokemonType.Bug,
+    power: 8,
+    pp: 20,
+    range: SkillRange.Front2,
+    accuracy: 85,
+    description: "Fires sharp pins rapidly.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
