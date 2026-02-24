@@ -237,6 +237,10 @@ export const EVOLUTIONS: EvolutionDef[] = [
   { from: "nidoranF", to: "nidorina", level: 16, newName: "Nidorina", hpBonus: 14, atkBonus: 10, defBonus: 8, newSkillId: "gunkShot" },
   { from: "gligar", to: "gliscor", level: 35, newName: "Gliscor", hpBonus: 16, atkBonus: 10, defBonus: 12, newSkillId: "drillRun" },
   { from: "rhyhorn", to: "rhydon", level: 42, newName: "Rhydon", hpBonus: 18, atkBonus: 12, defBonus: 10, newSkillId: "drillRun" },
+  // Phase 151-153: Rock/Bug/Fighting/Steel/Ghost/Psychic 7th tier
+  { from: "boldore", to: "gigalith", level: 40, newName: "Gigalith", hpBonus: 18, atkBonus: 12, defBonus: 12, newSkillId: "headSmash" },
+  { from: "pineco", to: "forretress", level: 31, newName: "Forretress", hpBonus: 16, atkBonus: 8, defBonus: 14, newSkillId: "signalBeam" },
+  { from: "slowpoke", to: "slowbro", level: 37, newName: "Slowbro", hpBonus: 18, atkBonus: 10, defBonus: 12, newSkillId: "zenHeadbutt" },
 ];
 
 /** Check if a species can evolve at a given level */

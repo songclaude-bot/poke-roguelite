@@ -357,4 +357,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   seviper: AbilityId.Guts, // Shed Skin equivalent
   gligar: AbilityId.Levitate, // Hyper Cutter equivalent
   rhyhorn: AbilityId.RockHead, // Lightning Rod equivalent
+  // Phase 151-153: Rock/Bug/Fighting/Steel/Ghost/Psychic 7th tier
+  sudowoodo: AbilityId.Sturdy, // Rock Head equivalent
+  boldore: AbilityId.Sturdy,
+  pineco: AbilityId.Sturdy, // Overcoat equivalent
+  heracross: AbilityId.Guts, // Moxie equivalent
+  hitmonlee: AbilityId.PurePower, // Limber equivalent
+  hitmonchan: AbilityId.Guts, // Iron Fist equivalent
+  steelix: AbilityId.Sturdy, // Rock Head equivalent
+  scizor: AbilityId.ShieldDust, // Technician equivalent
+  banette: AbilityId.Guts, // Cursed Body equivalent
+  shedinja: AbilityId.ShieldDust, // Wonder Guard equivalent
+  slowpoke: AbilityId.ShieldDust, // Own Tempo equivalent
+  girafarig: AbilityId.ShieldDust, // Inner Focus equivalent
 };

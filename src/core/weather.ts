@@ -207,6 +207,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     plasmaCorridor: [WeatherType.Rain, WeatherType.Sandstorm],
     corrosivePit: [WeatherType.Rain, WeatherType.Sandstorm],
     mantleCavern: [WeatherType.Sandstorm],
+    // Phase 151-153: Rock/Bug/Fighting/Steel/Ghost/Psychic 7th
+    obsidianForge: [WeatherType.Sandstorm],
+    chitinLabyrinth: [WeatherType.Rain],
+    colosseum: [WeatherType.Sandstorm],
+    steelAbyss: [WeatherType.Sandstorm, WeatherType.Hail],
+    necropolisDepths: [WeatherType.Hail],
+    cosmicLibrary: [WeatherType.Rain, WeatherType.Hail],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

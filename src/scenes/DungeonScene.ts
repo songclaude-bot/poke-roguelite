@@ -364,6 +364,13 @@ export class DungeonScene extends Phaser.Scene {
       plusle: "0311", minun: "0312",
       nidoranF: "0029", seviper: "0336",
       gligar: "0207", rhyhorn: "0111",
+      // Phase 151-153: Rock/Bug/Fighting/Steel/Ghost/Psychic 7th
+      sudowoodo: "0185", boldore: "0525",
+      pineco: "0204", heracross: "0214",
+      hitmonlee: "0106", hitmonchan: "0107",
+      steelix: "0208", scizor: "0212",
+      banette: "0354", shedinja: "0292",
+      slowpoke: "0079", girafarig: "0203",
     };
 
     // Load player + all enemy species + ally species for this dungeon
