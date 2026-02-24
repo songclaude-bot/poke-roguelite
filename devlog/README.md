@@ -810,3 +810,36 @@
 - **350종+ 기술**
 - **포스트게임 컨텐츠**: 50클리어 이상 해금 전설 던전
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 12: 12th Tier FINAL Dungeons
+
+### 12-1. Water/Fire/Grass/Electric/Poison/Ground (Phase 198-200)
+- 날짜: 2026-02-24
+- Kyogre, Palkia, Reshiram, Victini, Shaymin, Tapu Bulu, Thundurus, Zeraora, Eternatus, Poipole, Zygarde, Excadrill
+- Sovereign Depths (Water), Primordial Flame (Fire), Eden's Heart (Grass)
+- Thunder Sovereign Spire (Electric), Venom Nexus Apex (Poison), Tectonic Core (Ground)
+
+### 12-2. Rock/Bug/Fighting/Steel/Ghost/Psychic (Phase 201-203)
+- 날짜: 2026-02-24
+- Lycanroc, Gigalith, Volcarona, Golisopod, Urshifu, Keldeo, Heatran, Kartana, Spectrier, Polteageist, Mew, Cresselia
+- Petrified Apex (Rock), Primordial Hive (Bug), Martial Summit (Fighting)
+- Molten Forge (Steel), Spectral Plains (Ghost), Genesis Temple (Psychic)
+
+### 12-3. Ice/Dark/Fairy/Dragon/Flying/Normal (Phase 204-206)
+- 날짜: 2026-02-24
+- Calyrex-Ice, Cloyster, Grimmsnarl, Incineroar, Zacian, Tapu Lele, Garchomp, Latios, Zapdos, Moltres, Silvally, Meloetta
+- Crown Tundra Throne (Ice), Abyssal Darkhold (Dark), Radiant Sword Garden (Fairy)
+- Dragon Sovereign Spire (Dragon), Celestial Thunderpeak (Flying), Harmony Hall (Normal)
+
+### v2.0.0 마일스톤
+- **전 18타입 × 12개 던전 = 216개 던전** + Destiny Tower = 총 217개 던전!
+- **12th 티어 포켓몬 36종** 추가 (Phases 198-206)
+- **421종 스타터** (전체)
+- **540종+ 포켓몬** (진화 포함)
+- **450종+ 기술**
+- **전체 던전 완성!**: 1티어(기본) ~ 12티어(FINAL) 모든 던전 구현
+- **난이도 범위**: 1.0 ~ 8.0, 보스 배율 3.0x ~ 20.0x
+- **해금 조건**: 0클리어 ~ 60클리어
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/

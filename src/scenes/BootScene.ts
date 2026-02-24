@@ -32,7 +32,7 @@ export class BootScene extends Phaser.Scene {
       fontSize: "14px", color: hasSave ? "#4ade80" : "#667eea", fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    this.add.text(cx, cy + 60, "v1.9.0 — Legendary Post-Game", {
+    this.add.text(cx, cy + 60, "v2.0.0 — All Dungeons Complete", {
       fontSize: "9px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 

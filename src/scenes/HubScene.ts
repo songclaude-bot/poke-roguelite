@@ -116,7 +116,7 @@ export class HubScene extends Phaser.Scene {
       )
     );
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v1.9.0", {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v2.0.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(51);
 
@@ -856,6 +856,43 @@ export class HubScene extends Phaser.Scene {
       { id: "articuno", name: "Articuno", unlock: 25 },
       { id: "arceus", name: "Arceus", unlock: 26 },
       { id: "regigigas", name: "Regigigas", unlock: 25 },
+      // 12th dungeon starters (FINAL tier)
+      { id: "kyogre", name: "Kyogre", unlock: 28 },
+      { id: "palkia", name: "Palkia", unlock: 27 },
+      { id: "reshiram", name: "Reshiram", unlock: 28 },
+      { id: "victini", name: "Victini", unlock: 27 },
+      { id: "shaymin", name: "Shaymin", unlock: 28 },
+      { id: "tapuBulu", name: "Tapu Bulu", unlock: 27 },
+      { id: "thundurus", name: "Thundurus", unlock: 28 },
+      { id: "zeraora", name: "Zeraora", unlock: 27 },
+      { id: "eternatus", name: "Eternatus", unlock: 28 },
+      { id: "poipole", name: "Poipole", unlock: 27 },
+      { id: "zygarde", name: "Zygarde", unlock: 28 },
+      { id: "excadrill", name: "Excadrill", unlock: 27 },
+      { id: "lycanroc", name: "Lycanroc", unlock: 28 },
+      { id: "gigalith", name: "Gigalith", unlock: 27 },
+      { id: "volcarona", name: "Volcarona", unlock: 28 },
+      { id: "golisopod", name: "Golisopod", unlock: 27 },
+      { id: "urshifu", name: "Urshifu", unlock: 28 },
+      { id: "keldeo", name: "Keldeo", unlock: 27 },
+      { id: "heatran", name: "Heatran", unlock: 28 },
+      { id: "kartana", name: "Kartana", unlock: 27 },
+      { id: "spectrier", name: "Spectrier", unlock: 28 },
+      { id: "polteageist", name: "Polteageist", unlock: 27 },
+      { id: "mew", name: "Mew", unlock: 28 },
+      { id: "cresselia", name: "Cresselia", unlock: 27 },
+      { id: "calyrexIce", name: "Calyrex-Ice", unlock: 28 },
+      { id: "cloyster", name: "Cloyster", unlock: 27 },
+      { id: "grimmsnarl", name: "Grimmsnarl", unlock: 28 },
+      { id: "incineroar", name: "Incineroar", unlock: 27 },
+      { id: "zacian", name: "Zacian", unlock: 28 },
+      { id: "tapuLele", name: "Tapu Lele", unlock: 27 },
+      { id: "garchomp", name: "Garchomp", unlock: 28 },
+      { id: "latios", name: "Latios", unlock: 27 },
+      { id: "zapdos", name: "Zapdos", unlock: 28 },
+      { id: "moltres", name: "Moltres", unlock: 27 },
+      { id: "silvally", name: "Silvally", unlock: 28 },
+      { id: "meloetta", name: "Meloetta", unlock: 27 },
     ];
   }
 }
