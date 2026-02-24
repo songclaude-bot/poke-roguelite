@@ -32,6 +32,8 @@ export interface DungeonSaveData {
   starter?: string;
   // Challenge mode (if any)
   challengeMode?: string;
+  // Dungeon modifiers (if any)
+  modifiers?: string[];
 }
 
 export interface MetaSaveData {

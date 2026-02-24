@@ -536,6 +536,7 @@ export class HubScene extends Phaser.Scene {
         dungeonId: save.dungeonId,
         starter: save.starter ?? this.meta.starter ?? "mudkip",
         challengeMode: save.challengeMode,
+        modifiers: save.modifiers,
       });
     });
   }

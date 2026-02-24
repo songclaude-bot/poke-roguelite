@@ -36,6 +36,9 @@ import { ShopItem, generateShopItems, shouldSpawnShop } from "../core/shop";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
 import { getDailyConfig, calculateDailyScore, saveDailyScore } from "../core/daily-dungeon";
 import {
+  DungeonModifier, rollModifiers, modifiersFromIds, getModifierEffects, ModifierEffects,
+} from "../core/dungeon-modifiers";
+import {
   initAudio, startBgm, stopBgm,
   sfxHit, sfxSuperEffective, sfxNotEffective, sfxMove, sfxPickup,
   sfxLevelUp, sfxRecruit, sfxStairs, sfxDeath, sfxBossDefeat,
@@ -180,6 +183,10 @@ export class DungeonScene extends Phaser.Scene {
   private challengeTurnLimit = 0; // speedrun: max turns allowed
   private challengeBadgeText: Phaser.GameObjects.Text | null = null;
 
+  // Dungeon modifier state
+  private activeModifiers: DungeonModifier[] = [];
+  private modifierEffects: ModifierEffects = getModifierEffects([]);
+
   // Pokedex tracking: species encountered this run
   private seenSpecies = new Set<string>();
 
@@ -189,7 +196,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private persistentAllies: AllyData[] | null = null;
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[] }) {
     // Load D-Pad side preference
     try {
       const side = localStorage.getItem("poke-roguelite-dpadSide");
@@ -287,6 +294,42 @@ export class DungeonScene extends Phaser.Scene {
       // Boost player stats by 30%
       this.persistentAtk = Math.floor(this.persistentAtk * 1.3);
       this.persistentDef = Math.floor(this.persistentDef * 1.3);
+    }
+
+    // ── Dungeon Modifiers (regular dungeons only, not endless/daily/challenge) ──
+    const isRegularDungeon = this.dungeonDef.id !== "endlessDungeon"
+      && this.dungeonDef.id !== "dailyDungeon"
+      && !this.challengeMode;
+
+    if (data?.modifiers && data.modifiers.length > 0) {
+      // Reconstruct from IDs (floor transitions or save restore)
+      this.activeModifiers = modifiersFromIds(data.modifiers);
+    } else if (isRegularDungeon && data?.fromHub && isNewRun) {
+      // Roll fresh modifiers on new run from hub
+      this.activeModifiers = rollModifiers();
+    } else {
+      this.activeModifiers = [];
+    }
+    this.modifierEffects = getModifierEffects(this.activeModifiers);
+
+    // Apply modifier effects to dungeon and player stats
+    if (this.activeModifiers.length > 0) {
+      this.dungeonDef = { ...this.dungeonDef };
+      if (this.modifierEffects.difficultyMult !== 1) {
+        this.dungeonDef.difficulty *= this.modifierEffects.difficultyMult;
+      }
+      if (this.modifierEffects.itemsPerFloorMod !== 0) {
+        this.dungeonDef.itemsPerFloor = Math.max(0, this.dungeonDef.itemsPerFloor + this.modifierEffects.itemsPerFloorMod);
+      }
+      // Apply stat multipliers only on fresh run start (floor 1 from hub)
+      if (isNewRun) {
+        if (this.modifierEffects.playerAtkMult !== 1) {
+          this.persistentAtk = Math.floor(this.persistentAtk * this.modifierEffects.playerAtkMult);
+        }
+        if (this.modifierEffects.playerDefMult !== 1) {
+          this.persistentDef = Math.floor(this.persistentDef * this.modifierEffects.playerDefMult);
+        }
+      }
     }
 
     // Give starter items on new run
@@ -705,7 +748,8 @@ export class DungeonScene extends Phaser.Scene {
 
     for (let i = 1; i < rooms.length; i++) {
       const room = rooms[i];
-      for (let e = 0; e < enemiesPerRoom(this.currentFloor); e++) {
+      const enemyCount = this.modifierEffects.doubleEnemies ? enemiesPerRoom(this.currentFloor) * 2 : enemiesPerRoom(this.currentFloor);
+      for (let e = 0; e < enemyCount; e++) {
         const ex = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
         const ey = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
         if (terrain[ey][ex] !== TerrainType.GROUND) continue;
@@ -714,6 +758,12 @@ export class DungeonScene extends Phaser.Scene {
         // Pick random species from floor pool
         const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
         const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
+
+        // Apply enemyHpMult modifier
+        if (this.modifierEffects.enemyHpMult !== 1) {
+          enemyStats.hp = Math.floor(enemyStats.hp * this.modifierEffects.enemyHpMult);
+          enemyStats.maxHp = Math.floor(enemyStats.maxHp * this.modifierEffects.enemyHpMult);
+        }
 
         const enemy: Entity = {
           tileX: ex, tileY: ey,
@@ -1060,6 +1110,42 @@ export class DungeonScene extends Phaser.Scene {
           this.showLog("Solo challenge! No allies, +30% stats!");
         }
       }
+    }
+
+    // ── Dungeon Modifier Badges ──
+    if (this.activeModifiers.length > 0) {
+      const badgeY = this.challengeMode ? 48 : 36; // offset below challenge badge if present
+      for (let mi = 0; mi < this.activeModifiers.length; mi++) {
+        const mod = this.activeModifiers[mi];
+        this.add.text(GAME_WIDTH / 2, badgeY + mi * 12, `[${mod.name}]`, {
+          fontSize: "8px", color: mod.color, fontFamily: "monospace", fontStyle: "bold",
+          backgroundColor: "#00000088", padding: { x: 3, y: 1 },
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(103);
+      }
+
+      // Show modifier intro overlay (auto-dismiss after 2 seconds)
+      const overlayBg = this.add.rectangle(
+        GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH * 0.8, 30 + this.activeModifiers.length * 22,
+        0x000000, 0.85
+      ).setScrollFactor(0).setDepth(300);
+      const overlayTexts: Phaser.GameObjects.Text[] = [];
+      const overlayTitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 10 - this.activeModifiers.length * 8, "Dungeon Modifiers", {
+        fontSize: "11px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+      overlayTexts.push(overlayTitle);
+      for (let mi = 0; mi < this.activeModifiers.length; mi++) {
+        const mod = this.activeModifiers[mi];
+        const modText = this.add.text(
+          GAME_WIDTH / 2, GAME_HEIGHT / 2 + 6 + mi * 18 - (this.activeModifiers.length - 1) * 4,
+          `[${mod.name}] ${mod.description}`,
+          { fontSize: "9px", color: mod.color, fontFamily: "monospace", backgroundColor: "#00000066", padding: { x: 4, y: 2 } }
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+        overlayTexts.push(modText);
+      }
+      this.time.delayedCall(2000, () => {
+        overlayBg.destroy();
+        for (const t of overlayTexts) t.destroy();
+      });
     }
 
     // ── Minimap ──
@@ -2054,7 +2140,7 @@ export class DungeonScene extends Phaser.Scene {
         this.showLog("Used Escape Orb! Escaped the dungeon!");
         this.gameOver = true;
         clearDungeonSave();
-        const escGold = goldFromRun(this.currentFloor, this.enemiesDefeated, false);
+        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult);
         this.cameras.main.fadeOut(500);
         this.time.delayedCall(600, () => {
           this.scene.start("HubScene", {
@@ -2299,6 +2385,7 @@ export class DungeonScene extends Phaser.Scene {
       inventory: serializeInventory(this.inventory),
       starter: this.starterId,
       challengeMode: this.challengeMode ?? undefined,
+      modifiers: this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined,
     });
     this.showLog("Game saved!");
   }
@@ -2321,6 +2408,7 @@ export class DungeonScene extends Phaser.Scene {
       inventory: serializeInventory(this.inventory),
       starter: this.starterId,
       challengeMode: this.challengeMode ?? undefined,
+      modifiers: this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined,
     });
   }
 
@@ -2721,12 +2809,20 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
 
+    // Apply healOnFloor modifier before advancing
+    if (this.modifierEffects.healOnFloor) {
+      this.player.stats.hp = this.player.stats.maxHp;
+    }
+
     // Auto-save before advancing floor
     this.autoSave();
 
     this.gameOver = true;
     sfxStairs();
     this.showLog(`Went to B${this.currentFloor + 1}F!`);
+
+    // Pass modifier IDs through floor transitions
+    const modifierIds = this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined;
 
     this.cameras.main.fadeOut(500, 0, 0, 0);
     this.time.delayedCall(600, () => {
@@ -2745,6 +2841,7 @@ export class DungeonScene extends Phaser.Scene {
         belly: this.belly,
         starter: this.starterId,
         challengeMode: this.challengeMode ?? undefined,
+        modifiers: modifierIds,
       });
     });
   }
@@ -2759,7 +2856,8 @@ export class DungeonScene extends Phaser.Scene {
     const baseGold = goldFromRun(this.currentFloor, this.enemiesDefeated, true);
     const ngGoldBonus = 1 + this.ngPlusLevel * 0.15; // +15% gold per NG+ level
     const challengeGoldMultiplier = this.challengeMode === "speedrun" ? 2 : 1; // Speed Run = 2x gold
-    const gold = Math.floor((this.dungeonDef.boss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier);
+    const modGoldMult = this.modifierEffects.goldMult; // Dungeon modifier gold multiplier
+    const gold = Math.floor((this.dungeonDef.boss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -2850,7 +2948,7 @@ export class DungeonScene extends Phaser.Scene {
     sfxGameOver();
     clearDungeonSave();
 
-    const gold = goldFromRun(this.currentFloor, this.enemiesDefeated, false);
+    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -3553,9 +3651,9 @@ export class DungeonScene extends Phaser.Scene {
       // Enemy defeated — track for gold
       this.enemiesDefeated++;
       const isBossKill = entity.isBoss;
-      // Grant EXP (boss gives 5x)
+      // Grant EXP (boss gives 5x, apply modifier expMult)
       const baseExp = expFromEnemy(entity.stats.level, this.currentFloor);
-      const expGain = isBossKill ? baseExp * 5 : baseExp;
+      const expGain = Math.floor((isBossKill ? baseExp * 5 : baseExp) * this.modifierEffects.expMult);
       this.totalExp += expGain;
 
       if (isBossKill) {
@@ -3659,9 +3757,9 @@ export class DungeonScene extends Phaser.Scene {
         }
       }
 
-      // ── Recruitment check (bosses can't be recruited, solo challenge blocks recruitment) ──
+      // ── Recruitment check (bosses can't be recruited, solo/noRecruits blocks recruitment) ──
       const recruitBonus = getUpgradeBonus(loadMeta(), "recruitRate") * 5;
-      if (this.challengeMode !== "solo" && !isBossKill && entity.speciesId && this.allies.length < MAX_ALLIES && tryRecruit(this.player.stats.level, entity.stats.level, recruitBonus)) {
+      if (this.challengeMode !== "solo" && !this.modifierEffects.noRecruits && !isBossKill && entity.speciesId && this.allies.length < MAX_ALLIES && tryRecruit(this.player.stats.level, entity.stats.level, recruitBonus)) {
         this.time.delayedCall(800, () => {
           this.recruitEnemy(entity);
         });
