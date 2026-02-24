@@ -289,13 +289,18 @@ export class DungeonScene extends Phaser.Scene {
   private currentTheme!: FloorTheme;
   private themeOverlay: Phaser.GameObjects.Graphics | null = null;
 
+  // Speed Run Timer
+  private runElapsedSeconds = 0;          // total seconds elapsed across floors
+  private timerText!: Phaser.GameObjects.Text;
+  private timerEvent: Phaser.Time.TimerEvent | null = null;
+
   constructor() {
     super({ key: "DungeonScene" });
   }
 
   private persistentAllies: AllyData[] | null = null;
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[] }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number }) {
     // Load D-Pad side preference
     try {
       const side = localStorage.getItem("poke-roguelite-dpadSide");
@@ -447,6 +452,9 @@ export class DungeonScene extends Phaser.Scene {
     this.autoExploreTimer = null;
     this.autoExploreText = null;
     this.autoExploreTween = null;
+    // Speed run timer: carry over elapsed time from previous floors, or start fresh
+    this.runElapsedSeconds = data?.runElapsedTime ?? 0;
+    this.timerEvent = null;
     // NG+ starting gold bonus: add percentage of carried gold as bonus on new runs
     const ngGoldStartBonus = isNewRun && this.ngPlusBonuses.startingGoldPercent > 0
       ? Math.floor(meta.gold * this.ngPlusBonuses.startingGoldPercent / 100)
@@ -1481,6 +1489,25 @@ export class DungeonScene extends Phaser.Scene {
     this.turnText = this.add
       .text(8, 40, "", { fontSize: "10px", color: "#60a5fa", fontFamily: "monospace" })
       .setScrollFactor(0).setDepth(100);
+
+    // Speed Run Timer display
+    this.timerText = this.add
+      .text(8, 52, this.formatTime(this.runElapsedSeconds), { fontSize: "8px", color: "#6b7280", fontFamily: "monospace" })
+      .setScrollFactor(0).setDepth(100);
+
+    // Timer event: ticks every second, pauses when menus/overlays are open
+    this.timerEvent = this.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: () => {
+        // Don't count time when game is over or menus/overlays are open
+        if (this.gameOver) return;
+        if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.teamPanelOpen) return;
+        this.runElapsedSeconds++;
+        this.timerText.setText(this.formatTime(this.runElapsedSeconds));
+      },
+    });
+
     this.logText = this.add
       .text(8, GAME_HEIGHT - 200, "", {
         fontSize: "10px", color: "#fbbf24", fontFamily: "monospace",
@@ -4760,6 +4787,7 @@ export class DungeonScene extends Phaser.Scene {
         starter: this.starterId,
         challengeMode: this.challengeMode ?? undefined,
         modifiers: modifierIds,
+        runElapsedTime: this.runElapsedSeconds,
       });
     });
   }
@@ -4856,6 +4884,32 @@ export class DungeonScene extends Phaser.Scene {
     const clearMeta = loadMeta();
     const clearDungeonRunCount = (clearMeta.dungeonRunCounts ?? {})[this.dungeonDef.id] ?? 0;
 
+    // Speed run timer: check and save best time
+    const runTime = this.runElapsedSeconds;
+    if (!clearMeta.bestTimes) clearMeta.bestTimes = {};
+    const prevBest = clearMeta.bestTimes[this.dungeonDef.id];
+    const isNewBest = prevBest === undefined || runTime < prevBest;
+    if (isNewBest) {
+      clearMeta.bestTimes[this.dungeonDef.id] = runTime;
+      saveMeta(clearMeta);
+    }
+
+    // Time display on clear screen
+    const timeStr = `Time: ${this.formatTime(runTime)}`;
+    const bestStr = isNewBest
+      ? `Best: ${this.formatTime(runTime)}`
+      : `Best: ${this.formatTime(prevBest!)}`;
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 28, `${timeStr}    ${bestStr}`, {
+      fontSize: "10px", color: "#94a3b8", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    // "New Best Time!" banner
+    if (isNewBest) {
+      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 40, "New Best Time!", {
+        fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    }
+
     // Stats summary
     const clearStats = [
       `Run #${clearDungeonRunCount}`,
@@ -4867,11 +4921,11 @@ export class DungeonScene extends Phaser.Scene {
       this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
       `Score: ${clearRunScore}`,
     ].filter(Boolean).join("\n");
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 38, clearStats, {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 55, clearStats, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 95, "[Return to Town]", {
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 107, "[Return to Town]", {
       fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
@@ -4891,7 +4945,7 @@ export class DungeonScene extends Phaser.Scene {
     });
 
     // Run Again button
-    const runAgainText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 117, "[Run Again]", {
+    const runAgainText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 129, "[Run Again]", {
       fontSize: "14px", color: "#f59e0b", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
@@ -4934,6 +4988,11 @@ export class DungeonScene extends Phaser.Scene {
 
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 18, `Salvaged ${gold} Gold`, {
       fontSize: "11px", color: "#fde68a", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    // Speed run timer display on game over (not saved as best)
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 32, `Time: ${this.formatTime(this.runElapsedSeconds)}`, {
+      fontSize: "10px", color: "#6b7280", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
     // Daily dungeon: calculate and save score on game over
@@ -4992,11 +5051,11 @@ export class DungeonScene extends Phaser.Scene {
       this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
       `Score: ${goRunScore}`,
     ].filter(Boolean).join("\n");
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 38, goStats, {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 48, goStats, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 70, "[Return to Town]", {
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 82, "[Return to Town]", {
       fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
@@ -5016,7 +5075,7 @@ export class DungeonScene extends Phaser.Scene {
     });
 
     // Quick Retry button
-    const retryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 92, "[Quick Retry]", {
+    const retryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 104, "[Quick Retry]", {
       fontSize: "14px", color: "#f59e0b", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
@@ -6373,6 +6432,13 @@ export class DungeonScene extends Phaser.Scene {
       level: a.stats.level,
       skills: serializeSkills(a.skills),
     }));
+  }
+
+  /** Format seconds into MM:SS display string */
+  private formatTime(totalSeconds: number): string {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   }
 
   // ══════════════════════════════════════════════════════════

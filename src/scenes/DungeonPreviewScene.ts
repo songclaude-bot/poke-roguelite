@@ -117,6 +117,18 @@ export class DungeonPreviewScene extends Phaser.Scene {
       }
     }
 
+    // ── Best Time ──
+    const bestTimes = this.meta.bestTimes ?? {};
+    const bestTime = bestTimes[this.dungeonId];
+    const bestTimeStr = bestTime !== undefined
+      ? `Best Time: ${String(Math.floor(bestTime / 60)).padStart(2, "0")}:${String(bestTime % 60).padStart(2, "0")}`
+      : "No clear yet";
+    const bestTimeLabel = this.add.text(GAME_WIDTH / 2, cy, bestTimeStr, {
+      fontSize: "9px", color: bestTime !== undefined ? "#4ade80" : "#666680", fontFamily: "monospace",
+    }).setOrigin(0.5);
+    container.add(bestTimeLabel);
+    cy += 16;
+
     // Separator
     cy += 4;
     const sep1 = this.add.rectangle(GAME_WIDTH / 2, cy, contentW, 1, 0x334155);

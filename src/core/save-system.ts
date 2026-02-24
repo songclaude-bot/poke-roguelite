@@ -80,6 +80,8 @@ export interface MetaSaveData {
   clearedDungeons?: string[];
   // Passive income: timestamp of last hub visit (Date.now())
   lastVisitTimestamp?: number;
+  // Speed run best times per dungeon (dungeonId → best time in seconds)
+  bestTimes?: Record<string, number>;
 }
 
 const SAVE_VERSION = 1;
@@ -161,6 +163,7 @@ export function loadMeta(): MetaSaveData {
     if (data.dungeonRunCounts === undefined) data.dungeonRunCounts = {};
     if (data.clearedDungeons === undefined) data.clearedDungeons = [];
     if (data.lastVisitTimestamp === undefined) data.lastVisitTimestamp = undefined;
+    if (data.bestTimes === undefined) data.bestTimes = {};
     return data;
   } catch {
     return defaultMeta();
