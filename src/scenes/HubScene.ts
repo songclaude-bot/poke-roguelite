@@ -87,27 +87,26 @@ export class HubScene extends Phaser.Scene {
       y += 52;
     }
 
-    // ── Bottom fixed buttons ──
+    // ── Bottom fixed buttons (high depth to stay on top) ──
     const currentStarter = this.meta.starter ?? "mudkip";
     const starterName = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
 
-    const fixedY = GAME_HEIGHT - 110;
-    this.createButton(GAME_WIDTH / 2, fixedY, btnW, 32,
-      `Starter: ${starterName}`,
-      "Tap to change",
-      "#f472b6",
+    const fixedY = GAME_HEIGHT - 118;
+    // Solid background behind fixed buttons — covers from scroll end to bottom
+    const fixedBgTop = fixedY - 30;
+    const fixedBgH = GAME_HEIGHT - fixedBgTop;
+    this.add.rectangle(GAME_WIDTH / 2, fixedBgTop + fixedBgH / 2, GAME_WIDTH, fixedBgH, 0x1a2744).setDepth(50);
+
+    this.createFixedButton(GAME_WIDTH / 2, fixedY, btnW, 32,
+      `Starter: ${starterName}`, "Tap to change", "#f472b6",
       () => this.showStarterSelect()
     );
-    this.createButton(GAME_WIDTH / 2, fixedY + 38, btnW, 32,
-      "Upgrade Shop",
-      `Gold: ${this.meta.gold}`,
-      "#fbbf24",
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + 36, btnW, 32,
+      "Upgrade Shop", `Gold: ${this.meta.gold}`, "#fbbf24",
       () => this.scene.start("UpgradeScene")
     );
-    this.createButton(GAME_WIDTH / 2, fixedY + 76, btnW, 32,
-      "Records",
-      `Clears: ${this.meta.totalClears}  Best: B${this.meta.bestFloor}F`,
-      "#60a5fa",
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + 72, btnW, 32,
+      "Records", `Clears: ${this.meta.totalClears}  Best: B${this.meta.bestFloor}F`, "#60a5fa",
       () => this.showNotice(
         `Total Runs: ${this.meta.totalRuns}\nClears: ${this.meta.totalClears}\nBest Floor: B${this.meta.bestFloor}F\nTotal Gold: ${this.meta.totalGold}`
       )
@@ -115,20 +114,21 @@ export class HubScene extends Phaser.Scene {
 
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v0.20.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(51);
 
     // ── Scrollable dungeon list ──
     const scrollTop = y;
-    const scrollBottom = fixedY - 10;
+    const scrollBottom = fixedY - 16;
     const scrollH = scrollBottom - scrollTop;
 
     // Container for all dungeon buttons
-    const container = this.add.container(0, 0);
+    const container = this.add.container(0, 0).setDepth(10);
     let cy2 = scrollTop;
 
-    this.add.text(15, cy2, "── Dungeons ──", {
+    const header = this.add.text(15, cy2, "── Dungeons ──", {
       fontSize: "10px", color: "#94a3b8", fontFamily: "monospace",
     });
+    container.add(header);
     cy2 += 18;
 
     for (const dg of Object.values(DUNGEONS)) {
@@ -222,6 +222,29 @@ export class HubScene extends Phaser.Scene {
     this.add.text(x - w / 2 + 12, y + 5, desc, {
       fontSize: "9px", color: "#666680", fontFamily: "monospace",
     });
+  }
+
+  private createFixedButton(
+    x: number, y: number, w: number, h: number,
+    title: string, desc: string, color: string,
+    callback?: () => void
+  ) {
+    const bg = this.add.rectangle(x, y, w, h, 0x1a1a2e, 0.9)
+      .setStrokeStyle(1, callback ? 0x334155 : 0x222233)
+      .setDepth(51);
+    if (callback) {
+      bg.setInteractive({ useHandCursor: true });
+      bg.on("pointerover", () => bg.setFillStyle(0x2a2a4e, 1));
+      bg.on("pointerout", () => bg.setFillStyle(0x1a1a2e, 0.9));
+      bg.on("pointerdown", callback);
+    }
+
+    this.add.text(x - w / 2 + 12, y - 8, title, {
+      fontSize: "11px", color, fontFamily: "monospace", fontStyle: "bold",
+    }).setDepth(52);
+    this.add.text(x - w / 2 + 12, y + 5, desc, {
+      fontSize: "8px", color: "#666680", fontFamily: "monospace",
+    }).setDepth(52);
   }
 
   private enterDungeon(dungeonId: string) {
