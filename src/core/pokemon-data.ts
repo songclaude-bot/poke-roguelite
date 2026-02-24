@@ -1305,6 +1305,28 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["energyBall", "grassKnot", "petalDance"],
     floors: [],
   },
+
+  // ── Phase 68 Water 3rd ──
+  feebas: {
+    id: "feebas", name: "Feebas", spriteKey: "feebas",
+    types: [PokemonType.Water], attackType: PokemonType.Water,
+    baseStats: { hp: 22, atk: 8, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 8, idleFrames: 4,
+    skillIds: ["waterPulse", "dive", "tackle"],
+    floors: [],
+  },
+  wailmer: {
+    id: "wailmer", name: "Wailmer", spriteKey: "wailmer",
+    types: [PokemonType.Water], attackType: PokemonType.Water,
+    baseStats: { hp: 34, atk: 10, def: 8 },
+    walkFrameWidth: 32, walkFrameHeight: 40,
+    idleFrameWidth: 32, idleFrameHeight: 40,
+    walkFrames: 7, idleFrames: 7,
+    skillIds: ["dive", "brine", "waterPulse"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1421,6 +1443,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   minccino: { 7: "hyperVoice", 10: "triAttack" },
   foongus: { 7: "grassKnot", 10: "energyBall" },
   petilil: { 7: "energyBall", 10: "grassKnot" },
+  feebas: { 7: "dive", 10: "waterPulse" },
+  wailmer: { 7: "brine", 10: "dive" },
 };
 
 /** Check if a species learns a new skill at this level */

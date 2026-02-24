@@ -195,4 +195,6 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   minccino: AbilityId.ShieldDust,
   foongus: AbilityId.ShieldDust,
   petilil: AbilityId.Torrent, // Overgrow equivalent
+  feebas: AbilityId.SwiftSwim,
+  wailmer: AbilityId.SwiftSwim,
 };

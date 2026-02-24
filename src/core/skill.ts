@@ -1319,6 +1319,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Trips the target with a grass snare.",
   },
+
+  // ── Phase 68 Water Skills ──
+  dive: {
+    id: "dive",
+    name: "Dive",
+    type: PokemonType.Water,
+    power: 16,
+    pp: 10,
+    range: SkillRange.Front2,
+    accuracy: 90,
+    description: "Dives underwater and strikes the target.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

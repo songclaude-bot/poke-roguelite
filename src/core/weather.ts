@@ -122,6 +122,7 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     boulderPass: [WeatherType.Sandstorm],
     tranquilGrove: [WeatherType.Rain],
     fungalMarsh: [WeatherType.Rain],
+    abyssalTrench: [WeatherType.Rain],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 
