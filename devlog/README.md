@@ -286,12 +286,36 @@
 
 ---
 
-## 현재 게임 규모 (v0.40.0)
+## Phase 47: Voltage Lab
+
+### 47. Electric 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Shinx/Electrike, sparkCharge/wildCharge 스킬, Voltage Lab 10층, Storm Manectric 보스
+
+---
+
+## Phase 48: Venom Depths
+
+### 48. Poison 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Gulpin/Ekans, sludgeBomb/venoshock 스킬 재활용, Venom Depths 11층, Viper Arbok 보스
+
+---
+
+## Phase 49: Quake Tunnel
+
+### 49. Ground 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Cubone/Diglett, boneRush/bulldoze 스킬, Quake Tunnel 12층, Skull Marowak 보스
+
+---
+
+## 현재 게임 규모 (v0.45.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **31개 던전**: Beach Cave → Coral Reef + Destiny Tower
-- **76종+ 포켓몬** (진화 포함 88종+)
-- **105종+ 기술**
+- **36개 던전**: Beach Cave → Quake Tunnel + Destiny Tower
+- **86종+ 포켓몬** (진화 포함 100종+)
+- **112종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **32종 스타터** (클리어 수로 해금)
-- **60종+ 진화 경로**
+- **38종 스타터** (클리어 수로 해금)
+- **68종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
