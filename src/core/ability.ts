@@ -131,4 +131,5 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   dratini: AbilityId.ShieldDust,
   bagon: AbilityId.RockHead,
   gible: AbilityId.RockHead,
+  poochyena: AbilityId.RunAway,
 };

@@ -243,6 +243,7 @@ export class DungeonScene extends Phaser.Scene {
       grimer: "0088", nidoranM: "0032", tentacool: "0072",
       clefairy: "0035", jigglypuff: "0039", ralts: "0280",
       dratini: "0147", bagon: "0371", gible: "0443",
+      poochyena: "0261",
     };
 
     // Load player + all enemy species + ally species for this dungeon

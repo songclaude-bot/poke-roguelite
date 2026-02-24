@@ -503,6 +503,19 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["dragonClaw", "mudShot", "tackle"],
     floors: [],
   },
+  poochyena: {
+    id: "poochyena",
+    name: "Poochyena",
+    spriteKey: "poochyena",
+    types: [PokemonType.Dark],
+    attackType: PokemonType.Dark,
+    baseStats: { hp: 28, atk: 11, def: 5 },
+    walkFrameWidth: 32, walkFrameHeight: 48,
+    idleFrameWidth: 24, idleFrameHeight: 40,
+    walkFrames: 5, idleFrames: 6,
+    skillIds: ["bite", "pursuit", "tackle"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -555,6 +568,7 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   dratini: { 7: "twister", 10: "dragonPulse" },
   bagon: { 7: "dragonBreath", 10: "dragonPulse" },
   gible: { 7: "dragonBreath", 10: "dracoMeteor" },
+  poochyena: { 7: "snarl", 10: "darkPulse" },
 };
 
 /** Check if a species learns a new skill at this level */
