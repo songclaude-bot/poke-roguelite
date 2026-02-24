@@ -3181,6 +3181,75 @@ export class DungeonScene extends Phaser.Scene {
         this.showLog(`${user.name} used ${skill.name}!`);
       }
 
+      // ── Team Combo Attack ──
+      // Only triggers on player attacks with power, when allies exist
+      if (user === this.player && skill.power > 0 && totalHits > 0 && this.allies.length > 0) {
+        for (const target of targets) {
+          if (!target.alive) continue;
+          // Find allies adjacent to this target (Chebyshev distance = 1)
+          const adjacentAllies = this.allies.filter(ally => {
+            if (!ally.alive) return false;
+            const dx = Math.abs(ally.tileX - target.tileX);
+            const dy = Math.abs(ally.tileY - target.tileY);
+            return dx <= 1 && dy <= 1 && (dx + dy > 0);
+          });
+
+          if (adjacentAllies.length > 0 && Math.random() < 0.25) {
+            const comboAlly = adjacentAllies[Math.floor(Math.random() * adjacentAllies.length)];
+            const comboAtk = getEffectiveAtk(comboAlly);
+            const comboDmg = Math.max(1, Math.floor(comboAtk * 0.5));
+            target.stats.hp = Math.max(0, target.stats.hp - comboDmg);
+
+            // Log
+            this.showLog(`COMBO! ${comboAlly.name} follows up for ${comboDmg} damage!`);
+
+            // Camera shake
+            this.cameras.main.shake(100, 0.005);
+
+            // Flash the ally sprite
+            if (comboAlly.sprite) {
+              this.tweens.add({
+                targets: comboAlly.sprite,
+                alpha: { from: 1, to: 0.3 },
+                duration: 100,
+                yoyo: true,
+                repeat: 1,
+              });
+            }
+
+            // Damage popup on target
+            if (target.sprite) {
+              this.showDamagePopup(target.sprite.x, target.sprite.y, comboDmg, 1.0);
+              this.showEnemyHpBar(target);
+            }
+
+            // "COMBO!" floating text at target position
+            const comboTextX = target.tileX * TILE_DISPLAY + TILE_DISPLAY / 2;
+            const comboTextY = target.tileY * TILE_DISPLAY - 20;
+            const comboText = this.add.text(comboTextX, comboTextY, "COMBO!", {
+              fontSize: "12px",
+              color: "#fbbf24",
+              fontFamily: "monospace",
+              fontStyle: "bold",
+              stroke: "#000000",
+              strokeThickness: 3,
+            }).setOrigin(0.5).setDepth(300);
+
+            this.tweens.add({
+              targets: comboText,
+              y: comboTextY - 30,
+              alpha: 0,
+              duration: 800,
+              onComplete: () => comboText.destroy(),
+            });
+
+            // Check if enemy defeated by combo
+            this.updateHUD();
+            this.checkDeath(target);
+          }
+        }
+      }
+
       this.updateHUD();
       this.time.delayedCall(300, resolve);
     });
