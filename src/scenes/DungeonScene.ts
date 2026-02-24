@@ -16,7 +16,7 @@ import {
   AllyTactic,
 } from "../core/entity";
 import { getEnemyMoveDirection, isAdjacentToPlayer, directionToPlayer } from "../core/enemy-ai";
-import { getAllyMoveDirection, tryRecruit, directionTo } from "../core/ally-ai";
+import { getAllyMoveDirection, tryRecruit, directionTo, getFollowDist } from "../core/ally-ai";
 import { PokemonType, getEffectiveness, effectivenessText } from "../core/type-chart";
 import { Skill, SkillRange, SkillEffect, SKILL_DB, createSkill } from "../core/skill";
 import { getSkillTargetTiles } from "../core/skill-targeting";
@@ -2321,6 +2321,8 @@ export class DungeonScene extends Phaser.Scene {
 
   // ── Team (Ally Command) Panel ──
 
+  private teamPanelScroll = 0; // scroll offset for team panel
+
   private openTeamPanel() {
     if (this.teamPanelOpen) {
       this.closeTeamPanel();
@@ -2336,6 +2338,7 @@ export class DungeonScene extends Phaser.Scene {
 
     sfxMenuOpen();
     this.teamPanelOpen = true;
+    this.teamPanelScroll = 0;
     this.buildTeamPanelUI();
   }
 
@@ -2346,7 +2349,37 @@ export class DungeonScene extends Phaser.Scene {
     this.teamPanelUI = [];
   }
 
-  /** Rebuild the team panel UI (called on open and after tactic change) */
+  /** Swap two allies in formation order */
+  private swapAllyOrder(idxA: number, idxB: number) {
+    if (idxA < 0 || idxB < 0 || idxA >= this.allies.length || idxB >= this.allies.length) return;
+    [this.allies[idxA], this.allies[idxB]] = [this.allies[idxB], this.allies[idxA]];
+    this.buildTeamPanelUI();
+  }
+
+  /** Dismiss an ally from the party */
+  private dismissAlly(ally: Entity) {
+    // Remove from allies array
+    this.allies = this.allies.filter(a => a !== ally);
+    // Remove from allEntities
+    this.allEntities = this.allEntities.filter(a => a !== ally);
+    // Destroy sprite
+    if (ally.sprite) {
+      ally.sprite.destroy();
+      ally.sprite = undefined;
+    }
+    ally.alive = false;
+    this.showLog(`${ally.name} was dismissed from the team.`);
+
+    // If no more allies, close panel
+    if (this.allies.filter(a => a.alive).length === 0) {
+      this.closeTeamPanel();
+    } else {
+      this.buildTeamPanelUI();
+    }
+    this.updateHUD();
+  }
+
+  /** Rebuild the team panel UI (called on open and after tactic/order change) */
   private buildTeamPanelUI() {
     // Destroy existing UI first
     this.teamPanelUI.forEach(obj => obj.destroy());
@@ -2361,121 +2394,200 @@ export class DungeonScene extends Phaser.Scene {
     backdrop.on("pointerdown", () => this.closeTeamPanel());
     this.teamPanelUI.push(backdrop);
 
-    // Panel dimensions
-    const panelW = GAME_WIDTH - 24;
-    const rowH = 62;
-    const panelH = 40 + liveAllies.length * rowH + 36;
-    const panelX = 12;
-    const panelY = Math.max(30, (GAME_HEIGHT - panelH) / 2);
+    // Panel dimensions — each ally row is taller to fit more info
+    const panelW = GAME_WIDTH - 16;
+    const rowH = 118;
+    const headerH = 36;
+    const footerH = 36;
+    const contentH = liveAllies.length * rowH;
+    const panelH = headerH + contentH + footerH;
+    const panelX = 8;
+    const panelY = Math.max(8, Math.floor((GAME_HEIGHT - panelH) / 2));
 
     // Panel background
     const panelGfx = this.add.graphics().setScrollFactor(0).setDepth(151);
-    panelGfx.fillStyle(0x1a1a2e, 0.95);
+    panelGfx.fillStyle(0x1a1a2e, 0.97);
     panelGfx.fillRoundedRect(panelX, panelY, panelW, panelH, 8);
     panelGfx.lineStyle(2, 0x60a5fa, 0.8);
     panelGfx.strokeRoundedRect(panelX, panelY, panelW, panelH, 8);
     this.teamPanelUI.push(panelGfx);
 
     // Title
-    const title = this.add.text(GAME_WIDTH / 2, panelY + 14, "Team Tactics", {
-      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
+    const title = this.add.text(GAME_WIDTH / 2, panelY + 14, "Party Formation", {
+      fontSize: "13px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(152);
     this.teamPanelUI.push(title);
 
     // Tactic definitions for buttons
-    const tacticDefs: { tactic: AllyTactic; label: string; short: string }[] = [
-      { tactic: AllyTactic.FollowMe, label: "Follow", short: "Follow" },
-      { tactic: AllyTactic.GoAfterFoes, label: "Attack", short: "Attack" },
-      { tactic: AllyTactic.StayHere, label: "Stay", short: "Stay" },
-      { tactic: AllyTactic.Scatter, label: "Scatter", short: "Scatter" },
+    const tacticDefs: { tactic: AllyTactic; label: string }[] = [
+      { tactic: AllyTactic.FollowMe, label: "Follow" },
+      { tactic: AllyTactic.GoAfterFoes, label: "Attack" },
+      { tactic: AllyTactic.StayHere, label: "Stay" },
+      { tactic: AllyTactic.Scatter, label: "Scatter" },
     ];
 
     // Ally rows
     liveAllies.forEach((ally, idx) => {
-      const rowY = panelY + 32 + idx * rowH;
+      const rowY = panelY + headerH + idx * rowH;
       const currentTactic = ally.allyTactic ?? AllyTactic.FollowMe;
+      const allyIdx = this.allies.indexOf(ally);
+      const followDist = getFollowDist(allyIdx >= 0 ? allyIdx : idx);
 
-      // Ally name
-      const nameText = this.add.text(panelX + 10, rowY + 2, ally.name, {
-        fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace", fontStyle: "bold",
+      // Row separator line
+      if (idx > 0) {
+        const sepGfx = this.add.graphics().setScrollFactor(0).setDepth(152);
+        sepGfx.lineStyle(1, 0x60a5fa, 0.25);
+        sepGfx.lineBetween(panelX + 8, rowY, panelX + panelW - 8, rowY);
+        this.teamPanelUI.push(sepGfx);
+      }
+
+      // ── Row 1: Position number + Name + Level + Move buttons ──
+      const posNum = `#${idx + 1}`;
+      const posText = this.add.text(panelX + 8, rowY + 4, posNum, {
+        fontSize: "11px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+      }).setScrollFactor(0).setDepth(152);
+      this.teamPanelUI.push(posText);
+
+      const nameStr = `${ally.name}  Lv.${ally.stats.level}`;
+      const nameText = this.add.text(panelX + 30, rowY + 4, nameStr, {
+        fontSize: "10px", color: "#e0e0e0", fontFamily: "monospace", fontStyle: "bold",
       }).setScrollFactor(0).setDepth(152);
       this.teamPanelUI.push(nameText);
 
-      // HP bar
+      // Move Up / Move Down buttons (right side)
+      const orderBtnW = 22;
+      const orderBtnH = 14;
+      const orderBtnX = panelX + panelW - 58;
+
+      if (idx > 0) {
+        const upBtn = this.add.text(orderBtnX, rowY + 2, "Up", {
+          fontSize: "8px", color: "#60a5fa", fontFamily: "monospace",
+          backgroundColor: "#2a2a4e", padding: { x: 3, y: 2 },
+        }).setScrollFactor(0).setDepth(153).setInteractive();
+        upBtn.on("pointerdown", (p: Phaser.Input.Pointer) => {
+          p.event?.stopPropagation();
+          this.swapAllyOrder(allyIdx, allyIdx - 1);
+        });
+        upBtn.on("pointerover", () => upBtn.setColor("#fbbf24"));
+        upBtn.on("pointerout", () => upBtn.setColor("#60a5fa"));
+        this.teamPanelUI.push(upBtn);
+      }
+
+      if (idx < liveAllies.length - 1) {
+        const dnBtn = this.add.text(orderBtnX + orderBtnW + 4, rowY + 2, "Dn", {
+          fontSize: "8px", color: "#60a5fa", fontFamily: "monospace",
+          backgroundColor: "#2a2a4e", padding: { x: 3, y: 2 },
+        }).setScrollFactor(0).setDepth(153).setInteractive();
+        dnBtn.on("pointerdown", (p: Phaser.Input.Pointer) => {
+          p.event?.stopPropagation();
+          this.swapAllyOrder(allyIdx, allyIdx + 1);
+        });
+        dnBtn.on("pointerover", () => dnBtn.setColor("#fbbf24"));
+        dnBtn.on("pointerout", () => dnBtn.setColor("#60a5fa"));
+        this.teamPanelUI.push(dnBtn);
+      }
+
+      // ── Row 2: HP bar + Types + Follow distance ──
+      const row2Y = rowY + 20;
       const hpRatio = ally.stats.hp / ally.stats.maxHp;
       const hpBarW = 80;
       const hpBarX = panelX + 10;
-      const hpBarY = rowY + 18;
 
       const hpBg = this.add.graphics().setScrollFactor(0).setDepth(152);
       hpBg.fillStyle(0x333355, 1);
-      hpBg.fillRoundedRect(hpBarX, hpBarY, hpBarW, 6, 2);
+      hpBg.fillRoundedRect(hpBarX, row2Y, hpBarW, 7, 2);
       this.teamPanelUI.push(hpBg);
 
       const hpFill = this.add.graphics().setScrollFactor(0).setDepth(153);
       const hpColor = hpRatio > 0.5 ? 0x4ade80 : hpRatio > 0.25 ? 0xfbbf24 : 0xef4444;
       const fillW = Math.max(0, Math.floor(hpBarW * hpRatio));
       hpFill.fillStyle(hpColor, 1);
-      hpFill.fillRoundedRect(hpBarX, hpBarY, fillW, 6, 2);
+      hpFill.fillRoundedRect(hpBarX, row2Y, fillW, 7, 2);
       this.teamPanelUI.push(hpFill);
 
-      // HP text
-      const hpText = this.add.text(hpBarX + hpBarW + 4, hpBarY - 2, `${ally.stats.hp}/${ally.stats.maxHp}`, {
+      const hpText = this.add.text(hpBarX + hpBarW + 4, row2Y - 1, `${ally.stats.hp}/${ally.stats.maxHp}`, {
         fontSize: "8px", color: "#aab0c8", fontFamily: "monospace",
       }).setScrollFactor(0).setDepth(152);
       this.teamPanelUI.push(hpText);
 
-      // Current tactic label
-      const tacticLabel = tacticDefs.find(t => t.tactic === currentTactic)?.label ?? "Follow";
-      const tacticText = this.add.text(panelX + panelW - 10, rowY + 2, tacticLabel, {
-        fontSize: "9px", color: "#fbbf24", fontFamily: "monospace",
-      }).setOrigin(1, 0).setScrollFactor(0).setDepth(152);
-      this.teamPanelUI.push(tacticText);
+      // Types
+      const typeStr = ally.types.join("/");
+      const typeText = this.add.text(hpBarX + hpBarW + 60, row2Y - 1, typeStr, {
+        fontSize: "8px", color: "#a78bfa", fontFamily: "monospace",
+      }).setScrollFactor(0).setDepth(152);
+      this.teamPanelUI.push(typeText);
 
-      // Tactic buttons row
-      const btnY = rowY + 30;
-      const btnW = 70;
-      const totalBtnW = tacticDefs.length * btnW + (tacticDefs.length - 1) * 4;
+      // Follow distance indicator
+      const distText = this.add.text(panelX + panelW - 10, row2Y - 1, `${followDist}tile`, {
+        fontSize: "7px", color: "#6b7280", fontFamily: "monospace",
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(152);
+      this.teamPanelUI.push(distText);
+
+      // ── Row 3: Skills list ──
+      const row3Y = row2Y + 14;
+      const skillNames = ally.skills.length > 0
+        ? ally.skills.map(s => s.name).join(", ")
+        : "(no skills)";
+      const skillText = this.add.text(panelX + 10, row3Y, skillNames, {
+        fontSize: "8px", color: "#8899bb", fontFamily: "monospace",
+        wordWrap: { width: panelW - 24 },
+      }).setScrollFactor(0).setDepth(152);
+      this.teamPanelUI.push(skillText);
+
+      // ── Row 4: Tactic buttons ──
+      const row4Y = row3Y + 16;
+      const btnW = 62;
+      const totalBtnW = tacticDefs.length * btnW + (tacticDefs.length - 1) * 3;
       const btnStartX = panelX + (panelW - totalBtnW) / 2;
 
       tacticDefs.forEach((td, ti) => {
-        const bx = btnStartX + ti * (btnW + 4);
+        const bx = btnStartX + ti * (btnW + 3);
         const isActive = currentTactic === td.tactic;
         const bgColor = isActive ? "#2a4a3e" : "#2a2a4e";
         const textColor = isActive ? "#4ade80" : "#8899bb";
-        const borderHighlight = isActive;
 
-        const btn = this.add.text(bx + btnW / 2, btnY, td.short, {
-          fontSize: "9px", color: textColor, fontFamily: "monospace",
+        const btn = this.add.text(bx + btnW / 2, row4Y, td.label, {
+          fontSize: "8px", color: textColor, fontFamily: "monospace",
           fontStyle: isActive ? "bold" : "normal",
           backgroundColor: bgColor,
-          padding: { x: 4, y: 4 },
+          padding: { x: 3, y: 3 },
           fixedWidth: btnW - 4, align: "center",
         }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(153).setInteractive();
 
-        btn.on("pointerdown", () => {
+        btn.on("pointerdown", (p: Phaser.Input.Pointer) => {
+          p.event?.stopPropagation();
           ally.allyTactic = td.tactic;
-          // Rebuild UI to reflect change
           this.buildTeamPanelUI();
         });
-
         btn.on("pointerover", () => { if (!isActive) btn.setColor("#fbbf24"); });
         btn.on("pointerout", () => { if (!isActive) btn.setColor(textColor); });
-
         this.teamPanelUI.push(btn);
 
-        // Draw active indicator border
-        if (borderHighlight) {
+        if (isActive) {
           const borderGfx = this.add.graphics().setScrollFactor(0).setDepth(152);
           borderGfx.lineStyle(1, 0x4ade80, 0.8);
-          borderGfx.strokeRoundedRect(bx + 1, btnY - 1, btnW - 2, 22, 3);
+          borderGfx.strokeRoundedRect(bx + 1, row4Y - 1, btnW - 2, 20, 3);
           this.teamPanelUI.push(borderGfx);
         }
       });
+
+      // ── Row 5: Dismiss button ──
+      const row5Y = row4Y + 24;
+      const dismissBtn = this.add.text(panelX + panelW - 12, row5Y, "Dismiss", {
+        fontSize: "8px", color: "#ef4444", fontFamily: "monospace",
+        backgroundColor: "#3a1a2e", padding: { x: 4, y: 2 },
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(153).setInteractive();
+      dismissBtn.on("pointerdown", (p: Phaser.Input.Pointer) => {
+        p.event?.stopPropagation();
+        this.dismissAlly(ally);
+      });
+      dismissBtn.on("pointerover", () => dismissBtn.setColor("#fbbf24"));
+      dismissBtn.on("pointerout", () => dismissBtn.setColor("#ef4444"));
+      this.teamPanelUI.push(dismissBtn);
     });
 
     // Close button
-    const closeBtnY = panelY + panelH - 30;
+    const closeBtnY = panelY + panelH - 28;
     const closeBtn = this.add.text(GAME_WIDTH / 2, closeBtnY, "[ Close ]", {
       fontSize: "12px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
       backgroundColor: "#3a1a2e", padding: { x: 14, y: 5 },
@@ -5956,10 +6068,13 @@ export class DungeonScene extends Phaser.Scene {
           if (isParalyzed(ally)) return;
           this.tickEntityStatus(ally);
 
+          // Party position determines follow distance (0 = closest, 3 = farthest)
+          const partyPosition = this.allies.indexOf(ally);
           const { moveDir, attackTarget } = getAllyMoveDirection(
             ally, this.player, this.enemies,
             this.dungeon.terrain, this.dungeon.width, this.dungeon.height,
-            this.allEntities
+            this.allEntities,
+            partyPosition >= 0 ? partyPosition : 0
           );
 
           if (attackTarget) {

@@ -3,11 +3,21 @@ import { TerrainType } from "./dungeon-generator";
 import { Entity, canMoveTo, canMoveDiagonal, chebyshevDist, AllyTactic } from "./entity";
 
 // ── Constants ──
-const LEASH_DIST = 5;        // max distance before forced follow
-const FOLLOW_DIST = 2;       // ideal follow distance
+const BASE_FOLLOW_DIST = 2;  // ideal follow distance for position 0
+const BASE_LEASH_DIST = 5;   // max distance before forced follow for position 0
 const ATTACK_CHASE_RANGE = 3; // range to chase enemies
 const GO_AFTER_FOES_RANGE = 8; // range for GoAfterFoes tactic
 const MAX_PATH_SEARCH = 200;  // BFS node limit (keep fast)
+
+/** Get follow distance based on party position (0-indexed) */
+export function getFollowDist(partyPosition: number): number {
+  return BASE_FOLLOW_DIST + partyPosition; // pos 0 = 2, pos 1 = 3, pos 2 = 4, pos 3 = 5
+}
+
+/** Get leash distance based on party position (0-indexed) */
+export function getLeashDist(partyPosition: number): number {
+  return BASE_LEASH_DIST + partyPosition; // pos 0 = 5, pos 1 = 6, pos 2 = 7, pos 3 = 8
+}
 
 // ── FSM States ──
 export enum AllyState {
@@ -169,21 +179,22 @@ export function getAllyMoveDirection(
   terrain: TerrainType[][],
   width: number,
   height: number,
-  allEntities: Entity[]
+  allEntities: Entity[],
+  partyPosition: number = 0
 ): { moveDir: Direction | null; attackTarget: Entity | null } {
   const tactic = ally.allyTactic ?? AllyTactic.FollowMe;
 
   // Dispatch to tactic-specific AI
   switch (tactic) {
     case AllyTactic.GoAfterFoes:
-      return allyAI_GoAfterFoes(ally, player, enemies, terrain, width, height, allEntities);
+      return allyAI_GoAfterFoes(ally, player, enemies, terrain, width, height, allEntities, partyPosition);
     case AllyTactic.StayHere:
       return allyAI_StayHere(ally, enemies);
     case AllyTactic.Scatter:
       return allyAI_Scatter(ally, player, enemies, terrain, width, height, allEntities);
     case AllyTactic.FollowMe:
     default:
-      return allyAI_FollowMe(ally, player, enemies, terrain, width, height, allEntities);
+      return allyAI_FollowMe(ally, player, enemies, terrain, width, height, allEntities, partyPosition);
   }
 }
 
@@ -196,12 +207,15 @@ function allyAI_FollowMe(
   terrain: TerrainType[][],
   width: number,
   height: number,
-  allEntities: Entity[]
+  allEntities: Entity[],
+  partyPosition: number = 0
 ): { moveDir: Direction | null; attackTarget: Entity | null } {
   const distToPlayer = chebyshevDist(ally.tileX, ally.tileY, player.tileX, player.tileY);
+  const followDist = getFollowDist(partyPosition);
+  const leashDist = getLeashDist(partyPosition);
 
   // Determine FSM state
-  let state = resolveState(ally, player, enemies, distToPlayer);
+  let state = resolveState(ally, player, enemies, distToPlayer, followDist, leashDist);
 
   switch (state) {
     case AllyState.Yield: {
@@ -239,7 +253,7 @@ function allyAI_FollowMe(
 
     case AllyState.Follow:
     default: {
-      if (distToPlayer <= FOLLOW_DIST) {
+      if (distToPlayer <= followDist) {
         return { moveDir: null, attackTarget: null }; // close enough, idle
       }
       return { moveDir: bfsToPlayer(ally, player, terrain, width, height, allEntities), attackTarget: null };
@@ -256,9 +270,11 @@ function allyAI_GoAfterFoes(
   terrain: TerrainType[][],
   width: number,
   height: number,
-  allEntities: Entity[]
+  allEntities: Entity[],
+  partyPosition: number = 0
 ): { moveDir: Direction | null; attackTarget: Entity | null } {
   const distToPlayer = chebyshevDist(ally.tileX, ally.tileY, player.tileX, player.tileY);
+  const leashDist = getLeashDist(partyPosition);
 
   // Still yield to player if blocking
   if (distToPlayer === 1 && isBlockingPlayer(ally, player)) {
@@ -286,7 +302,7 @@ function allyAI_GoAfterFoes(
   }
 
   // No enemy in range — fall back to following player loosely
-  if (distToPlayer > LEASH_DIST) {
+  if (distToPlayer > leashDist) {
     return { moveDir: bfsToPlayer(ally, player, terrain, width, height, allEntities), attackTarget: null };
   }
   return { moveDir: null, attackTarget: null };
@@ -355,7 +371,9 @@ function resolveState(
   ally: Entity,
   player: Entity,
   enemies: Entity[],
-  distToPlayer: number
+  distToPlayer: number,
+  followDist: number = BASE_FOLLOW_DIST,
+  leashDist: number = BASE_LEASH_DIST
 ): AllyState {
   // Check if ally is blocking the player's potential movement paths
   if (distToPlayer === 1 && isBlockingPlayer(ally, player)) {
@@ -363,7 +381,7 @@ function resolveState(
   }
 
   // Leash: too far from player → follow
-  if (distToPlayer > LEASH_DIST) {
+  if (distToPlayer > leashDist) {
     return AllyState.Follow;
   }
 
@@ -377,7 +395,7 @@ function resolveState(
 
   // Nearby enemy → chase (only if reasonably close to player)
   const nearestEnemy = findNearestEnemy(ally, enemies, ATTACK_CHASE_RANGE);
-  if (nearestEnemy && distToPlayer <= LEASH_DIST - 1) {
+  if (nearestEnemy && distToPlayer <= leashDist - 1) {
     return AllyState.Chase;
   }
 
