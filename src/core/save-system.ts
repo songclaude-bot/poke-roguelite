@@ -76,6 +76,8 @@ export interface MetaSaveData {
   lastChallenge?: string;
   // Per-dungeon run counts (dungeonId → count)
   dungeonRunCounts?: Record<string, number>;
+  // Dungeon completion tracker: IDs of dungeons cleared at least once
+  clearedDungeons?: string[];
 }
 
 const SAVE_VERSION = 1;
@@ -155,6 +157,7 @@ export function loadMeta(): MetaSaveData {
     if (data.lastDungeonId === undefined) data.lastDungeonId = undefined;
     if (data.lastChallenge === undefined) data.lastChallenge = undefined;
     if (data.dungeonRunCounts === undefined) data.dungeonRunCounts = {};
+    if (data.clearedDungeons === undefined) data.clearedDungeons = [];
     return data;
   } catch {
     return defaultMeta();

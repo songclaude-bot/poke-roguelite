@@ -5065,6 +5065,14 @@ export class DungeonScene extends Phaser.Scene {
       addToStorage(meta.storage, stack.itemId, stack.count);
     }
 
+    // Track cleared dungeons
+    if (cleared) {
+      if (!meta.clearedDungeons) meta.clearedDungeons = [];
+      if (!meta.clearedDungeons.includes(this.dungeonDef.id)) {
+        meta.clearedDungeons.push(this.dungeonDef.id);
+      }
+    }
+
     // 2. Save last dungeon info
     meta.lastDungeonId = this.dungeonDef.id;
     meta.lastChallenge = this.challengeMode ?? undefined;

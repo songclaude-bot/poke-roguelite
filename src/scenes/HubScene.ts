@@ -88,6 +88,13 @@ export class HubScene extends Phaser.Scene {
           addToStorage(this.meta.storage, stack.itemId, stack.count);
         }
       }
+      // Track cleared dungeons
+      if (data.cleared && data.dungeonId) {
+        if (!this.meta.clearedDungeons) this.meta.clearedDungeons = [];
+        if (!this.meta.clearedDungeons.includes(data.dungeonId)) {
+          this.meta.clearedDungeons.push(data.dungeonId);
+        }
+      }
       // Track last dungeon for quick re-entry
       if (data.dungeonId) {
         this.meta.lastDungeonId = data.dungeonId;
@@ -406,10 +413,50 @@ export class HubScene extends Phaser.Scene {
     // Track the Y position of the highest unlocked tier header for auto-scroll
     let highestUnlockedTierY = 0;
 
+    // Cleared dungeons set for quick lookup
+    const clearedSet = new Set(this.meta.clearedDungeons ?? []);
+
+    // Count total clearable dungeons (exclude special modes shown as separate buttons)
+    const totalDungeons = Object.values(DUNGEONS).filter(
+      d => d.id !== "endlessDungeon" && d.id !== "dailyDungeon" && d.id !== "bossRush"
+    ).length;
+    const totalCleared = Object.values(DUNGEONS).filter(
+      d => d.id !== "endlessDungeon" && d.id !== "dailyDungeon" && d.id !== "bossRush" && clearedSet.has(d.id)
+    ).length;
+
     const renderList = () => {
       // Clear container
       container.removeAll(true);
       let cy = scrollTop;
+
+      // ── Overall Completion Display ──
+      const allComplete = totalCleared >= totalDungeons && totalDungeons > 0;
+      const completionLabel = allComplete
+        ? "ALL DUNGEONS COMPLETE!"
+        : `Dungeons Cleared: ${totalCleared} / ${totalDungeons}`;
+      const completionColor = allComplete ? "#ffd700" : "#94a3b8";
+      const completionText = this.add.text(GAME_WIDTH / 2, cy, completionLabel, {
+        fontSize: allComplete ? "10px" : "9px", color: completionColor, fontFamily: "monospace",
+        fontStyle: allComplete ? "bold" : "normal",
+      }).setOrigin(0.5);
+      container.add(completionText);
+      cy += 14;
+
+      // Progress bar
+      const barW = 200;
+      const barH = 6;
+      const barX = GAME_WIDTH / 2 - barW / 2;
+      const barBg = this.add.rectangle(GAME_WIDTH / 2, cy, barW, barH, 0x222233, 0.9)
+        .setStrokeStyle(1, 0x334155);
+      container.add(barBg);
+      const fillRatio = totalDungeons > 0 ? totalCleared / totalDungeons : 0;
+      if (fillRatio > 0) {
+        const fillW = Math.max(2, barW * fillRatio);
+        const fillColor = allComplete ? 0xffd700 : 0x4ade80;
+        const barFill = this.add.rectangle(barX + fillW / 2, cy, fillW, barH - 2, fillColor, 0.9);
+        container.add(barFill);
+      }
+      cy += 14;
 
       const listHeader = this.add.text(15, cy, "── Dungeons ──", {
         fontSize: "10px", color: "#94a3b8", fontFamily: "monospace",
@@ -424,6 +471,11 @@ export class HubScene extends Phaser.Scene {
         const allLocked = unlockedCount === 0;
         const arrow = isExpanded ? "\u25BC" : "\u25B6";
         const lockIcon = allLocked ? " \uD83D\uDD12" : "";
+
+        // Tier completion stats
+        const tierClearedCount = dungeons.filter(d => clearedSet.has(d.id)).length;
+        const tierComplete = tierClearedCount >= dungeons.length && dungeons.length > 0;
+
         const headerText = `${arrow} ${tier.label}: ${tier.name} (${dungeons.length})${lockIcon}`;
 
         // Track position for auto-scroll
@@ -431,9 +483,11 @@ export class HubScene extends Phaser.Scene {
           highestUnlockedTierY = cy - scrollTop;
         }
 
-        // Tier header background
-        const hdrBg = this.add.rectangle(GAME_WIDTH / 2, cy, btnW, 28, tier.color, 0.85)
-          .setStrokeStyle(1, allLocked ? 0x222233 : 0x556677);
+        // Tier header background — gold tint when fully completed
+        const hdrColor = tierComplete ? 0x4a4a1a : tier.color;
+        const hdrStroke = tierComplete ? 0xffd700 : (allLocked ? 0x222233 : 0x556677);
+        const hdrBg = this.add.rectangle(GAME_WIDTH / 2, cy, btnW, 28, hdrColor, 0.85)
+          .setStrokeStyle(1, hdrStroke);
         container.add(hdrBg);
 
         // Tier header text
@@ -443,11 +497,14 @@ export class HubScene extends Phaser.Scene {
         });
         container.add(hdrText);
 
-        // Unlocked count subtitle
-        const hdrSub = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 8, cy - 6,
-          `${unlockedCount}/${dungeons.length} unlocked`, {
-          fontSize: "7px", color: allLocked ? "#444455" : "#778899",
-          fontFamily: "monospace",
+        // Tier completion info (right side)
+        const tierInfoText = tierComplete
+          ? "COMPLETE"
+          : `${tierClearedCount}/${dungeons.length} cleared`;
+        const tierInfoColor = tierComplete ? "#ffd700" : (allLocked ? "#444455" : "#778899");
+        const hdrSub = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 8, cy - 6, tierInfoText, {
+          fontSize: "7px", color: tierInfoColor,
+          fontFamily: "monospace", fontStyle: tierComplete ? "bold" : "normal",
         }).setOrigin(1, 0);
         container.add(hdrSub);
 
@@ -472,6 +529,7 @@ export class HubScene extends Phaser.Scene {
         if (isExpanded) {
           for (const dg of dungeons) {
             const isUnlocked = dg.unlockClears <= this.meta.totalClears;
+            const isCleared = clearedSet.has(dg.id);
             const color = isUnlocked ? "#e0e0e0" : "#444460";
             const desc = isUnlocked ? dg.description : `Unlock: ${dg.unlockClears} clears needed`;
 
@@ -487,13 +545,22 @@ export class HubScene extends Phaser.Scene {
               bg.on("pointerdown", () => this.enterDungeon(dgId));
             }
 
+            // Dungeon name
             const t1 = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 14, cy - 9, dg.name, {
               fontSize: "11px", color, fontFamily: "monospace", fontStyle: "bold",
             });
+            container.add(t1);
+            // Subtle green checkmark for cleared dungeons
+            if (isCleared) {
+              const checkT = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 22, cy - 9, "\u2713", {
+                fontSize: "11px", color: "#4ade80", fontFamily: "monospace",
+              });
+              container.add(checkT);
+            }
             const t2 = this.add.text(GAME_WIDTH / 2 - btnW / 2 + 14, cy + 5, desc, {
               fontSize: "8px", color: "#666680", fontFamily: "monospace",
             });
-            container.add([t1, t2]);
+            container.add(t2);
             cy += 44;
           }
         }
