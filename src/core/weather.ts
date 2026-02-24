@@ -242,6 +242,13 @@ export function rollFloorWeather(dungeonId: string, floor: number): WeatherType 
     wyrmpeakSummit: [WeatherType.Sandstorm, WeatherType.Hail],
     galeStronghold: [WeatherType.Rain, WeatherType.Hail],
     apexArena: [WeatherType.None, WeatherType.Sandstorm],
+    // Phase 168-170: 9th Tier Water/Fire/Grass/Electric/Poison/Ground
+    leviathanTrench: [WeatherType.Rain],
+    infernalSummit: [WeatherType.Sandstorm],
+    worldTreeCanopy: [WeatherType.Rain],
+    thunderGodSpire: [WeatherType.Rain, WeatherType.Sandstorm],
+    venomousAbyss: [WeatherType.Rain, WeatherType.Sandstorm],
+    tectonicThrone: [WeatherType.Sandstorm],
     destinyTower: [WeatherType.Rain, WeatherType.Sandstorm, WeatherType.Hail],
   };
 

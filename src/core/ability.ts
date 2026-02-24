@@ -425,4 +425,17 @@ export const SPECIES_ABILITIES: Record<string, AbilityId> = {
   braviary: AbilityId.Guts, // Sheer Force equivalent
   snorlax: AbilityId.Sturdy, // Thick Fat equivalent
   zangoose: AbilityId.Guts, // Immunity equivalent
+  // Phase 168-170: 9th Tier Water/Fire/Grass/Electric/Poison/Ground
+  gyarados: AbilityId.Guts, // Intimidate equivalent
+  kingdra: AbilityId.SwiftSwim, // Sniper equivalent
+  blaziken: AbilityId.PurePower, // Speed Boost equivalent
+  typhlosion: AbilityId.FlameBody, // Blaze equivalent
+  venusaur: AbilityId.Torrent, // Overgrow equivalent
+  sceptile: AbilityId.PurePower, // Unburden equivalent
+  jolteon: AbilityId.Static, // Volt Absorb equivalent
+  ampharos: AbilityId.Static, // Plus equivalent
+  nidoking: AbilityId.Guts, // Sheer Force equivalent
+  crobat: AbilityId.Levitate, // Inner Focus equivalent
+  krookodile: AbilityId.Guts, // Intimidate equivalent
+  nidoqueen: AbilityId.Sturdy, // Poison Point equivalent
 };

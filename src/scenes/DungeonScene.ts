@@ -399,6 +399,13 @@ export class DungeonScene extends Phaser.Scene {
       dragonite: "0149", flygon: "0330",
       staraptor: "0398", braviary: "0628",
       snorlax: "0143", zangoose: "0335",
+      // Phase 168-170: 9th Tier Water/Fire/Grass/Electric/Poison/Ground
+      gyarados: "0130", kingdra: "0230",
+      blaziken: "0257", typhlosion: "0157",
+      venusaur: "0003", sceptile: "0254",
+      jolteon: "0135", ampharos: "0181",
+      nidoking: "0034", crobat: "0169",
+      krookodile: "0553", nidoqueen: "0031",
     };
 
     // Load player + all enemy species + ally species for this dungeon
