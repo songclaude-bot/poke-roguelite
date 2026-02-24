@@ -167,6 +167,9 @@ export class DungeonScene extends Phaser.Scene {
   // Weather
   private currentWeather = WeatherType.None;
   private weatherText!: Phaser.GameObjects.Text;
+  private weatherOverlay: Phaser.GameObjects.Rectangle | null = null;
+  private weatherParticles: Phaser.GameObjects.Graphics | null = null;
+  private weatherTimer: Phaser.Time.TimerEvent | null = null;
 
   // Boss state
   private bossEntity: Entity | null = null;
@@ -1118,6 +1121,19 @@ export class DungeonScene extends Phaser.Scene {
       this.weatherText.setText(`${wd.symbol} ${wd.name}: ${wd.description}`);
       this.weatherText.setColor(wd.color);
       this.showLog(`The weather is ${wd.name}!`);
+    }
+    this.setupWeatherVisuals();
+
+    // ── Weather HUD Indicator ──
+    if (this.currentWeather !== WeatherType.None) {
+      const weatherNames: Record<string, string> = {
+        [WeatherType.Rain]: "Rain",
+        [WeatherType.Sandstorm]: "Sandstorm",
+        [WeatherType.Hail]: "Hail",
+      };
+      this.add.text(GAME_WIDTH - 10, 55, weatherNames[this.currentWeather], {
+        fontSize: "8px", color: "#94a3b8", fontFamily: "monospace",
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
     }
 
     // ── Challenge Mode Badge ──
@@ -2787,6 +2803,97 @@ export class DungeonScene extends Phaser.Scene {
       if (this.tryRevive()) return;
       this.player.alive = false;
       this.showGameOver();
+    }
+  }
+
+  // ── Weather Visuals ──
+
+  private clearWeatherVisuals() {
+    if (this.weatherOverlay) { this.weatherOverlay.destroy(); this.weatherOverlay = null; }
+    if (this.weatherParticles) { this.weatherParticles.destroy(); this.weatherParticles = null; }
+    if (this.weatherTimer) { this.weatherTimer.destroy(); this.weatherTimer = null; }
+  }
+
+  private setupWeatherVisuals() {
+    this.clearWeatherVisuals();
+    if (this.currentWeather === WeatherType.None) return;
+
+    switch (this.currentWeather) {
+      case WeatherType.Rain: {
+        // Blue-tinted overlay
+        this.weatherOverlay = this.add.rectangle(
+          GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT,
+          0x3b82f6, 0.06
+        ).setScrollFactor(0).setDepth(150);
+
+        // Rain particle effect
+        const gfx = this.add.graphics().setScrollFactor(0).setDepth(150);
+        this.weatherParticles = gfx;
+        this.weatherTimer = this.time.addEvent({
+          delay: 80,
+          loop: true,
+          callback: () => {
+            gfx.clear();
+            gfx.lineStyle(1, 0x6390f0, 0.3);
+            for (let i = 0; i < 40; i++) {
+              const x = Math.random() * GAME_WIDTH;
+              const y = Math.random() * GAME_HEIGHT;
+              gfx.lineBetween(x, y, x - 3, y + 12);
+            }
+          },
+        });
+        break;
+      }
+      case WeatherType.Sandstorm: {
+        // Brown/sepia overlay
+        this.weatherOverlay = this.add.rectangle(
+          GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT,
+          0xd4a574, 0.08
+        ).setScrollFactor(0).setDepth(150);
+
+        // Sand particles blowing horizontally
+        const gfx = this.add.graphics().setScrollFactor(0).setDepth(150);
+        this.weatherParticles = gfx;
+        this.weatherTimer = this.time.addEvent({
+          delay: 100,
+          loop: true,
+          callback: () => {
+            gfx.clear();
+            gfx.fillStyle(0xd4a843, 0.15);
+            for (let i = 0; i < 30; i++) {
+              const x = Math.random() * GAME_WIDTH;
+              const y = Math.random() * GAME_HEIGHT;
+              gfx.fillCircle(x, y, 1 + Math.random() * 2);
+            }
+          },
+        });
+        break;
+      }
+      case WeatherType.Hail: {
+        // White/light blue overlay
+        this.weatherOverlay = this.add.rectangle(
+          GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT,
+          0x93c5fd, 0.06
+        ).setScrollFactor(0).setDepth(150);
+
+        // Hail particles (small white dots)
+        const gfx = this.add.graphics().setScrollFactor(0).setDepth(150);
+        this.weatherParticles = gfx;
+        this.weatherTimer = this.time.addEvent({
+          delay: 120,
+          loop: true,
+          callback: () => {
+            gfx.clear();
+            gfx.fillStyle(0xffffff, 0.25);
+            for (let i = 0; i < 25; i++) {
+              const x = Math.random() * GAME_WIDTH;
+              const y = Math.random() * GAME_HEIGHT;
+              gfx.fillCircle(x, y, 1 + Math.random());
+            }
+          },
+        });
+        break;
+      }
     }
   }
 
