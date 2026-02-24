@@ -264,6 +264,7 @@ export class DungeonScene extends Phaser.Scene {
       cubone: "0104", diglett: "0050",
       paras: "0046", venonat: "0048",
       shieldon: "0410", bronzor: "0436",
+      misdreavus: "0200", duskull: "0355",
     };
 
     // Load player + all enemy species + ally species for this dungeon

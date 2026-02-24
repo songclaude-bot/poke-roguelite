@@ -1069,6 +1069,32 @@ export const SPECIES: Record<string, PokemonSpecies> = {
     skillIds: ["gyroBall", "flashCannon", "tackle"],
     floors: [],
   },
+  misdreavus: {
+    id: "misdreavus",
+    name: "Misdreavus",
+    spriteKey: "misdreavus",
+    types: [PokemonType.Ghost],
+    attackType: PokemonType.Ghost,
+    baseStats: { hp: 28, atk: 12, def: 6 },
+    walkFrameWidth: 24, walkFrameHeight: 48,
+    idleFrameWidth: 24, idleFrameHeight: 48,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["shadowBall", "shadowSneak", "nightShade"],
+    floors: [],
+  },
+  duskull: {
+    id: "duskull",
+    name: "Duskull",
+    spriteKey: "duskull",
+    types: [PokemonType.Ghost],
+    attackType: PokemonType.Ghost,
+    baseStats: { hp: 24, atk: 10, def: 10 },
+    walkFrameWidth: 24, walkFrameHeight: 48,
+    idleFrameWidth: 32, idleFrameHeight: 56,
+    walkFrames: 4, idleFrames: 4,
+    skillIds: ["shadowSneak", "nightShade", "lick"],
+    floors: [],
+  },
 };
 
 /** Get enemy species that appear on a given floor */
@@ -1164,6 +1190,8 @@ export const LEVELUP_SKILLS: Record<string, Record<number, string>> = {
   venonat: { 7: "signalBeam", 10: "sleepPowder" },
   shieldon: { 7: "ironHead", 10: "flashCannon" },
   bronzor: { 7: "gyroBall", 10: "flashCannon" },
+  misdreavus: { 7: "shadowBall", 10: "shadowSneak" },
+  duskull: { 7: "shadowSneak", 10: "shadowBall" },
 };
 
 /** Check if a species learns a new skill at this level */

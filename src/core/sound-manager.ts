@@ -403,6 +403,12 @@ const BGM_PATTERNS: Record<string, BgmPattern> = {
     bass: [131, 131, 196, 196, 131, 131, 196, 196, 220, 220, 165, 165, 196, 196, 262, 262],
     tempo: 0.22, melodyType: "square", bassType: "sawtooth",
   },
+  // Phantom Crypt — eerie, haunting
+  phantomCrypt: {
+    melody: [220, 262, 247, 220, 196, 220, 262, 294, 262, 220, 196, 175, 196, 220, 262, 247],
+    bass: [110, 110, 131, 131, 98, 98, 110, 110, 131, 131, 98, 98, 88, 88, 110, 110],
+    tempo: 0.36, melodyType: "sine", bassType: "triangle",
+  },
   // Hub — peaceful town
   hub: {
     melody: [392, 440, 494, 523, 587, 523, 494, 440, 392, 349, 330, 349, 392, 440, 494, 440],

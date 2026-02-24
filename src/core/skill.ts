@@ -1188,6 +1188,17 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Spins rapidly, hitting all nearby foes.",
   },
+  // ── Phase 53 Ghost Skills ──
+  shadowSneak: {
+    id: "shadowSneak",
+    name: "Shadow Sneak",
+    type: PokemonType.Ghost,
+    power: 10,
+    pp: 20,
+    range: SkillRange.Front2,
+    accuracy: 100,
+    description: "Strikes from the shadows with priority.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */
