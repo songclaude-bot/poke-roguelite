@@ -73,6 +73,10 @@ import {
   ScoreChain, ChainAction, createScoreChain, addChainAction, resetChain,
   tickChainIdle, getChainTier, getChainColor, getChainHexColor,
 } from "../core/score-chain";
+import {
+  BossWave, GauntletConfig, GauntletReward,
+  shouldTriggerGauntlet, generateGauntlet, getGauntletReward,
+} from "../core/boss-gauntlet";
 
 interface AllyData {
   speciesId: string;
@@ -259,6 +263,18 @@ export class DungeonScene extends Phaser.Scene {
   private bossHpBar: Phaser.GameObjects.Graphics | null = null;
   private bossHpBg: Phaser.GameObjects.Graphics | null = null;
   private bossNameText: Phaser.GameObjects.Text | null = null;
+
+  // Boss Gauntlet state
+  private gauntletActive = false;
+  private gauntletConfig: GauntletConfig | null = null;
+  private gauntletCurrentWave = 0;        // 0-indexed current wave
+  private gauntletTotalWavesCleared = 0;   // waves cleared for scoring
+  private gauntletEnemies: Entity[] = [];  // enemies in current gauntlet wave
+  private gauntletStairsLocked = false;
+  // Gauntlet HUD elements
+  private gauntletWaveText: Phaser.GameObjects.Text | null = null;
+  private gauntletVignette: Phaser.GameObjects.Graphics | null = null;
+  private gauntletVignetteTween: Phaser.Tweens.Tween | null = null;
 
   // Hamburger dropdown menu state
   private menuOpen = false;
@@ -449,6 +465,16 @@ export class DungeonScene extends Phaser.Scene {
     this.bossHpBar = null;
     this.bossHpBg = null;
     this.bossNameText = null;
+    // Reset gauntlet state
+    this.gauntletActive = false;
+    this.gauntletConfig = null;
+    this.gauntletCurrentWave = 0;
+    this.gauntletTotalWavesCleared = 0;
+    this.gauntletEnemies = [];
+    this.gauntletStairsLocked = false;
+    this.gauntletWaveText = null;
+    this.gauntletVignette = null;
+    this.gauntletVignetteTween = null;
     this.activeSkillIndex = -1;
     this.skillButtons = [];
     this.bagOpen = false;
@@ -1295,6 +1321,16 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Boss Gauntlet check ──
+    if (!this.bossEntity && shouldTriggerGauntlet(this.currentFloor, this.dungeonDef.id, this.dungeonDef.floors)) {
+      this.gauntletConfig = generateGauntlet(this.currentFloor, this.dungeonDef.id, this.dungeonDef.difficulty);
+      this.gauntletActive = true;
+      this.gauntletCurrentWave = 0;
+      this.gauntletTotalWavesCleared = 0;
+      this.gauntletStairsLocked = true;
+      this.gauntletEnemies = [];
+    }
+
     // ── Spawn floor items ──
     this.inventory = this.persistentInventory ?? [];
 
@@ -1806,6 +1842,10 @@ export class DungeonScene extends Phaser.Scene {
     // Boss floor entrance message
     if (this.bossEntity) {
       this.showLog(`⚠ BOSS FLOOR! ${this.bossEntity.name} awaits!`);
+    } else if (this.gauntletActive) {
+      // Gauntlet announcement (deferred to give scene time to render)
+      this.showLog(`${this.dungeonDef.name} B${this.currentFloor}F`);
+      this.time.delayedCall(300, () => this.startGauntlet());
     } else {
       this.showLog(`${this.dungeonDef.name} B${this.currentFloor}F`);
     }
@@ -4766,6 +4806,11 @@ export class DungeonScene extends Phaser.Scene {
         this.showLog("The stairs are sealed! Defeat the boss first!");
         return;
       }
+      // Block stairs during gauntlet
+      if (this.gauntletStairsLocked) {
+        this.showLog("The stairs are sealed! Clear the gauntlet first!");
+        return;
+      }
       this.advanceFloor();
     }
   }
@@ -5755,6 +5800,7 @@ export class DungeonScene extends Phaser.Scene {
       this.challengeMode === "speedrun" ? "Speed Run Bonus: 2x Gold!" : "",
       this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
       this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
+      this.gauntletTotalWavesCleared > 0 ? `Gauntlet Waves: ${this.gauntletTotalWavesCleared}` : "",
       clearChainStr,
       `Score: ${clearRunScore}`,
     ].filter(Boolean).join("\n");
@@ -5894,6 +5940,7 @@ export class DungeonScene extends Phaser.Scene {
       `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
       this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
       this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
+      this.gauntletTotalWavesCleared > 0 ? `Gauntlet Waves: ${this.gauntletTotalWavesCleared}` : "",
       goChainStr,
       `Score: ${goRunScore}`,
     ].filter(Boolean).join("\n");
@@ -7173,7 +7220,388 @@ export class DungeonScene extends Phaser.Scene {
       this.time.delayedCall(300, () => {
         this.checkMonsterHouseCleared();
       });
+
+      // ── Gauntlet wave clear check ──
+      if (this.gauntletActive) {
+        this.time.delayedCall(400, () => {
+          this.checkGauntletWaveCleared();
+        });
+      }
     }
+  }
+
+  // ── Boss Gauntlet Methods ──
+
+  /** Start the gauntlet: show announcement, create HUD, spawn first wave */
+  private startGauntlet() {
+    if (!this.gauntletConfig) return;
+
+    // Screen shake on gauntlet start
+    this.cameras.main.shake(500, 0.02);
+    this.cameras.main.flash(400, 255, 50, 50);
+
+    // Big red "BOSS GAUNTLET!" announcement text
+    const gauntletTitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "BOSS GAUNTLET!", {
+      fontSize: "22px", color: "#ff2222", fontFamily: "monospace", fontStyle: "bold",
+      stroke: "#000000", strokeThickness: 5,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(300);
+    this.tweens.add({
+      targets: gauntletTitle,
+      y: GAME_HEIGHT / 2 - 80,
+      alpha: { from: 1, to: 0 },
+      scaleX: { from: 1, to: 1.5 },
+      scaleY: { from: 1, to: 1.5 },
+      duration: 2500,
+      ease: "Quad.easeOut",
+      onComplete: () => gauntletTitle.destroy(),
+    });
+
+    this.showLog("A Boss Gauntlet begins! Defeat all waves!");
+
+    // Create gauntlet wave HUD text (top center, red)
+    this.gauntletWaveText = this.add.text(
+      GAME_WIDTH / 2, 86, `Wave 1/${this.gauntletConfig.waves.length}`,
+      { fontSize: "11px", color: "#ff4444", fontFamily: "monospace", fontStyle: "bold",
+        stroke: "#000000", strokeThickness: 2 }
+    ).setOrigin(0.5).setScrollFactor(0).setDepth(103);
+
+    // Pulsing red vignette border
+    this.gauntletVignette = this.add.graphics().setScrollFactor(0).setDepth(99);
+    this.drawGauntletVignette(0.3);
+    // Pulsing tween for the vignette
+    const vignetteObj = { alpha: 0.3 };
+    this.gauntletVignetteTween = this.tweens.add({
+      targets: vignetteObj,
+      alpha: { from: 0.15, to: 0.4 },
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+      onUpdate: () => {
+        this.drawGauntletVignette(vignetteObj.alpha);
+      },
+    });
+
+    // Switch to boss theme for dramatic effect
+    switchToBossTheme();
+
+    // Spawn the first wave after a brief delay
+    this.time.delayedCall(800, () => {
+      this.spawnGauntletWave(0);
+    });
+  }
+
+  /** Draw red vignette border overlay */
+  private drawGauntletVignette(alpha: number) {
+    if (!this.gauntletVignette) return;
+    this.gauntletVignette.clear();
+    // Draw red gradient border (4 edge rectangles)
+    const borderW = 12;
+    this.gauntletVignette.fillStyle(0xff0000, alpha);
+    // top
+    this.gauntletVignette.fillRect(0, 0, GAME_WIDTH, borderW);
+    // bottom
+    this.gauntletVignette.fillRect(0, GAME_HEIGHT - borderW, GAME_WIDTH, borderW);
+    // left
+    this.gauntletVignette.fillRect(0, 0, borderW, GAME_HEIGHT);
+    // right
+    this.gauntletVignette.fillRect(GAME_WIDTH - borderW, 0, borderW, GAME_HEIGHT);
+  }
+
+  /** Spawn a specific gauntlet wave's bosses */
+  private spawnGauntletWave(waveIndex: number) {
+    if (!this.gauntletConfig) return;
+    if (waveIndex >= this.gauntletConfig.waves.length) return;
+
+    this.gauntletCurrentWave = waveIndex;
+    this.gauntletEnemies = [];
+    const wave = this.gauntletConfig.waves[waveIndex];
+    const bossCount = wave.count ?? 1;
+    const rooms = this.dungeon.rooms;
+
+    // Pick the largest room (excluding the player's room) for boss placement
+    const bossRoom = rooms.length > 1
+      ? rooms.slice(1).reduce((best, r) => (r.w * r.h > best.w * best.h) ? r : best, rooms[1])
+      : rooms[0];
+
+    for (let i = 0; i < bossCount; i++) {
+      const speciesId = i === 0 ? wave.bossSpecies : this.gauntletConfig.waves[waveIndex].bossSpecies;
+      const sp = SPECIES[speciesId];
+      if (!sp) continue;
+
+      // Offset placement for multiple bosses
+      const offsetX = i === 0 ? 0 : (i % 2 === 0 ? 1 : -1);
+      const offsetY = i > 1 ? 1 : 0;
+      let bx = bossRoom.x + Math.floor(bossRoom.w / 2) + offsetX;
+      let by = bossRoom.y + Math.floor(bossRoom.h / 2) + offsetY;
+
+      // Clamp to room bounds
+      bx = Math.max(bossRoom.x + 1, Math.min(bossRoom.x + bossRoom.w - 2, bx));
+      by = Math.max(bossRoom.y + 1, Math.min(bossRoom.y + bossRoom.h - 2, by));
+
+      // Make sure tile is ground and not occupied
+      if (this.dungeon.terrain[by]?.[bx] !== TerrainType.GROUND) continue;
+      if (this.allEntities.some(e => e.alive && e.tileX === bx && e.tileY === by)) {
+        // Try adjacent tile
+        bx = Math.min(bossRoom.x + bossRoom.w - 2, bx + 1);
+      }
+
+      const baseStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
+      const bossStats = {
+        hp: Math.floor(baseStats.hp * wave.hpMultiplier * this.difficultyMods.enemyHpMult),
+        maxHp: Math.floor(baseStats.hp * wave.hpMultiplier * this.difficultyMods.enemyHpMult),
+        atk: Math.floor(baseStats.atk * wave.hpMultiplier * this.difficultyMods.enemyAtkMult),
+        def: Math.floor(baseStats.def * wave.hpMultiplier),
+        level: wave.level,
+      };
+
+      const bossName = waveIndex === (this.gauntletConfig.waves.length - 1) && this.gauntletConfig.waves.length >= 3
+        ? `Elite ${sp.name}` : `Gauntlet ${sp.name}`;
+
+      const boss: Entity = {
+        tileX: bx, tileY: by,
+        facing: Direction.Down,
+        stats: bossStats,
+        alive: true,
+        spriteKey: sp.spriteKey,
+        name: bossName,
+        types: sp.types,
+        attackType: sp.attackType,
+        skills: createSpeciesSkills(sp),
+        statusEffects: [],
+        speciesId: sp.spriteKey,
+        isBoss: true,
+        ability: SPECIES_ABILITIES[sp.spriteKey],
+      };
+
+      // Create sprite with boss entrance animation (fade-in + size bounce)
+      const bossTex = `${sp.spriteKey}-idle`;
+      if (this.textures.exists(bossTex)) {
+        boss.sprite = this.add.sprite(
+          this.tileToPixelX(bx), this.tileToPixelY(by), bossTex
+        );
+        boss.sprite.setScale(0).setDepth(11).setAlpha(0);
+        const bossAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+        if (this.anims.exists(bossAnim)) boss.sprite.play(bossAnim);
+
+        // Boss entrance animation: fade-in + size bounce
+        this.tweens.add({
+          targets: boss.sprite,
+          scaleX: TILE_SCALE * 1.5,
+          scaleY: TILE_SCALE * 1.5,
+          alpha: 1,
+          duration: 500,
+          ease: "Back.easeOut",
+          onComplete: () => {
+            // Settle to normal boss scale
+            if (boss.sprite) {
+              this.tweens.add({
+                targets: boss.sprite,
+                scaleX: TILE_SCALE * 1.4,
+                scaleY: TILE_SCALE * 1.4,
+                duration: 200,
+                ease: "Quad.easeOut",
+              });
+            }
+          },
+        });
+      }
+
+      // Orange-red tint aura for gauntlet bosses
+      if (boss.sprite) boss.sprite.setTint(0xff8833);
+      this.time.delayedCall(800, () => { if (boss.sprite) boss.sprite.clearTint(); });
+
+      // Track as the main boss entity for HP bar display (first boss of wave)
+      if (i === 0) {
+        this.bossEntity = boss;
+      }
+
+      this.gauntletEnemies.push(boss);
+      this.enemies.push(boss);
+      this.allEntities.push(boss);
+      this.seenSpecies.add(sp.id);
+    }
+
+    // Create/update boss HP bar for the first boss of this wave
+    this.createGauntletBossHpBar();
+
+    // Update wave HUD text
+    if (this.gauntletWaveText) {
+      this.gauntletWaveText.setText(`Wave ${waveIndex + 1}/${this.gauntletConfig.waves.length}`);
+    }
+
+    this.updateHUD();
+  }
+
+  /** Create/refresh the boss HP bar for the gauntlet's current primary boss */
+  private createGauntletBossHpBar() {
+    // Clean up existing boss HP bar
+    if (this.bossHpBg) this.bossHpBg.destroy();
+    if (this.bossHpBar) this.bossHpBar.destroy();
+    if (this.bossNameText) this.bossNameText.destroy();
+
+    if (!this.bossEntity) return;
+
+    const barW = 200;
+    const barX = (GAME_WIDTH - barW) / 2;
+    const barY = 56;
+
+    this.bossHpBg = this.add.graphics().setScrollFactor(0).setDepth(100);
+    this.bossHpBg.fillStyle(0x1a1a2e, 0.95);
+    this.bossHpBg.fillRoundedRect(barX - 4, barY - 4, barW + 8, 24, 4);
+    this.bossHpBg.lineStyle(2, 0xff4444);
+    this.bossHpBg.strokeRoundedRect(barX - 4, barY - 4, barW + 8, 24, 4);
+
+    this.bossHpBar = this.add.graphics().setScrollFactor(0).setDepth(101);
+
+    this.bossNameText = this.add.text(GAME_WIDTH / 2, barY - 2, `★ ${this.bossEntity.name} ★`, {
+      fontSize: "10px", color: "#ff6666", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(102);
+  }
+
+  /** Check if all gauntlet enemies in the current wave are defeated */
+  private checkGauntletWaveCleared() {
+    if (!this.gauntletActive || !this.gauntletConfig) return;
+
+    // Check if all gauntlet enemies in the current wave are dead
+    const allDead = this.gauntletEnemies.every(e => !e.alive);
+    if (!allDead) return;
+
+    this.gauntletTotalWavesCleared++;
+    const totalWaves = this.gauntletConfig.waves.length;
+    const currentWaveDisplay = this.gauntletCurrentWave + 1;
+
+    if (currentWaveDisplay < totalWaves) {
+      // More waves remain — show "Wave X/Y Cleared!" and prepare next wave
+      const waveMsg = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20,
+        `Wave ${currentWaveDisplay}/${totalWaves} Cleared!`,
+        { fontSize: "18px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+          stroke: "#000000", strokeThickness: 4 }
+      ).setOrigin(0.5).setScrollFactor(0).setDepth(300);
+      this.tweens.add({
+        targets: waveMsg,
+        y: GAME_HEIGHT / 2 - 50,
+        alpha: { from: 1, to: 0 },
+        duration: 2000,
+        ease: "Quad.easeOut",
+        onComplete: () => waveMsg.destroy(),
+      });
+
+      // Flash between waves
+      this.cameras.main.flash(300, 255, 200, 100);
+
+      this.showLog(`Wave ${currentWaveDisplay}/${totalWaves} cleared!`);
+
+      // Heal player 20% HP between waves if restBetweenWaves
+      if (this.gauntletConfig.restBetweenWaves && this.player.alive) {
+        const healAmount = Math.floor(this.player.stats.maxHp * 0.2);
+        this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + healAmount);
+        this.showLog(`Resting... Recovered ${healAmount} HP!`);
+        this.updateHUD();
+      }
+
+      // Clean up current boss HP bar
+      this.bossEntity = null;
+
+      // Spawn next wave after a rest period (3 seconds)
+      this.time.delayedCall(3000, () => {
+        this.spawnGauntletWave(this.gauntletCurrentWave + 1);
+      });
+    } else {
+      // All waves cleared — gauntlet complete!
+      this.gauntletActive = false;
+      this.gauntletStairsLocked = false;
+      this.bossEntity = null;
+
+      // "GAUNTLET COMPLETE!" gold celebration text
+      const completeText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30,
+        "GAUNTLET COMPLETE!",
+        { fontSize: "20px", color: "#ffd700", fontFamily: "monospace", fontStyle: "bold",
+          stroke: "#000000", strokeThickness: 5 }
+      ).setOrigin(0.5).setScrollFactor(0).setDepth(300);
+      this.tweens.add({
+        targets: completeText,
+        y: GAME_HEIGHT / 2 - 70,
+        alpha: { from: 1, to: 0 },
+        scaleX: { from: 1, to: 1.4 },
+        scaleY: { from: 1, to: 1.4 },
+        duration: 3000,
+        ease: "Quad.easeOut",
+        onComplete: () => completeText.destroy(),
+      });
+
+      // Explosion particles on gauntlet completion
+      this.spawnGauntletParticles();
+
+      // Screen shake + gold flash
+      this.cameras.main.shake(600, 0.02);
+      this.cameras.main.flash(500, 255, 215, 0);
+
+      // Award rewards
+      const reward = getGauntletReward(this.gauntletConfig, this.gauntletTotalWavesCleared);
+      this.gold += reward.gold;
+      this.totalExp += reward.exp;
+      this.showLog(`Gauntlet complete! +${reward.gold}G +${reward.exp} EXP`);
+
+      if (reward.item) {
+        const itemDef = ITEM_DB[reward.item];
+        if (itemDef && this.inventory.length < MAX_INVENTORY) {
+          const existing = this.inventory.find(s => s.item.id === itemDef.id && itemDef.stackable);
+          if (existing) existing.count++;
+          else this.inventory.push({ item: itemDef, count: 1 });
+          this.showLog(`Bonus: Received ${itemDef.name}!`);
+        }
+      }
+
+      // Remove vignette and wave HUD
+      this.cleanupGauntletHUD();
+
+      this.updateHUD();
+    }
+  }
+
+  /** Spawn explosion particles for gauntlet completion */
+  private spawnGauntletParticles() {
+    const colors = [0xffd700, 0xff6622, 0xff4444, 0xffaa00, 0xffffff];
+    for (let i = 0; i < 20; i++) {
+      const px = GAME_WIDTH / 2 + (Math.random() - 0.5) * 200;
+      const py = GAME_HEIGHT / 2 + (Math.random() - 0.5) * 100;
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const size = 2 + Math.random() * 4;
+      const particle = this.add.graphics().setScrollFactor(0).setDepth(301);
+      particle.fillStyle(color, 1);
+      particle.fillCircle(px, py, size);
+      this.tweens.add({
+        targets: particle,
+        x: (Math.random() - 0.5) * 120,
+        y: -40 - Math.random() * 80,
+        alpha: { from: 1, to: 0 },
+        scaleX: { from: 1, to: 0.2 },
+        scaleY: { from: 1, to: 0.2 },
+        duration: 800 + Math.random() * 600,
+        ease: "Quad.easeOut",
+        onComplete: () => particle.destroy(),
+      });
+    }
+  }
+
+  /** Clean up gauntlet HUD elements */
+  private cleanupGauntletHUD() {
+    if (this.gauntletWaveText) {
+      this.gauntletWaveText.destroy();
+      this.gauntletWaveText = null;
+    }
+    if (this.gauntletVignetteTween) {
+      this.gauntletVignetteTween.stop();
+      this.gauntletVignetteTween = null;
+    }
+    if (this.gauntletVignette) {
+      this.gauntletVignette.destroy();
+      this.gauntletVignette = null;
+    }
+    // Clean up boss HP bar
+    if (this.bossHpBg) { this.bossHpBg.destroy(); this.bossHpBg = null; }
+    if (this.bossHpBar) { this.bossHpBar.destroy(); this.bossHpBar = null; }
+    if (this.bossNameText) { this.bossNameText.destroy(); this.bossNameText = null; }
   }
 
   /** Recruit a defeated enemy as ally */
