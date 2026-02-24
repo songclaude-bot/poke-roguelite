@@ -515,7 +515,14 @@
 - **Normal 3rd**: Cozy Burrow — Stufful(0759), Furfrou(0676) + workUp 스킬
 - **마일스톤**: 전 18타입 3차 던전 완성!
 
-## 현재 게임 규모 (v0.95.0)
+## Phase 91-94: QoL Improvements (v0.95.0 → v1.0.0)
+- **Auto-Save**: 매 층 이동 시 자동 저장 (데이터 손실 방지)
+- **Status Effect Tints**: 번/마비/공업/방업 상태를 스프라이트 색상으로 표시
+- **Enemy HP Bars**: 적 데미지 시 임시 HP바 표시 (색상 변화)
+- **Level-Up Animations**: 스케일 바운스 + 스탯 팝업 (HP 초록, ATK 빨강, DEF 파랑)
+- **Evolution Animations**: 화면 흔들림 + 줌 효과 + 800ms 플래시
+
+## 🎉 v1.0.0 Full Release!
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
 - **69개 던전**: Beach Cave → Cozy Burrow + Destiny Tower (18타입 × 3 + Destiny Tower + etc.)
 - **165종+ 포켓몬** (진화 포함 185종+)
@@ -523,4 +530,5 @@
 - **20종 아이템** (6종 TM 포함)
 - **97종 스타터** (클리어 수로 해금)
 - **131종+ 진화 경로**
+- **Auto-save, Enemy HP bars, Status tints, Enhanced animations**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
