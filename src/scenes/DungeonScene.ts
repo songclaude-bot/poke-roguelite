@@ -1340,6 +1340,44 @@ export class DungeonScene extends Phaser.Scene {
         this.showLog(`Ate a Big Apple! Belly fully restored!`);
         break;
       }
+      case "warpOrb": {
+        let warped = 0;
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          const pt = this.findWalkableTile();
+          if (pt) {
+            e.tileX = pt.x; e.tileY = pt.y;
+            if (e.sprite) e.sprite.setPosition(this.tileToPixelX(pt.x), this.tileToPixelY(pt.y));
+            warped++;
+          }
+        }
+        this.showLog(`Used Warp Orb! ${warped} enemies warped away!`);
+        break;
+      }
+      case "foeHoldOrb": {
+        let held = 0;
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          e.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 5 });
+          held++;
+        }
+        this.showLog(`Used Foe-Hold Orb! ${held} enemies paralyzed!`);
+        break;
+      }
+      case "maxElixir": {
+        for (const sk of this.player.skills) { sk.currentPp = sk.pp; }
+        this.showLog("Used Max Elixir! All PP restored!");
+        break;
+      }
+      default: {
+        // TM handling
+        if (item.tmSkillId) {
+          this.useTM(index, item);
+          return; // Don't consume here — handled inside useTM
+        }
+        this.showLog(`Used ${item.name}.`);
+        break;
+      }
     }
 
     // Consume item
@@ -1348,6 +1386,46 @@ export class DungeonScene extends Phaser.Scene {
       this.inventory.splice(index, 1);
     }
 
+    this.updateHUD();
+  }
+
+  /** Find a random walkable tile (ground, no entity) */
+  private findWalkableTile(): { x: number; y: number } | null {
+    const { terrain, width, height } = this.dungeon;
+    for (let tries = 0; tries < 200; tries++) {
+      const x = Math.floor(Math.random() * width);
+      const y = Math.floor(Math.random() * height);
+      if (terrain[y][x] !== TerrainType.GROUND) continue;
+      if (this.allEntities.some(e => e.alive && e.tileX === x && e.tileY === y)) continue;
+      return { x, y };
+    }
+    return null;
+  }
+
+  /** Use a TM to teach a skill — replaces the first (weakest) skill */
+  private useTM(index: number, item: ItemDef) {
+    if (!item.tmSkillId) return;
+    const newSkill = SKILL_DB[item.tmSkillId];
+    if (!newSkill) { this.showLog("Invalid TM!"); return; }
+
+    // Replace the skill with lowest power (or first non-Tackle)
+    let replaceIdx = 0;
+    let lowestPower = Infinity;
+    for (let i = 0; i < this.player.skills.length; i++) {
+      if (this.player.skills[i].power < lowestPower) {
+        lowestPower = this.player.skills[i].power;
+        replaceIdx = i;
+      }
+    }
+
+    const oldName = this.player.skills[replaceIdx].name;
+    this.player.skills[replaceIdx] = createSkill(SKILL_DB[item.tmSkillId]);
+    this.showLog(`Learned ${newSkill.name}! (replaced ${oldName})`);
+
+    // Consume TM
+    const stack = this.inventory[index];
+    stack.count--;
+    if (stack.count <= 0) this.inventory.splice(index, 1);
     this.updateHUD();
   }
 

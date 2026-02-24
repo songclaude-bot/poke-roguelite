@@ -6,6 +6,7 @@ export enum ItemCategory {
   Berry = "berry",
   Seed = "seed",
   Orb = "orb",
+  TM = "tm",
 }
 
 export enum ItemTarget {
@@ -22,6 +23,8 @@ export interface ItemDef {
   description: string;
   /** Applied by the scene when used */
   stackable: boolean;
+  /** For TM items — the skill ID this TM teaches */
+  tmSkillId?: string;
 }
 
 export interface ItemStack {
@@ -120,6 +123,86 @@ export const ITEM_DB: Record<string, ItemDef> = {
     description: "Fully restores Belly.",
     stackable: true,
   },
+  // ── Additional items ──
+  warpOrb: {
+    id: "warpOrb",
+    name: "Warp Orb",
+    category: ItemCategory.Orb,
+    target: ItemTarget.Room,
+    description: "Warps all enemies in the room to random tiles.",
+    stackable: false,
+  },
+  foeHoldOrb: {
+    id: "foeHoldOrb",
+    name: "Foe-Hold Orb",
+    category: ItemCategory.Orb,
+    target: ItemTarget.Room,
+    description: "Paralyzes all enemies in the room.",
+    stackable: false,
+  },
+  maxElixir: {
+    id: "maxElixir",
+    name: "Max Elixir",
+    category: ItemCategory.Berry,
+    target: ItemTarget.Self,
+    description: "Restores all skill PP to max.",
+    stackable: true,
+  },
+  // ── TMs ──
+  tmFlamethrower: {
+    id: "tmFlamethrower",
+    name: "TM Flamethrower",
+    category: ItemCategory.TM,
+    target: ItemTarget.Self,
+    description: "Teaches Flamethrower to replace a skill.",
+    stackable: false,
+    tmSkillId: "flamethrower",
+  },
+  tmThunderbolt: {
+    id: "tmThunderbolt",
+    name: "TM Thunderbolt",
+    category: ItemCategory.TM,
+    target: ItemTarget.Self,
+    description: "Teaches Thunderbolt to replace a skill.",
+    stackable: false,
+    tmSkillId: "thunderbolt",
+  },
+  tmIceBeam: {
+    id: "tmIceBeam",
+    name: "TM Ice Beam",
+    category: ItemCategory.TM,
+    target: ItemTarget.Self,
+    description: "Teaches Ice Beam to replace a skill.",
+    stackable: false,
+    tmSkillId: "iceBeam",
+  },
+  tmShadowBall: {
+    id: "tmShadowBall",
+    name: "TM Shadow Ball",
+    category: ItemCategory.TM,
+    target: ItemTarget.Self,
+    description: "Teaches Shadow Ball to replace a skill.",
+    stackable: false,
+    tmSkillId: "shadowBall",
+  },
+  tmDragonPulse: {
+    id: "tmDragonPulse",
+    name: "TM Dragon Pulse",
+    category: ItemCategory.TM,
+    target: ItemTarget.Self,
+    description: "Teaches Dragon Pulse to replace a skill.",
+    stackable: false,
+    tmSkillId: "dragonPulse",
+  },
+  tmEarthquake: {
+    id: "tmEarthquake",
+    name: "TM Earthquake",
+    category: ItemCategory.TM,
+    target: ItemTarget.Self,
+    description: "Teaches Earthquake to replace a skill.",
+    stackable: false,
+    tmSkillId: "earthPower",
+  },
 };
 
 /** Items that can spawn on dungeon floors, with relative weights */
@@ -135,6 +218,15 @@ export const FLOOR_ITEM_TABLE: { itemId: string; weight: number }[] = [
   { itemId: "escapeOrb", weight: 3 },
   { itemId: "luminousOrb", weight: 5 },
   { itemId: "allPowerOrb", weight: 4 },
+  { itemId: "warpOrb", weight: 3 },
+  { itemId: "foeHoldOrb", weight: 3 },
+  { itemId: "maxElixir", weight: 6 },
+  { itemId: "tmFlamethrower", weight: 1 },
+  { itemId: "tmThunderbolt", weight: 1 },
+  { itemId: "tmIceBeam", weight: 1 },
+  { itemId: "tmShadowBall", weight: 1 },
+  { itemId: "tmDragonPulse", weight: 1 },
+  { itemId: "tmEarthquake", weight: 1 },
 ];
 
 /** Pick a random item from the floor table */
