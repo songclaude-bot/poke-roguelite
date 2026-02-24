@@ -382,12 +382,36 @@
 
 ---
 
-## 현재 게임 규모 (v0.60.0)
+## Phase 63: Brawl Dojo
+
+### 63. Fighting 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Tyrogue/Crabrawler, hammerArm 스킬, Brawl Dojo 12층, Grand Crabominable 보스
+
+---
+
+## Phase 64: Boulder Pass
+
+### 64. Rock 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Roggenrola/Rockruff, rockWrecker 스킬, Boulder Pass 12층, Alpha Lycanroc 보스
+
+---
+
+## Phase 65: Tranquil Grove
+
+### 65. Normal 2차 던전
+- 날짜: 2026-02-24
+- 핵심: Lillipup/Minccino, triAttack 스킬, Tranquil Grove 10층, Noble Stoutland 보스
+
+---
+
+## 현재 게임 규모 (v0.65.0)
 - **18종 타입**: Normal, Water, Fire, Grass, Electric, Flying, Poison, Ground, Rock, Bug, Fighting, Steel, Ghost, Psychic, Ice, Dark, Fairy, Dragon
-- **47개 던전**: Beach Cave → Gale Cliffs + Destiny Tower
-- **109종+ 포켓몬** (진화 포함 127종+)
-- **124종+ 기술**
+- **50개 던전**: Beach Cave → Tranquil Grove + Destiny Tower
+- **117종+ 포켓몬** (진화 포함 135종+)
+- **128종+ 기술**
 - **20종 아이템** (6종 TM 포함)
-- **55종 스타터** (클리어 수로 해금)
-- **90종+ 진화 경로**
+- **61종 스타터** (클리어 수로 해금)
+- **96종+ 진화 경로**
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
