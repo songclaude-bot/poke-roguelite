@@ -57,13 +57,22 @@ export function getEffectiveDef(entity: Entity): number {
   return hasDefUp ? Math.floor(entity.stats.def * 1.5) : entity.stats.def;
 }
 
+/** Human-readable labels for status effect wear-off messages */
+const STATUS_WORE_OFF_LABEL: Record<string, string> = {
+  [SkillEffect.Burn]: "Burn",
+  [SkillEffect.Paralyze]: "Paralysis",
+  [SkillEffect.AtkUp]: "ATK boost",
+  [SkillEffect.DefUp]: "DEF boost",
+};
+
 /** Tick status effects at end of turn, remove expired ones */
 export function tickStatusEffects(entity: Entity): string[] {
   const messages: string[] = [];
   entity.statusEffects = entity.statusEffects.filter(s => {
     s.turnsLeft--;
     if (s.turnsLeft <= 0) {
-      messages.push(`${entity.name}'s ${s.type} wore off.`);
+      const label = STATUS_WORE_OFF_LABEL[s.type] ?? s.type;
+      messages.push(`${entity.name}'s ${label} wore off!`);
       return false;
     }
     return true;

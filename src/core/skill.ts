@@ -24,10 +24,10 @@ export enum SkillRange {
 /** Effect applied on hit */
 export enum SkillEffect {
   None = "none",
-  AtkUp = "atkUp",         // +50% ATK for 5 turns
-  DefUp = "defUp",         // +50% DEF for 5 turns
+  AtkUp = "atkUp",         // +50% ATK for 10 turns
+  DefUp = "defUp",         // +50% DEF for 10 turns
   Heal = "heal",           // Restore HP
-  Burn = "burn",           // DoT: 5 dmg/turn for 3 turns
+  Burn = "burn",           // DoT: 5 dmg/turn for 5 turns
   Paralyze = "paralyze",   // 50% chance to skip turn for 3 turns
 }
 

@@ -131,6 +131,12 @@ export class DungeonScene extends Phaser.Scene {
   private hpBarFill!: Phaser.GameObjects.Graphics;
   private portraitSprite!: Phaser.GameObjects.Sprite;
 
+  // Status icons HUD (next to HP bar)
+  private statusHudTexts: Phaser.GameObjects.Text[] = [];
+
+  // Status flash animation timers
+  private statusFlashTimers: Phaser.Time.TimerEvent[] = [];
+
   // Belly Bar graphics
   private bellyBarBg!: Phaser.GameObjects.Graphics;
   private bellyBarFill!: Phaser.GameObjects.Graphics;
@@ -1255,6 +1261,7 @@ export class DungeonScene extends Phaser.Scene {
       this.showLog(`The weather is ${wd.name}!`);
     }
     this.setupWeatherVisuals();
+    this.setupStatusFlashAnimations();
 
     // ── Weather HUD Indicator ──
     if (this.currentWeather !== WeatherType.None) {
@@ -1372,7 +1379,7 @@ export class DungeonScene extends Phaser.Scene {
           this.recoverPP(this.player);
           this.tickBelly();
           this.tickWeather();
-          tickStatusEffects(this.player);
+          this.tickEntityStatus(this.player);
           this.updateHUD();
         });
       });
@@ -1530,7 +1537,7 @@ export class DungeonScene extends Phaser.Scene {
         this.recoverPP(this.player);
         this.tickBelly();
         this.tickWeather();
-        tickStatusEffects(this.player);
+        this.tickEntityStatus(this.player);
         this.updateHUD();
       });
     });
@@ -1905,13 +1912,14 @@ export class DungeonScene extends Phaser.Scene {
     this.floorText.setPosition(40, 27);
     this.hpText.setText(`${p.hp}/${p.maxHp}`);
 
-    // Show active buffs
-    const buffs = this.player.statusEffects.map(s => `${s.type}(${s.turnsLeft})`).join(" ");
-    const buffStr = buffs ? `  ${buffs}` : "";
+    // Show active buffs (compact version in turn text)
     const abilityName = this.player.ability ? ABILITIES[this.player.ability]?.name ?? "" : "";
     const abilityStr = abilityName ? ` [${abilityName}]` : "";
     const goldStr = this.gold > 0 ? ` ${this.gold}G` : "";
-    this.turnText.setText(`Lv.${p.level}${goldStr} T${this.turnManager.turn}${abilityStr}${buffStr}`);
+    this.turnText.setText(`Lv.${p.level}${goldStr} T${this.turnManager.turn}${abilityStr}`);
+
+    // Status icons HUD (next to HP bar)
+    this.updateStatusHud();
 
     // Status effect visual tint on player sprite
     this.updateStatusTint(this.player);
@@ -2730,6 +2738,45 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
+  /** Update the status icons HUD next to the HP bar */
+  private updateStatusHud() {
+    // Destroy previous status HUD texts
+    for (const t of this.statusHudTexts) t.destroy();
+    this.statusHudTexts = [];
+
+    const effects = this.player.statusEffects;
+    if (effects.length === 0) return;
+
+    // Position: right of HP bar (HP bar ends at x=138, y=8)
+    let xOffset = 142;
+    const yPos = 8;
+
+    // Status icon configs
+    const statusConfig: Record<string, { label: string; color: string }> = {
+      [SkillEffect.Burn]: { label: "BRN", color: "#ff6644" },
+      [SkillEffect.Paralyze]: { label: "PAR", color: "#ffdd44" },
+      [SkillEffect.AtkUp]: { label: "ATK\u2191", color: "#ff8844" },
+      [SkillEffect.DefUp]: { label: "DEF\u2191", color: "#4488ff" },
+    };
+
+    for (const se of effects) {
+      const cfg = statusConfig[se.type];
+      if (!cfg) continue;
+
+      const txt = this.add.text(xOffset, yPos, `${cfg.label}${se.turnsLeft}`, {
+        fontSize: "7px",
+        color: cfg.color,
+        fontFamily: "monospace",
+        fontStyle: "bold",
+        backgroundColor: "#0a0a1ecc",
+        padding: { x: 2, y: 1 },
+      }).setScrollFactor(0).setDepth(102);
+
+      this.statusHudTexts.push(txt);
+      xOffset += txt.width + 3;
+    }
+  }
+
   /** Apply persistent status effect tint to entity sprite */
   private updateStatusTint(entity: { sprite?: Phaser.GameObjects.Sprite; statusEffects: StatusEffect[] }) {
     if (!entity.sprite) return;
@@ -2751,6 +2798,121 @@ export class DungeonScene extends Phaser.Scene {
     } else {
       entity.sprite.clearTint();
     }
+  }
+
+  /**
+   * Tick status effects for an entity: apply burn damage, show wear-off popups,
+   * and display log messages. Wraps the core tickStatusEffects function.
+   */
+  private tickEntityStatus(entity: Entity) {
+    // Apply burn damage before ticking (so burn deals damage on the turn it expires too)
+    const hasBurn = entity.statusEffects.some(s => s.type === SkillEffect.Burn);
+    if (hasBurn && entity.alive) {
+      const burnDmg = 5;
+      entity.stats.hp = Math.max(0, entity.stats.hp - burnDmg);
+      if (entity.sprite) {
+        this.showDamagePopup(entity.sprite.x, entity.sprite.y, burnDmg, 1.0);
+      }
+      this.showLog(`${entity.name} is hurt by its burn!`);
+      if (entity.stats.hp <= 0) {
+        entity.alive = false;
+      }
+    }
+
+    // Tick turn counters and get wear-off messages
+    const messages = tickStatusEffects(entity);
+    for (const msg of messages) {
+      this.showLog(msg);
+      // Show floating popup for wear-off on player
+      if (entity === this.player && entity.sprite) {
+        this.showStatusPopup(entity.sprite.x, entity.sprite.y - 16, msg);
+      }
+    }
+
+    // Update tint after status changes
+    this.updateStatusTint(entity);
+  }
+
+  /** Show a floating status wear-off popup text */
+  private showStatusPopup(x: number, y: number, text: string) {
+    const popup = this.add.text(x, y - 8, text, {
+      fontSize: "8px",
+      color: "#88ff88",
+      fontFamily: "monospace",
+      fontStyle: "bold",
+      backgroundColor: "#00000099",
+      padding: { x: 3, y: 1 },
+    }).setOrigin(0.5).setDepth(200);
+
+    this.tweens.add({
+      targets: popup,
+      y: y - 30,
+      alpha: 0,
+      duration: 1200,
+      ease: "Power2",
+      onComplete: () => popup.destroy(),
+    });
+  }
+
+  /**
+   * Setup periodic flash animations for status effects on all entities.
+   * Called once during floor setup. Burn: orange flash every 2s.
+   * Paralyze: yellow jitter every 2s.
+   */
+  private setupStatusFlashAnimations() {
+    // Clean up any existing timers
+    for (const t of this.statusFlashTimers) t.destroy();
+    this.statusFlashTimers = [];
+
+    // Burn flash timer — every 2 seconds, flash burned entities orange
+    const burnTimer = this.time.addEvent({
+      delay: 2000,
+      loop: true,
+      callback: () => {
+        const allEnts = [this.player, ...this.allies, ...this.enemies];
+        for (const ent of allEnts) {
+          if (!ent.alive || !ent.sprite) continue;
+          if (!ent.statusEffects.some(s => s.type === SkillEffect.Burn)) continue;
+          // Quick orange flash
+          ent.sprite.setTint(0xff5500);
+          this.time.delayedCall(150, () => {
+            if (ent.sprite && ent.alive) this.updateStatusTint(ent);
+          });
+        }
+      },
+    });
+    this.statusFlashTimers.push(burnTimer);
+
+    // Paralyze jitter timer — every 2 seconds, jitter paralyzed entities
+    const paraTimer = this.time.addEvent({
+      delay: 2000,
+      startAt: 1000, // offset so it doesn't overlap with burn flash
+      loop: true,
+      callback: () => {
+        const allEnts = [this.player, ...this.allies, ...this.enemies];
+        for (const ent of allEnts) {
+          if (!ent.alive || !ent.sprite) continue;
+          if (!ent.statusEffects.some(s => s.type === SkillEffect.Paralyze)) continue;
+          // Quick yellow flash + small jitter
+          const origX = ent.sprite.x;
+          ent.sprite.setTint(0xffff00);
+          this.tweens.add({
+            targets: ent.sprite,
+            x: origX + 2,
+            duration: 50,
+            yoyo: true,
+            repeat: 2,
+            onComplete: () => {
+              if (ent.sprite && ent.alive) {
+                ent.sprite.x = origX;
+                this.updateStatusTint(ent);
+              }
+            },
+          });
+        }
+      },
+    });
+    this.statusFlashTimers.push(paraTimer);
   }
 
   // ── Stairs ──
@@ -3743,8 +3905,8 @@ export class DungeonScene extends Phaser.Scene {
     this.tickBelly();
     this.tickWeather();
 
-    // Tick status effects
-    tickStatusEffects(this.player);
+    // Tick status effects (burn damage + wear-off messages)
+    this.tickEntityStatus(this.player);
     this.updateHUD();
 
     if (!this.player.alive && !this.gameOver) {
@@ -3766,7 +3928,7 @@ export class DungeonScene extends Phaser.Scene {
 
     this.tickBelly();
     this.tickWeather();
-    tickStatusEffects(this.player);
+    this.tickEntityStatus(this.player);
     this.updateHUD();
 
     if (!this.player.alive && !this.gameOver) {
@@ -4131,17 +4293,17 @@ export class DungeonScene extends Phaser.Scene {
 
     switch (skill.effect) {
       case SkillEffect.AtkUp:
-        target.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 5 });
+        target.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 10 });
         sfxBuff();
-        this.showLog(`${target.name}'s ATK rose!`);
+        this.showLog(`${target.name}'s ATK rose! (10 turns)`);
         if (target.sprite) target.sprite.setTint(0xff8844);
         this.time.delayedCall(300, () => { if (target.sprite) target.sprite.clearTint(); });
         break;
 
       case SkillEffect.DefUp:
-        target.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 5 });
+        target.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
         sfxBuff();
-        this.showLog(`${target.name}'s DEF rose!`);
+        this.showLog(`${target.name}'s DEF rose! (10 turns)`);
         break;
 
       case SkillEffect.Heal: {
@@ -4159,7 +4321,7 @@ export class DungeonScene extends Phaser.Scene {
       case SkillEffect.Paralyze:
         if (!target.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
           target.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 3 });
-          this.showLog(`${target.name} was paralyzed!`);
+          this.showLog(`${target.name} was paralyzed! (3 turns)`);
           if (target.sprite) target.sprite.setTint(0xffff00);
           this.time.delayedCall(300, () => { if (target.sprite) target.sprite.clearTint(); });
         }
@@ -4167,8 +4329,8 @@ export class DungeonScene extends Phaser.Scene {
 
       case SkillEffect.Burn:
         if (!target.statusEffects.some(s => s.type === SkillEffect.Burn)) {
-          target.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 3 });
-          this.showLog(`${target.name} was burned!`);
+          target.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
+          this.showLog(`${target.name} was burned! (5 turns)`);
         }
         break;
     }
@@ -4552,7 +4714,7 @@ export class DungeonScene extends Phaser.Scene {
           }
 
           // Tick enemy status effects
-          tickStatusEffects(enemy);
+          this.tickEntityStatus(enemy);
 
           // Find closest adjacent target (player or ally)
           const adjacentTargets = [this.player, ...this.allies].filter(
@@ -4597,7 +4759,7 @@ export class DungeonScene extends Phaser.Scene {
         return async () => {
           if (!ally.alive || !this.player.alive) return;
           if (isParalyzed(ally)) return;
-          tickStatusEffects(ally);
+          this.tickEntityStatus(ally);
 
           const { moveDir, attackTarget } = getAllyMoveDirection(
             ally, this.player, this.enemies,
