@@ -28,6 +28,7 @@ import {
 } from "../core/quests";
 import { NPC_LIST, getNpcDialogue, NPC } from "../core/npc-dialogue";
 import { getTotalTalentPoints } from "../core/talent-tree";
+import { getForgeLevel, getForgeBonus, MAX_FORGE_LEVEL } from "../core/forge";
 
 // ── Constants ──
 const NAV_H = 52;
@@ -828,12 +829,18 @@ export class HubScene extends Phaser.Scene {
     }).setOrigin(0.5);
     this.tabContent.push(goldT);
 
+    const forgeLv = getForgeLevel(this.meta);
+    const forgeLabel = forgeLv > 0
+      ? `Equip Forge +${forgeLv}${forgeLv >= MAX_FORGE_LEVEL ? " MAX" : ""}`
+      : "Equip Forge";
+
     const items: { label: string; desc: string; color: string; bgColor: number; scene: string }[] = [
       { label: "Upgrade Shop", desc: "Buy permanent stat upgrades", color: "#fbbf24", bgColor: 0x2a2a1a, scene: "UpgradeScene" },
       { label: equippedHeldItem ? `Held: ${equippedHeldItem.name}` : "Held Items", desc: "Equip passive items", color: "#f59e0b", bgColor: 0x2a1a0a, scene: "HeldItemScene" },
+      { label: forgeLabel, desc: "Upgrade held item stats with gold", color: "#e8a735", bgColor: 0x2a2008, scene: "ForgeScene" },
       { label: "Move Tutor", desc: "Customize your moveset", color: "#a855f7", bgColor: 0x1a0a2a, scene: "MoveTutorScene" },
       { label: abilityDef ? `${abilityDef.name} Lv${abilityLv}` : "Ability", desc: "Upgrade your innate ability", color: "#667eea", bgColor: 0x0a1a2a, scene: "AbilityUpgradeScene" },
-      { label: `Forge (${storedItemCount} items)`, desc: "Craft & synthesize items", color: "#ff8c42", bgColor: 0x2a1a0a, scene: "CraftingScene" },
+      { label: `Item Forge (${storedItemCount} items)`, desc: "Craft & synthesize items", color: "#ff8c42", bgColor: 0x2a1a0a, scene: "CraftingScene" },
       { label: talentPoints > 0 ? `Talents (${talentPoints} pts)` : "Talent Tree", desc: "Invest gold in permanent talents", color: "#fbbf24", bgColor: 0x2a2a1a, scene: "TalentTreeScene" },
     ];
 

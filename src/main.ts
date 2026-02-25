@@ -15,6 +15,7 @@ import { LeaderboardScene } from "./scenes/LeaderboardScene";
 import { SettingsScene } from "./scenes/SettingsScene";
 import { QuestBoardScene } from "./scenes/QuestBoardScene";
 import { TalentTreeScene } from "./scenes/TalentTreeScene";
+import { ForgeScene } from "./scenes/ForgeScene";
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from "./config";
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -35,7 +36,7 @@ const config: Phaser.Types.Core.GameConfig = {
   dom: {
     createContainer: true,
   },
-  scene: [BootScene, HubScene, DungeonPreviewScene, DungeonScene, UpgradeScene, AchievementScene, PokedexScene, MoveTutorScene, HeldItemScene, CraftingScene, HelpScene, AbilityUpgradeScene, LeaderboardScene, SettingsScene, QuestBoardScene, TalentTreeScene],
+  scene: [BootScene, HubScene, DungeonPreviewScene, DungeonScene, UpgradeScene, AchievementScene, PokedexScene, MoveTutorScene, HeldItemScene, CraftingScene, HelpScene, AbilityUpgradeScene, LeaderboardScene, SettingsScene, QuestBoardScene, TalentTreeScene, ForgeScene],
 };
 
 const game = new Phaser.Game(config);

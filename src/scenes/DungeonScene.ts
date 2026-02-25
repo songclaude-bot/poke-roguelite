@@ -48,6 +48,7 @@ import {
 } from "../core/dungeon-shop";
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
 import { HeldItemEffect, getHeldItem } from "../core/held-items";
+import { getForgeBonus } from "../core/forge";
 import { getEquippedEnchantment, Enchantment } from "../core/enchantments";
 import { getDailyConfig, calculateDailyScore, saveDailyScore } from "../core/daily-dungeon";
 import { calculateScore, saveRunScore } from "../core/leaderboard";
@@ -533,9 +534,11 @@ export class DungeonScene extends Phaser.Scene {
     const equippedId = meta.equippedHeldItem;
     const heldItem = equippedId ? getHeldItem(equippedId) : undefined;
     this.heldItemEffect = heldItem?.effect ?? {};
-    const heldHpBonus = this.heldItemEffect.hpBonus ?? 0;
-    const heldAtkBonus = this.heldItemEffect.atkBonus ?? 0;
-    const heldDefBonus = this.heldItemEffect.defBonus ?? 0;
+    // Apply forge bonus to held item stat bonuses
+    const forgeBonus = 1 + getForgeBonus(meta.forgeLevel ?? 0) / 100;
+    const heldHpBonus = Math.floor((this.heldItemEffect.hpBonus ?? 0) * forgeBonus);
+    const heldAtkBonus = Math.floor((this.heldItemEffect.atkBonus ?? 0) * forgeBonus);
+    const heldDefBonus = Math.floor((this.heldItemEffect.defBonus ?? 0) * forgeBonus);
 
     // Load enchantment on held item
     this.enchantment = equippedId ? getEquippedEnchantment(meta) : null;

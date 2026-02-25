@@ -89,6 +89,8 @@ export interface MetaSaveData {
   challengeQuests?: Quest[];    // persistent challenge quests
   // Talent Tree levels (talentId → level)
   talentLevels?: Record<string, number>;
+  // Forge upgrade level for held items (0-5)
+  forgeLevel?: number;
 }
 
 const SAVE_VERSION = 1;
@@ -175,6 +177,7 @@ export function loadMeta(): MetaSaveData {
     if (data.questLastDate === undefined) data.questLastDate = undefined;
     if (data.challengeQuests === undefined) data.challengeQuests = [];
     if (data.talentLevels === undefined) data.talentLevels = {};
+    if (data.forgeLevel === undefined) data.forgeLevel = 0;
     return data;
   } catch {
     return defaultMeta();
