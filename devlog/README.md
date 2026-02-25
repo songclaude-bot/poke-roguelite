@@ -1382,3 +1382,26 @@
 - **켈레온 상점**: 구매/판매/도둑 메카닉 완비
 - **v1.0→v4.0**: 1일 만에 MVP에서 274개 Phase 완성!
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 33: 퍼즐 방 + 아이템 합성
+
+### 33-1. 던전 퍼즐 방 (Phase 275)
+- 날짜: 2026-02-24
+- 5종 퍼즐: TileSequence, SwitchOrder, MemoryMatch, EnemyRush, ItemSacrifice
+- 10% 확률 스폰, 청록 카펫 비주얼
+- 시퀀스 표시 + 진행도 HUD + 보상 팝업
+- 실패 시 빨간 플래시, 성공 시 초록 파티클
+
+### 33-2. 아이템 합성 시스템 (Phase 276)
+- 날짜: 2026-02-24
+- 11종 합성 레시피 (기본 아이템 3개 → ★ 강화 아이템)
+- ★ Mega Oran Berry, ★ Golden Apple, ★ Auto Reviver 등
+- CraftingScene에 Synthesis 탭 추가
+- 강화 아이템 던전 내 사용 가능 (강화 힐링/데미지)
+
+### v4.1.0 마일스톤
+- **퍼즐 방**: 5종 미니게임 + 보상 시스템
+- **아이템 합성**: 11종 업그레이드 경로 + ★ 아이템
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
