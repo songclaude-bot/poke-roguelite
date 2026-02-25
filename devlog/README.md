@@ -1632,3 +1632,22 @@
 - **날씨 예보**: 층별 날씨 예측 + HUD 표시
 - **파티 프리셋**: 5개 편성 저장/불러오기
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+## Phase 44: 함정 + 스킬 콤보 확장
+
+### 44-1. 함정 확장 (12종)
+- 날짜: 2026-02-25
+- 4종 추가: Sticky(점착), Hunger(배고픔), Summon(소환), Grudge(원한)
+- Summon Trap: 인접 타일에 적 2마리 소환
+- Grudge Trap: 저주 상태이상 8턴
+
+### 44-2. 스킬 콤보 확장 (18종)
+- 날짜: 2026-02-25
+- 8종 추가: Elemental Storm, Nature's Wrath, Shadow Dance, Iron Wall
+- Fairy Ring, Dragon's Rage, Blizzard Rush, Toxic Chain
+- Shadow Dance: 2턴 100% 회피, Dragon's Rage: 다음 공격 3배
+
+### v5.2.0 마일스톤
+- **함정**: 12종 (기존 8 + 신규 4)
+- **스킬 콤보**: 18종 (기존 10 + 신규 8)
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
