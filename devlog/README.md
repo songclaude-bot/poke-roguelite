@@ -1670,3 +1670,24 @@
 - **미니보스**: 8종 강적 + 보장 보상
 - **탐색 보상**: 3단계 층 탐색 보너스
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+## Phase 46: 아이템 친화도 + 던전 일지
+
+### 46-1. 아이템 친화도 시스템
+- 날짜: 2026-02-25
+- 타입 기반 아이템 효과 보너스 (6종 친화도 규칙)
+- Grass→Berry, Fighting→Food, Fire→Orb, Psychic→TM, Ghost→Seed, Steel→Equipment
+- 1.5배 효과 증가 (힐링, 데미지, PP 회복 등)
+- 10개 아이템 사용 경로에 친화도 적용
+
+### 46-2. 던전 일지 시스템
+- 날짜: 2026-02-25
+- 던전별 탐험 기록 영구 저장 (localStorage)
+- 클리어/패배/조우 종 기록, 최고 도달 층수
+- JournalScene: 스크롤 가능한 던전 히스토리 뷰
+- 허브에 Journal 버튼 추가
+
+### v5.4.0 마일스톤
+- **아이템 친화도**: 타입별 아이템 효과 보너스 시스템
+- **던전 일지**: 영구 탐험 기록 + Journal 씬
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
