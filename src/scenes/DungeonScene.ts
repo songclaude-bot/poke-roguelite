@@ -118,6 +118,11 @@ import {
   EnemyVariant, rollEnemyVariant, getVariantConfig, getVariantColor,
   getVariantHexColor, getVariantName, isSpecialVariant,
 } from "../core/enemy-variants";
+import {
+  ActiveBlessing, Blessing, getBlessingEffect, tickBlessingDurations,
+  activateBlessing, rollBlessingOrCurse, getRandomBlessing, getRandomCurse,
+  serializeBlessings, deserializeBlessings,
+} from "../core/blessings";
 
 interface AllyData {
   speciesId: string;
@@ -478,13 +483,17 @@ export class DungeonScene extends Phaser.Scene {
   // Run Log — battle log tracking all significant events across the run
   private runLog: RunLog = createRunLog();
 
+  // Blessing & Curse state (run-specific, persist across floors)
+  private activeBlessings: ActiveBlessing[] = [];
+  private blessingHudIcons: Phaser.GameObjects.Text[] = [];
+
   constructor() {
     super({ key: "DungeonScene" });
   }
 
   private persistentAllies: AllyData[] | null = null;
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number; scoreChain?: ScoreChain; legendaryEncountered?: boolean; questItemsCollected?: number; questItemsUsed?: boolean; relics?: Relic[]; runLogEntries?: RunLogEntry[] }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number; scoreChain?: ScoreChain; legendaryEncountered?: boolean; questItemsCollected?: number; questItemsUsed?: boolean; relics?: Relic[]; runLogEntries?: RunLogEntry[]; blessings?: { id: string; remaining: number }[] }) {
     // Load D-Pad side preference
     try {
       const side = localStorage.getItem("poke-roguelite-dpadSide");
@@ -650,6 +659,9 @@ export class DungeonScene extends Phaser.Scene {
     this.relicOverlayUI = [];
     // Run log: restore from floor transition or create fresh on new run
     this.runLog = data?.runLogEntries ? RunLog.deserialize(data.runLogEntries) : createRunLog();
+    // Blessing/curse state: restore from floor transition or reset on new run
+    this.activeBlessings = data?.blessings ? deserializeBlessings(data.blessings) : [];
+    this.blessingHudIcons = [];
     // Reset combo state on new floor
     this.recentSkillIds = [];
     this.comboDoubleDamage = false;
@@ -2462,6 +2474,13 @@ export class DungeonScene extends Phaser.Scene {
 
     this.updateHUD();
     this.updateRelicHUD();
+    this.updateBlessingHUD();
+
+    // Grant a random blessing/curse every 5 floors (starting floor 5)
+    if (this.currentFloor > 1 && this.currentFloor % 5 === 0 && this.activeBlessings.length < 5) {
+      const b = rollBlessingOrCurse();
+      this.time.delayedCall(800, () => this.grantBlessing(b));
+    }
 
     // Boss floor entrance message
     if (this.bossEntity) {
@@ -3047,9 +3066,10 @@ export class DungeonScene extends Phaser.Scene {
 
     // Reveal area around player each update (DarkFloor mutation reduces radius, talent increases)
     const revealTalentBonus = this.talentEffects.sightRangeBonus ?? 0;
-    const revealRadius = (hasMutation(this.floorMutations, MutationType.DarkFloor)
+    const blessingSightReduction = getBlessingEffect(this.activeBlessings, "sightReduction");
+    const revealRadius = Math.max(1, ((hasMutation(this.floorMutations, MutationType.DarkFloor)
       ? getMutationEffect(MutationType.DarkFloor, "sightRadius")
-      : 4) + revealTalentBonus;
+      : 4) + revealTalentBonus) - blessingSightReduction);
     this.revealArea(this.player.tileX, this.player.tileY, revealRadius);
 
     // ── Background (themed) ──
@@ -5706,7 +5726,8 @@ export class DungeonScene extends Phaser.Scene {
       // Difficulty-based drain: higher difficulty = faster hunger, NG+ reduces drain
       const ngBellyMult = 1 - this.ngPlusBonuses.bellyDrainReduction / 100;
       const talentBellyMult = 1 - (this.talentEffects.bellyDrainReduction ?? 0) / 100;
-      const drainRate = (0.5 + this.dungeonDef.difficulty * 0.1) * this.difficultyMods.bellyDrainMult * ngBellyMult * talentBellyMult;
+      const blessingBellyMult = 1 + getBlessingEffect(this.activeBlessings, "bellyDrainMult");
+      const drainRate = (0.5 + this.dungeonDef.difficulty * 0.1) * this.difficultyMods.bellyDrainMult * ngBellyMult * talentBellyMult * blessingBellyMult;
       const prevBelly = this.belly;
       this.belly = Math.max(0, this.belly - drainRate);
 
@@ -5784,6 +5805,16 @@ export class DungeonScene extends Phaser.Scene {
         if (this.player.sprite) {
           this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, 0, 1, `+${relicRegenAmount} Relic`);
         }
+      }
+    }
+
+    // ── Blessing: Nature's Grace — regen HP every N turns ──
+    const bRegenAmt = getBlessingEffect(this.activeBlessings, "regenAmount");
+    const bRegenInt = getBlessingEffect(this.activeBlessings, "regenInterval") || 5;
+    if (bRegenAmt > 0 && this.player.alive && this.floorTurns > 0 && this.floorTurns % bRegenInt === 0 && this.player.stats.hp < this.player.stats.maxHp) {
+      this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + bRegenAmt);
+      if (this.player.sprite) {
+        this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, 0, 1, `+${bRegenAmt} Grace`);
       }
     }
 
@@ -7792,6 +7823,11 @@ export class DungeonScene extends Phaser.Scene {
       else this.inventory.push({ item: itemDef, count: 1 });
     }
 
+    // Puzzle reward: grant a random blessing
+    if (this.activeBlessings.length < 5) {
+      this.time.delayedCall(500, () => this.grantBlessing(getRandomBlessing()));
+    }
+
     // Score chain bonus (treat puzzle solve like a monster house clear)
     const chainBonus = addChainAction(this.scoreChain, "monsterHouseClear");
     if (chainBonus > 0) this.showLog(`Puzzle Chain +${chainBonus} pts!`);
@@ -7823,6 +7859,11 @@ export class DungeonScene extends Phaser.Scene {
     this.puzzleFailEffect();
 
     this.showPuzzleResult("Puzzle Failed", "Better luck next time...", "#ef4444");
+
+    // Puzzle failure: grant a random curse
+    if (this.activeBlessings.length < 5) {
+      this.time.delayedCall(500, () => this.grantBlessing(getRandomCurse()));
+    }
 
     // Clean up puzzle visuals
     this.cleanupPuzzleTiles();
@@ -7983,6 +8024,13 @@ export class DungeonScene extends Phaser.Scene {
     // Run log: floor advance
     this.runLog.add(RunLogEvent.FloorAdvanced, `Advanced to B${this.currentFloor + 1}F`, this.currentFloor, this.turnManager.turn);
 
+    // Tick blessing/curse durations on floor advance
+    const prevBlessingCount = this.activeBlessings.length;
+    this.activeBlessings = tickBlessingDurations(this.activeBlessings);
+    if (this.activeBlessings.length < prevBlessingCount) {
+      this.showLog("Some blessings/curses have expired.");
+    }
+
     // Pass modifier IDs through floor transitions
     const modifierIds = this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined;
 
@@ -8011,6 +8059,7 @@ export class DungeonScene extends Phaser.Scene {
         questItemsUsed: this.questItemsUsed,
         relics: this.activeRelics,
         runLogEntries: this.runLog.serialize(),
+        blessings: serializeBlessings(this.activeBlessings),
       });
     });
   }
@@ -8034,7 +8083,8 @@ export class DungeonScene extends Phaser.Scene {
     const clearMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
     const clearTalentGoldMult = 1 + (this.talentEffects.goldPercent ?? 0) / 100;
     const clearRelicGoldMult = 1 + (this.relicEffects.goldMult ?? 0);
-    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * this.difficultyMods.goldMult * clearEnchGoldMult * clearMutGoldMult * clearTalentGoldMult * clearRelicGoldMult);
+    const clearBlessingGoldMult = 1 + getBlessingEffect(this.activeBlessings, "goldMult");
+    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * this.difficultyMods.goldMult * clearEnchGoldMult * clearMutGoldMult * clearTalentGoldMult * clearRelicGoldMult * clearBlessingGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -8765,7 +8815,8 @@ export class DungeonScene extends Phaser.Scene {
     if (!skill || skill.currentPp <= 0) return;
 
     this.player.facing = dir;
-    skill.currentPp--;
+    const extraPpCost = getBlessingEffect(this.activeBlessings, "extraPpCost");
+    skill.currentPp = Math.max(0, skill.currentPp - 1 - extraPpCost);
 
     await this.turnManager.executeTurn(
       () => this.performSkill(this.player, skill, dir),
@@ -9002,6 +9053,8 @@ export class DungeonScene extends Phaser.Scene {
       // Ability: Run Away / Levitate dodge bonus at higher levels
       if (defender.ability === AbilityId.RunAway) dodgeChance += getRunAwayDodgeBonus(defender.abilityLevel ?? 1) * 100;
       if (defender.ability === AbilityId.Levitate) dodgeChance += getLevitateDodgeBonus(defender.abilityLevel ?? 1) * 100;
+      // Blessing: Swift Step dodge chance bonus
+      if (defender === this.player) dodgeChance += getBlessingEffect(this.activeBlessings, "dodgeChance") * 100;
       if (defender === this.player && dodgeChance > 0 && Math.random() * 100 < dodgeChance) {
         sfxDodge();
         this.showLog(`${defender.name} dodged ${attacker.name}'s attack!`);
@@ -9021,6 +9074,9 @@ export class DungeonScene extends Phaser.Scene {
       // Relic: ATK/DEF multipliers (player only)
       if (attacker === this.player) atk = Math.floor(atk * (1 + (this.relicEffects.atkMult ?? 0)));
       if (defender === this.player) def = Math.floor(def * (1 + (this.relicEffects.defMult ?? 0)));
+      // Blessing: ATK/DEF multipliers (player only)
+      if (attacker === this.player) atk = Math.floor(atk * (1 + getBlessingEffect(this.activeBlessings, "atkMult")));
+      if (defender === this.player) def = Math.floor(def * (1 + getBlessingEffect(this.activeBlessings, "defMult")));
       const baseDmg = Math.max(1, atk - Math.floor(def / 2));
       // Ability: Torrent — scaled by ability level
       let abilityMult = 1.0;
@@ -11764,6 +11820,59 @@ export class DungeonScene extends Phaser.Scene {
       ic.on("pointerdown", () => this.showRelicInfoPopup(r));
       this.relicHudIcons.push(ic);
     }
+  }
+
+  private updateBlessingHUD() {
+    for (const ic of this.blessingHudIcons) { if (ic && ic.scene) ic.destroy(); }
+    this.blessingHudIcons = [];
+    if (this.activeBlessings.length === 0) return;
+    const startX = 8 + this.activeRelics.length * 18;
+    for (let i = 0; i < this.activeBlessings.length; i++) {
+      const ab = this.activeBlessings[i];
+      const icon = ab.blessing.isCurse ? "▼" : "▲";
+      const clr = `#${ab.blessing.color.toString(16).padStart(6, "0")}`;
+      const ic = this.add.text(startX + i * 18, 64, icon, {
+        fontSize: "12px", color: clr, fontFamily: "monospace", fontStyle: "bold",
+        backgroundColor: "#0a0a0fcc", padding: { x: 2, y: 1 },
+      }).setScrollFactor(0).setDepth(100).setInteractive();
+      ic.on("pointerdown", () => this.showBlessingInfoPopup(ab));
+      this.blessingHudIcons.push(ic);
+    }
+  }
+
+  private showBlessingInfoPopup(ab: ActiveBlessing) {
+    const clr = `#${ab.blessing.color.toString(16).padStart(6, "0")}`;
+    const label = ab.blessing.isCurse ? "CURSE" : "BLESSING";
+    const popup = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2,
+      `${ab.blessing.isCurse ? "▼" : "▲"} ${ab.blessing.name} [${label}]\n${ab.blessing.description}\n${ab.remainingFloors} floors remaining`, {
+      fontSize: "11px", color: clr, fontFamily: "monospace", fontStyle: "bold",
+      backgroundColor: "#0a0a0fee", padding: { x: 12, y: 8 },
+      wordWrap: { width: 250 }, align: "center",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(500);
+    popup.setInteractive();
+    popup.on("pointerdown", () => popup.destroy());
+    this.time.delayedCall(2500, () => { if (popup.scene) popup.destroy(); });
+  }
+
+  private grantBlessing(blessing: Blessing) {
+    const ab = activateBlessing(blessing);
+    this.activeBlessings.push(ab);
+    const label = blessing.isCurse ? "CURSE" : "BLESSING";
+    const clr = `#${blessing.color.toString(16).padStart(6, "0")}`;
+    this.showLog(`${blessing.isCurse ? "▼" : "▲"} ${label}: ${blessing.name} — ${blessing.description}`);
+    sfxBuff();
+    const overlay = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40,
+      `${blessing.isCurse ? "▼ Cursed!" : "▲ Blessed!"}\n${blessing.name}\n${blessing.description}`, {
+      fontSize: "13px", color: clr, fontFamily: "monospace", fontStyle: "bold",
+      backgroundColor: "#0a0a1aee", padding: { x: 16, y: 10 },
+      wordWrap: { width: 260 }, align: "center",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(500).setAlpha(0);
+    this.tweens.add({ targets: overlay, alpha: 1, y: GAME_HEIGHT / 2 - 50, duration: 300, ease: "Back.easeOut" });
+    this.time.delayedCall(2000, () => {
+      this.tweens.add({ targets: overlay, alpha: 0, duration: 300, onComplete: () => overlay.destroy() });
+    });
+    this.updateBlessingHUD();
+    this.runLog.add(RunLogEvent.ItemPickedUp, `${label}: ${blessing.name}`, this.currentFloor, this.turnManager.turn);
   }
 
   private showRelicInfoPopup(relic: Relic) {
