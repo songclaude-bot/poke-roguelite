@@ -20,6 +20,10 @@ import {
 import {
   calculatePassiveIncome, getIncomeRate, updateLastVisit,
 } from "../core/passive-income";
+import {
+  generateDailyQuests, getChallengeQuests, hasClaimableQuests,
+  getTodayDateString, updateQuestProgress, RunQuestData,
+} from "../core/quests";
 
 /**
  * HubScene — the town between dungeon runs.
@@ -45,6 +49,12 @@ export class HubScene extends Phaser.Scene {
     challengeMode?: string;
     pokemonSeen?: string[];
     inventory?: { itemId: string; count: number }[];
+    // Quest tracking data from dungeon run
+    questItemsCollected?: number;
+    questItemsUsed?: boolean;
+    questBestChainTier?: string;
+    questBossDefeated?: boolean;
+    questLegendaryDefeated?: boolean;
   }) {
     this.meta = loadMeta();
 
@@ -103,6 +113,42 @@ export class HubScene extends Phaser.Scene {
         this.meta.lastDungeonId = data.dungeonId;
         this.meta.lastChallenge = data.challengeMode ?? undefined;
       }
+
+      // ── Quest Progress Update ──
+      if (data.dungeonId) {
+        // Ensure quests are initialized
+        const today = getTodayDateString();
+        if (this.meta.questLastDate !== today) {
+          this.meta.activeQuests = generateDailyQuests(new Date(), this.meta);
+          this.meta.questLastDate = today;
+        }
+        if (!this.meta.challengeQuests || this.meta.challengeQuests.length === 0) {
+          this.meta.challengeQuests = getChallengeQuests(this.meta);
+        }
+
+        const runData: RunQuestData = {
+          enemiesDefeated: data.enemiesDefeated ?? 0,
+          cleared: data.cleared ?? false,
+          dungeonId: data.dungeonId,
+          itemsCollected: data.questItemsCollected ?? 0,
+          floorReached: data.bestFloor ?? 0,
+          bestChainTier: data.questBestChainTier ?? "",
+          bossDefeated: data.questBossDefeated ?? false,
+          legendaryDefeated: data.questLegendaryDefeated ?? false,
+          noItemsUsed: data.questItemsUsed === false || data.questItemsUsed === undefined,
+          turnsUsed: data.turns ?? 9999,
+        };
+
+        // Update daily quests
+        if (this.meta.activeQuests && this.meta.activeQuests.length > 0) {
+          updateQuestProgress(this.meta.activeQuests, runData);
+        }
+        // Update challenge quests
+        if (this.meta.challengeQuests && this.meta.challengeQuests.length > 0) {
+          updateQuestProgress(this.meta.challengeQuests, runData);
+        }
+      }
+
       saveMeta(this.meta);
     }
   }
@@ -248,8 +294,8 @@ export class HubScene extends Phaser.Scene {
     const currentStarter = this.meta.starter ?? "mudkip";
     const starterName = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
 
-    const fixedY = GAME_HEIGHT - 268;
-    const btnSpacing = 28;
+    const fixedY = GAME_HEIGHT - 294;
+    const btnSpacing = 27;
     // Solid background behind fixed buttons — covers from scroll end to bottom
     const fixedBgTop = fixedY - 30;
     const fixedBgH = GAME_HEIGHT - fixedBgTop;
@@ -297,6 +343,45 @@ export class HubScene extends Phaser.Scene {
       "Records", `Clears: ${this.meta.totalClears}  Best: B${this.meta.bestFloor}F`, "#60a5fa",
       () => this.scene.start("AchievementScene")
     );
+
+    // ── Quests Button ──
+    // Refresh daily quests if date changed
+    const today = getTodayDateString();
+    if (this.meta.questLastDate !== today) {
+      this.meta.activeQuests = generateDailyQuests(new Date(), this.meta);
+      this.meta.questLastDate = today;
+    }
+    if (!this.meta.challengeQuests || this.meta.challengeQuests.length === 0) {
+      this.meta.challengeQuests = getChallengeQuests(this.meta);
+    }
+    saveMeta(this.meta);
+
+    const allQuests = [...(this.meta.activeQuests ?? []), ...(this.meta.challengeQuests ?? [])];
+    const claimableCount = allQuests.filter(q => q.completed && !q.claimed).length;
+    const questDesc = claimableCount > 0 ? `${claimableCount} ready to claim!` : "Daily & challenge missions";
+    const questBtnResult = this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 8, btnW, 28,
+      "Quests", questDesc, "#10b981",
+      () => this.scene.start("QuestBoardScene")
+    );
+
+    // Notification badge for claimable quests
+    if (claimableCount > 0) {
+      const badgeX = GAME_WIDTH / 2 + btnW / 2 - 16;
+      const badgeY = fixedY + btnSpacing * 8 - 8;
+      const badge = this.add.circle(badgeX, badgeY, 7, 0xef4444).setDepth(53);
+      const badgeText = this.add.text(badgeX, badgeY, String(claimableCount), {
+        fontSize: "8px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(54);
+      // Pulse animation
+      this.tweens.add({
+        targets: badge,
+        scaleX: { from: 1, to: 1.3 },
+        scaleY: { from: 1, to: 1.3 },
+        duration: 600,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
 
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v4.2.0", {
       fontSize: "8px", color: "#444460", fontFamily: "monospace",
@@ -518,16 +603,16 @@ export class HubScene extends Phaser.Scene {
         }).setOrigin(1, 0);
         container.add(hdrSub);
 
-        // Make header tappable
+        // Make header tappable (use pointerup + distance check to avoid scroll conflicts)
         hdrBg.setInteractive({ useHandCursor: true });
         const tierId = tier.id;
         hdrBg.on("pointerover", () => hdrBg.setAlpha(1));
         hdrBg.on("pointerout", () => hdrBg.setAlpha(0.85));
-        hdrBg.on("pointerdown", () => {
+        hdrBg.on("pointerup", (ptr: Phaser.Input.Pointer) => {
+          if (ptr.getDistance() > 10) return; // was a scroll, not a tap
           expandedState[tierId] = !expandedState[tierId];
           const prevScroll = scrollOffset;
           renderList();
-          // Restore scroll position (clamped to new max)
           scrollOffset = Math.max(-maxScroll, Math.min(0, prevScroll));
           container.y = scrollOffset;
           updateIndicator();
@@ -552,7 +637,10 @@ export class HubScene extends Phaser.Scene {
               bg.setInteractive({ useHandCursor: true });
               bg.on("pointerover", () => bg.setFillStyle(0x2a2a4e, 1));
               bg.on("pointerout", () => bg.setFillStyle(0x1a1a2e, 0.9));
-              bg.on("pointerdown", () => this.enterDungeon(dgId));
+              bg.on("pointerup", (ptr: Phaser.Input.Pointer) => {
+                if (ptr.getDistance() > 10) return; // was a scroll, not a tap
+                this.enterDungeon(dgId);
+              });
             }
 
             // Dungeon name
@@ -957,27 +1045,39 @@ export class HubScene extends Phaser.Scene {
     const uiItems: Phaser.GameObjects.GameObject[] = [];
     let starterSelectActive = true;
 
+    // Dark overlay
     const overlay = this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.85
     ).setDepth(200).setInteractive();
     uiItems.push(overlay);
 
-    const title = this.add.text(GAME_WIDTH / 2, 30, "── Choose Starter ──", {
+    // Title
+    const title = this.add.text(GAME_WIDTH / 2, 20, "Choose Starter", {
       fontSize: "14px", color: "#f472b6", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5).setDepth(201);
     uiItems.push(title);
 
-    // Starter options
+    // Close button (top-right, always visible)
+    const closeBtn = this.add.text(GAME_WIDTH - 12, 20, "✕", {
+      fontSize: "18px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(210).setInteractive({ useHandCursor: true });
+    uiItems.push(closeBtn);
+
     const starters = this.getStarterList();
     const current = this.meta.starter ?? "mudkip";
 
-    // Virtual scroll configuration
-    const ITEM_H = 36;
-    const VISIBLE_TOP = 50;
-    const VISIBLE_BOTTOM = GAME_HEIGHT - 50;
+    // Grid configuration
+    const COLS = 4;
+    const CELL_W = 82;
+    const CELL_H = 34;
+    const GAP_X = 4;
+    const GAP_Y = 4;
+    const GRID_LEFT = (GAME_WIDTH - COLS * (CELL_W + GAP_X) + GAP_X) / 2;
+    const VISIBLE_TOP = 40;
+    const VISIBLE_BOTTOM = GAME_HEIGHT - 40;
     const VISIBLE_H = VISIBLE_BOTTOM - VISIBLE_TOP;
-    const POOL_SIZE = Math.ceil(VISIBLE_H / ITEM_H) + 2; // enough to fill screen + buffer
-    const TOTAL_H = starters.length * ITEM_H + 40; // +40 for close button
+    const ROWS = Math.ceil(starters.length / COLS);
+    const TOTAL_H = ROWS * (CELL_H + GAP_Y);
     const MAX_SCROLL = Math.max(0, TOTAL_H - VISIBLE_H);
 
     // Mask for scroll area
@@ -986,127 +1086,123 @@ export class HubScene extends Phaser.Scene {
     uiItems.push(maskShape as unknown as Phaser.GameObjects.GameObject);
     const mask = maskShape.createGeometryMask();
 
-    // Create object pool (only POOL_SIZE rows, not 164!)
-    const pool: { bg: Phaser.GameObjects.Rectangle; nameT: Phaser.GameObjects.Text; descT: Phaser.GameObjects.Text; idx: number }[] = [];
-    const poolContainer = this.add.container(0, 0).setDepth(202).setMask(mask);
-    uiItems.push(poolContainer);
+    // Container for all grid cells
+    const gridContainer = this.add.container(0, 0).setDepth(202).setMask(mask);
+    uiItems.push(gridContainer);
 
-    for (let i = 0; i < POOL_SIZE; i++) {
-      const bg = this.add.rectangle(GAME_WIDTH / 2, 0, 300, 30, 0x1a1a2e, 0.95)
-        .setStrokeStyle(1, 0x334155);
-      const nameT = this.add.text(GAME_WIDTH / 2 - 130, 0, "", {
-        fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace", fontStyle: "bold",
-      });
-      const descT = this.add.text(GAME_WIDTH / 2 - 130, 0, "", {
-        fontSize: "7px", color: "#666680", fontFamily: "monospace",
-      });
-      poolContainer.add([bg, nameT, descT]);
-      bg.setInteractive({ useHandCursor: true });
-      pool.push({ bg, nameT, descT, idx: -1 });
-    }
+    // Create all grid cells
+    const cells: { bg: Phaser.GameObjects.Rectangle; nameT: Phaser.GameObjects.Text; starterIdx: number }[] = [];
 
-    // Close button
-    const closeBtn = this.add.text(GAME_WIDTH / 2, 0, "[Close]", {
-      fontSize: "13px", color: "#60a5fa", fontFamily: "monospace",
-    }).setOrigin(0.5).setInteractive().setDepth(202);
-    poolContainer.add(closeBtn);
+    const buildGrid = () => {
+      gridContainer.removeAll(true);
+      cells.length = 0;
 
+      for (let i = 0; i < starters.length; i++) {
+        const s = starters[i];
+        const col = i % COLS;
+        const row = Math.floor(i / COLS);
+        const cx = GRID_LEFT + col * (CELL_W + GAP_X) + CELL_W / 2;
+        const cy = VISIBLE_TOP + 4 + row * (CELL_H + GAP_Y) + CELL_H / 2;
+
+        const isUnlocked = this.meta.totalClears >= s.unlock;
+        const isCurrent = s.id === current;
+
+        const bgColor = isCurrent ? 0x3a3a1a : isUnlocked ? 0x1a1a2e : 0x111118;
+        const strokeColor = isCurrent ? 0xfbbf24 : isUnlocked ? 0x334155 : 0x1a1a22;
+        const textColor = isCurrent ? "#fbbf24" : isUnlocked ? "#d0d0e0" : "#333344";
+
+        const bg = this.add.rectangle(cx, cy, CELL_W, CELL_H, bgColor, 0.95)
+          .setStrokeStyle(1, strokeColor);
+        gridContainer.add(bg);
+
+        const label = isUnlocked ? s.name : "???";
+        const nameT = this.add.text(cx, cy, label, {
+          fontSize: "9px", color: textColor, fontFamily: "monospace",
+          fontStyle: isCurrent ? "bold" : "normal",
+        }).setOrigin(0.5);
+        gridContainer.add(nameT);
+
+        if (isUnlocked && !isCurrent) {
+          bg.setInteractive({ useHandCursor: true });
+          bg.on("pointerup", (ptr: Phaser.Input.Pointer) => {
+            if (ptr.getDistance() > 10) return; // scroll, not tap
+            this.meta.starter = s.id;
+            saveMeta(this.meta);
+            const name = s.name.charAt(0).toUpperCase() + s.name.slice(1);
+            if (this.starterLabel) this.starterLabel.setText(`Starter: ${name}`);
+            buildGrid();
+            gridContainer.y = scrollOffset;
+          });
+        }
+
+        cells.push({ bg, nameT, starterIdx: i });
+      }
+    };
+
+    buildGrid();
+
+    // Scroll state
     let scrollOffset = 0;
 
-    // Find current starter and scroll to it
+    // Auto-scroll to current starter
     const currentIdx = starters.findIndex(s => s.id === current);
-    if (currentIdx > 5) {
-      scrollOffset = Math.min(MAX_SCROLL, (currentIdx - 3) * ITEM_H);
+    if (currentIdx >= 0) {
+      const currentRow = Math.floor(currentIdx / COLS);
+      const targetY = currentRow * (CELL_H + GAP_Y);
+      scrollOffset = -Math.min(MAX_SCROLL, Math.max(0, targetY - VISIBLE_H / 3));
+      gridContainer.y = scrollOffset;
     }
 
-    const cleanup = () => {
-      if (!starterSelectActive) return;
-      starterSelectActive = false;
-      // Remove our specific pointermove listener
-      this.input.off("pointermove", scrollHandler);
-      uiItems.forEach(o => o.destroy());
+    // Scroll indicator
+    const indicator = this.add.rectangle(
+      GAME_WIDTH - 4, VISIBLE_TOP, 3,
+      Math.max(20, (VISIBLE_H / TOTAL_H) * VISIBLE_H),
+      0x667eea, 0.5
+    ).setOrigin(0.5, 0).setDepth(203).setVisible(MAX_SCROLL > 0);
+    uiItems.push(indicator);
+
+    const updateIndicator = () => {
+      if (MAX_SCROLL <= 0) return;
+      const ratio = -scrollOffset / MAX_SCROLL;
+      indicator.y = VISIBLE_TOP + ratio * (VISIBLE_H - indicator.height);
     };
-
-    const bindRow = (row: typeof pool[0], dataIdx: number, yPos: number) => {
-      row.idx = dataIdx;
-      row.bg.setY(yPos);
-      row.nameT.setY(yPos - 7);
-      row.descT.setY(yPos + 5);
-
-      if (dataIdx < 0 || dataIdx >= starters.length) {
-        row.bg.setVisible(false);
-        row.nameT.setVisible(false);
-        row.descT.setVisible(false);
-        return;
-      }
-
-      const s = starters[dataIdx];
-      const isUnlocked = this.meta.totalClears >= s.unlock;
-      const isCurrent = s.id === (this.meta.starter ?? "mudkip");
-      const color = isCurrent ? "#fbbf24" : isUnlocked ? "#e0e0e0" : "#444460";
-
-      row.bg.setVisible(true).setFillStyle(0x1a1a2e, 0.95)
-        .setStrokeStyle(1, isCurrent ? 0xfbbf24 : isUnlocked ? 0x334155 : 0x222233);
-      row.nameT.setVisible(true).setText(isCurrent ? `★ ${s.name}` : s.name).setColor(color);
-      row.descT.setVisible(true).setText(
-        isUnlocked ? (isCurrent ? "Currently selected" : "Tap to select")
-          : `Need ${s.unlock} clears (have ${this.meta.totalClears})`
-      );
-
-      row.bg.removeAllListeners("pointerdown");
-      row.bg.removeAllListeners("pointerover");
-      row.bg.removeAllListeners("pointerout");
-
-      if (isUnlocked && !isCurrent) {
-        row.bg.on("pointerover", () => row.bg.setFillStyle(0x2a2a4e, 1));
-        row.bg.on("pointerout", () => row.bg.setFillStyle(0x1a1a2e, 0.95));
-        row.bg.on("pointerdown", () => {
-          this.meta.starter = s.id;
-          saveMeta(this.meta);
-          // Update hub starter label without scene restart
-          const name = s.name.charAt(0).toUpperCase() + s.name.slice(1);
-          if (this.starterLabel) this.starterLabel.setText(`Starter: ${name}`);
-          // Refresh visible rows to show new selection
-          renderVisible();
-        });
-      }
-    };
-
-    const renderVisible = () => {
-      const startIdx = Math.floor(scrollOffset / ITEM_H);
-      for (let i = 0; i < POOL_SIZE; i++) {
-        const dataIdx = startIdx + i;
-        const yPos = VISIBLE_TOP + 10 + dataIdx * ITEM_H - scrollOffset;
-        bindRow(pool[i], dataIdx, yPos);
-      }
-      // Position close button after last item
-      const closeBtnY = VISIBLE_TOP + 10 + starters.length * ITEM_H - scrollOffset + 10;
-      closeBtn.setY(closeBtnY);
-    };
-
-    renderVisible();
-    closeBtn.on("pointerdown", cleanup);
+    updateIndicator();
 
     // Scroll handling
     let dragStartY = 0;
     let isDragging = false;
 
-    overlay.on("pointerdown", (ptr: Phaser.Input.Pointer) => {
+    const onDown = (ptr: Phaser.Input.Pointer) => {
+      if (!starterSelectActive) return;
       dragStartY = ptr.y;
       isDragging = true;
-    });
+    };
 
-    // Use named function for clean removal
     const scrollHandler = (ptr: Phaser.Input.Pointer) => {
       if (!starterSelectActive || !ptr.isDown || !isDragging) return;
       const dy = ptr.y - dragStartY;
       dragStartY = ptr.y;
-      scrollOffset = Math.max(0, Math.min(MAX_SCROLL, scrollOffset - dy));
-      renderVisible();
+      scrollOffset = Math.max(-MAX_SCROLL, Math.min(0, scrollOffset + dy));
+      gridContainer.y = scrollOffset;
+      updateIndicator();
     };
-    this.input.on("pointermove", scrollHandler);
 
-    this.input.on("pointerup", () => { isDragging = false; });
+    const onUp = () => { isDragging = false; };
+
+    this.input.on("pointerdown", onDown);
+    this.input.on("pointermove", scrollHandler);
+    this.input.on("pointerup", onUp);
+
+    const cleanup = () => {
+      if (!starterSelectActive) return;
+      starterSelectActive = false;
+      this.input.off("pointerdown", onDown);
+      this.input.off("pointermove", scrollHandler);
+      this.input.off("pointerup", onUp);
+      uiItems.forEach(o => o.destroy());
+    };
+
+    closeBtn.on("pointerdown", cleanup);
   }
 
   private getStarterList(): { id: string; name: string; unlock: number }[] {

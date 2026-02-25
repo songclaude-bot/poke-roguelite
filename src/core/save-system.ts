@@ -5,6 +5,7 @@
 
 import { Skill, SKILL_DB, createSkill } from "./skill";
 import { ItemStack, ITEM_DB } from "./item";
+import type { Quest } from "./quests";
 
 const SAVE_KEY = "poke-roguelite-save";
 const META_KEY = "poke-roguelite-meta";
@@ -82,6 +83,10 @@ export interface MetaSaveData {
   lastVisitTimestamp?: number;
   // Speed run best times per dungeon (dungeonId → best time in seconds)
   bestTimes?: Record<string, number>;
+  // Quest / Mission Board
+  activeQuests?: Quest[];       // current daily quests
+  questLastDate?: string;       // date string (YYYY-MM-DD) of when daily quests were generated
+  challengeQuests?: Quest[];    // persistent challenge quests
 }
 
 const SAVE_VERSION = 1;
@@ -164,6 +169,9 @@ export function loadMeta(): MetaSaveData {
     if (data.clearedDungeons === undefined) data.clearedDungeons = [];
     if (data.lastVisitTimestamp === undefined) data.lastVisitTimestamp = undefined;
     if (data.bestTimes === undefined) data.bestTimes = {};
+    if (data.activeQuests === undefined) data.activeQuests = [];
+    if (data.questLastDate === undefined) data.questLastDate = undefined;
+    if (data.challengeQuests === undefined) data.challengeQuests = [];
     return data;
   } catch {
     return defaultMeta();

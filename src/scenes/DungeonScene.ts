@@ -97,6 +97,10 @@ import {
   rollMutations, hasMutation, getMutationEffect, getMutationDef,
   mutationColorHex,
 } from "../core/dungeon-mutations";
+import {
+  generateDailyQuests, getChallengeQuests, updateQuestProgress,
+  getTodayDateString, RunQuestData,
+} from "../core/quests";
 
 interface AllyData {
   speciesId: string;
@@ -222,6 +226,9 @@ export class DungeonScene extends Phaser.Scene {
   // Game state
   private gameOver = false;
   private enemiesDefeated = 0;
+  // Quest tracking
+  private questItemsCollected = 0;
+  private questItemsUsed = false;
 
   // Trap state
   private floorTraps: FloorTrap[] = [];
@@ -428,7 +435,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private persistentAllies: AllyData[] | null = null;
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number; scoreChain?: ScoreChain; legendaryEncountered?: boolean }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number; scoreChain?: ScoreChain; legendaryEncountered?: boolean; questItemsCollected?: number; questItemsUsed?: boolean }) {
     // Load D-Pad side preference
     try {
       const side = localStorage.getItem("poke-roguelite-dpadSide");
@@ -562,6 +569,14 @@ export class DungeonScene extends Phaser.Scene {
     this.teamPanelOpen = false;
     this.teamPanelUI = [];
     this.enemiesDefeated = 0;
+    // Quest tracking: restore from floor transition or reset on new run
+    if (data?.floor && data.floor > 1) {
+      this.questItemsCollected = data.questItemsCollected ?? 0;
+      this.questItemsUsed = data.questItemsUsed ?? false;
+    } else {
+      this.questItemsCollected = 0;
+      this.questItemsUsed = false;
+    }
     // Reset combo state on new floor
     this.recentSkillIds = [];
     this.comboDoubleDamage = false;
@@ -3645,6 +3660,7 @@ export class DungeonScene extends Phaser.Scene {
           challengeMode: this.challengeMode ?? undefined,
           pokemonSeen: Array.from(this.seenSpecies),
           inventory: serializeInventory(this.inventory),
+          ...this.getQuestTrackingData(),
         });
       });
     });
@@ -4047,6 +4063,7 @@ export class DungeonScene extends Phaser.Scene {
     this.floorItems.splice(idx, 1);
     this.showLog(`Picked up ${fi.item.name}!`);
     this.updateQuickSlotLabel();
+    this.questItemsCollected++;
 
     // Score chain: item pickup
     addChainAction(this.scoreChain, "itemPickup");
@@ -4199,6 +4216,7 @@ export class DungeonScene extends Phaser.Scene {
 
     const item = stack.item;
     this.lastUsedItemId = item.id;
+    this.questItemsUsed = true;
     sfxHeal();
 
     switch (item.id) {
@@ -4293,6 +4311,7 @@ export class DungeonScene extends Phaser.Scene {
             challengeMode: this.challengeMode ?? undefined,
             pokemonSeen: Array.from(this.seenSpecies),
             inventory: serializeInventory(this.inventory),
+            ...this.getQuestTrackingData(),
           });
         });
         break;
@@ -4445,6 +4464,7 @@ export class DungeonScene extends Phaser.Scene {
             challengeMode: this.challengeMode ?? undefined,
             pokemonSeen: Array.from(this.seenSpecies),
             inventory: serializeInventory(this.inventory),
+            ...this.getQuestTrackingData(),
           });
         });
         break;
@@ -7720,6 +7740,20 @@ export class DungeonScene extends Phaser.Scene {
     return enemies;
   }
 
+  /** Get quest tracking data for passing to HubScene */
+  private getQuestTrackingData(): Record<string, unknown> {
+    const bestChainTier = getChainTier(this.scoreChain.maxChainReached);
+    const bossDefeated = this.isBossRush ? this.bossesDefeated > 0 : !!this.dungeonDef.boss;
+    const legendaryDefeated = this.legendaryEncountered && this.legendaryEntity === null && this.legendaryEncounter === null;
+    return {
+      questItemsCollected: this.questItemsCollected,
+      questItemsUsed: this.questItemsUsed,
+      questBestChainTier: bestChainTier,
+      questBossDefeated: bossDefeated,
+      questLegendaryDefeated: legendaryDefeated,
+    };
+  }
+
   private advanceFloor() {
     this.stopAutoExplore();
     // Endless dungeon never shows clear screen — always advance
@@ -7779,6 +7813,8 @@ export class DungeonScene extends Phaser.Scene {
         runElapsedTime: this.runElapsedSeconds,
         scoreChain: this.scoreChain,
         legendaryEncountered: this.legendaryEncountered,
+        questItemsCollected: this.questItemsCollected,
+        questItemsUsed: this.questItemsUsed,
       });
     });
   }
@@ -7943,6 +7979,7 @@ export class DungeonScene extends Phaser.Scene {
         challengeMode: this.challengeMode ?? undefined,
         pokemonSeen: Array.from(this.seenSpecies),
         inventory: serializeInventory(this.inventory),
+        ...this.getQuestTrackingData(),
       });
     });
 
@@ -8084,6 +8121,7 @@ export class DungeonScene extends Phaser.Scene {
         challengeMode: this.challengeMode ?? undefined,
         pokemonSeen: Array.from(this.seenSpecies),
         inventory: serializeInventory(this.inventory),
+        ...this.getQuestTrackingData(),
       });
     });
 
@@ -8155,6 +8193,37 @@ export class DungeonScene extends Phaser.Scene {
 
     // 4. Increment totalRuns for the new run (DungeonPreviewScene does this)
     meta.totalRuns++;
+
+    // 4b. Update quest progress for this run
+    const today = getTodayDateString();
+    if (meta.questLastDate !== today) {
+      meta.activeQuests = generateDailyQuests(new Date(), meta);
+      meta.questLastDate = today;
+    }
+    if (!meta.challengeQuests || meta.challengeQuests.length === 0) {
+      meta.challengeQuests = getChallengeQuests(meta);
+    }
+    const bestChainTier = getChainTier(this.scoreChain.maxChainReached);
+    const qrBossDefeated = this.isBossRush ? this.bossesDefeated > 0 : !!this.dungeonDef.boss;
+    const qrLegendaryDefeated = this.legendaryEncountered && this.legendaryEntity === null && this.legendaryEncounter === null;
+    const runQuestData: RunQuestData = {
+      enemiesDefeated: this.enemiesDefeated,
+      cleared,
+      dungeonId: this.dungeonDef.id,
+      itemsCollected: this.questItemsCollected,
+      floorReached: bestFloor,
+      bestChainTier,
+      bossDefeated: qrBossDefeated,
+      legendaryDefeated: qrLegendaryDefeated,
+      noItemsUsed: !this.questItemsUsed,
+      turnsUsed: this.turnManager.turn,
+    };
+    if (meta.activeQuests && meta.activeQuests.length > 0) {
+      updateQuestProgress(meta.activeQuests, runQuestData);
+    }
+    if (meta.challengeQuests && meta.challengeQuests.length > 0) {
+      updateQuestProgress(meta.challengeQuests, runQuestData);
+    }
 
     saveMeta(meta);
     clearDungeonSave();
