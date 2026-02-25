@@ -1405,3 +1405,27 @@
 - **퍼즐 방**: 5종 미니게임 + 보상 시스템
 - **아이템 합성**: 11종 업그레이드 경로 + ★ 아이템
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 34: 전설 조우 + 던전 변이
+
+### 34-1. 전설 포켓몬 조우 시스템 (Phase 278)
+- 날짜: 2026-02-25
+- 10종 전설 포켓몬: Mewtwo, Rayquaza, Lugia, Ho-Oh, Groudon, Kyogre, Dialga, Palkia, Arceus, Giratina
+- 3% 확률 (NG+당 +1%), 70%+ 깊은 층에서만 등장
+- 금색 오라 + 1.5x 스프라이트 + 드라마틱 입장 연출
+- 고유 보상: 골드, 기술 습득, 희귀 아이템
+- 도망 가능 (계단 사용) but 보상 없음
+
+### 34-2. 던전 변이 시스템 (Phase 279)
+- 날짜: 2026-02-25
+- 12종 변이: GiantEnemies, DarkFloor, GoldenAge, ItemRain, EnemySwarm, FastEnemies, RegenFloor, CursedFloor, TypeShift, MirrorWorld, TreasureFloor, TinyDungeon
+- 20% 확률/층, 최대 2개 동시, 배타적 조합 규칙
+- 색상 코딩 HUD 배지 + 변이 공지 배너
+- 모든 기존 시스템과 중첩 가능
+
+### v4.2.0 마일스톤
+- **전설 조우**: 10종 전설 미니보스 + 금색 연출 + 고유 보상
+- **던전 변이**: 12종 층별 변이 + 배타적 조합 + HUD 배지
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
