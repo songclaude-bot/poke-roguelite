@@ -52,6 +52,7 @@ export interface Entity {
   statusEffects: StatusEffect[];
   isAlly?: boolean; // true if recruited ally
   isBoss?: boolean; // true if floor boss
+  isMiniBoss?: boolean; // true if mini-boss (stronger enemy with guaranteed reward)
   speciesId?: string; // species key for serialization
   ability?: AbilityId; // passive ability
   abilityLevel?: number; // ability upgrade level (1-5, default 1)

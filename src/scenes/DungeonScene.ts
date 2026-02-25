@@ -139,6 +139,12 @@ import {
   RescueOption, MAX_RESCUES_PER_RUN,
   getRescueOptions,
 } from "../core/rescue-system";
+import {
+  ExplorationTier, EXPLORATION_TIERS, getNewTiers,
+} from "../core/exploration-rewards";
+import {
+  MiniBoss, shouldSpawnMiniBoss, rollMiniBoss, getMiniBossReward,
+} from "../core/mini-bosses";
 
 interface AllyData {
   speciesId: string;
@@ -422,6 +428,13 @@ export class DungeonScene extends Phaser.Scene {
   private legendaryParticleTimer: Phaser.Time.TimerEvent | null = null;
   private legendaryParticleGraphics: Phaser.GameObjects.Graphics | null = null;
 
+  // Mini-boss state
+  private miniBossEntity: Entity | null = null;
+  private miniBossData: MiniBoss | null = null;
+  private miniBossHpBar: Phaser.GameObjects.Graphics | null = null;
+  private miniBossHpBg: Phaser.GameObjects.Graphics | null = null;
+  private miniBossNameText: Phaser.GameObjects.Text | null = null;
+
   // Dungeon modifier state
   private activeModifiers: DungeonModifier[] = [];
   private modifierEffects: ModifierEffects = getModifierEffects([]);
@@ -448,6 +461,10 @@ export class DungeonScene extends Phaser.Scene {
   private autoExploreTimer: Phaser.Time.TimerEvent | null = null;
   private autoExploreText: Phaser.GameObjects.Text | null = null;
   private autoExploreTween: Phaser.Tweens.Tween | null = null;
+
+  // Exploration Reward state
+  private lastExplorationPercent = 0;
+  private explorationRewardsGranted = new Set<number>();
 
   // Skill Combo state
   private recentSkillIds: string[] = [];  // last 3 skill IDs used by player
@@ -660,6 +677,12 @@ export class DungeonScene extends Phaser.Scene {
     this.legendaryNameText = null;
     this.legendaryParticleTimer = null;
     this.legendaryParticleGraphics = null;
+    // Reset mini-boss state
+    this.miniBossEntity = null;
+    this.miniBossData = null;
+    this.miniBossHpBar = null;
+    this.miniBossHpBg = null;
+    this.miniBossNameText = null;
     // Reset gauntlet state
     this.gauntletActive = false;
     this.gauntletConfig = null;
@@ -803,6 +826,8 @@ export class DungeonScene extends Phaser.Scene {
     this.autoExploreTimer = null;
     this.autoExploreText = null;
     this.autoExploreTween = null;
+    this.lastExplorationPercent = 0;
+    this.explorationRewardsGranted = new Set<number>();
     this.fullMapOpen = false;
     this.fullMapOverlayBg = null;
     this.fullMapGfx = null;
@@ -1726,6 +1751,63 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Mini-Boss spawn check (10% on non-boss floors after floor 3) ──
+    {
+      const mbIsBossFloor = !!(this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors) || this.isBossRush;
+      if (!this.bossEntity && !this.legendaryEntity && !mbIsBossFloor
+          && shouldSpawnMiniBoss(this.currentFloor, mbIsBossFloor, this.dungeonDef.difficulty)) {
+        const mbData = rollMiniBoss(this.currentFloor, this.dungeonDef.difficulty);
+        if (mbData) {
+          const mbSp = SPECIES[mbData.speciesId];
+          if (mbSp && rooms.length > 1) {
+            this.miniBossData = mbData;
+            const mbRoom = rooms.slice(1).reduce((best, r) =>
+              (r.w * r.h > best.w * best.h) ? r : best, rooms[1]);
+            const mbx = mbRoom.x + Math.floor(mbRoom.w / 2);
+            const mby = mbRoom.y + Math.floor(mbRoom.h / 2);
+            const baseStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, mbSp, this.ngPlusLevel);
+            const mbStats = {
+              hp: Math.floor(baseStats.hp * mbData.hpMult * this.difficultyMods.enemyHpMult),
+              maxHp: Math.floor(baseStats.hp * mbData.hpMult * this.difficultyMods.enemyHpMult),
+              atk: Math.floor(baseStats.atk * mbData.atkMult * this.difficultyMods.enemyAtkMult),
+              def: Math.floor(baseStats.def * mbData.defMult),
+              level: mbData.level,
+            };
+            const miniBoss: Entity = {
+              tileX: mbx, tileY: mby,
+              facing: Direction.Down,
+              stats: mbStats,
+              alive: true,
+              spriteKey: mbSp.spriteKey,
+              name: mbData.name,
+              types: mbSp.types,
+              attackType: mbSp.attackType,
+              skills: createSpeciesSkills(mbSp),
+              statusEffects: [],
+              speciesId: mbSp.spriteKey,
+              isMiniBoss: true,
+              ability: SPECIES_ABILITIES[mbSp.spriteKey],
+            };
+            const mbTex = `${mbSp.spriteKey}-idle`;
+            if (this.textures.exists(mbTex)) {
+              miniBoss.sprite = this.add.sprite(
+                this.tileToPixelX(mbx), this.tileToPixelY(mby), mbTex
+              );
+              miniBoss.sprite.setScale(TILE_SCALE * 1.25).setDepth(11);
+              const mbAnim = `${mbSp.spriteKey}-idle-${Direction.Down}`;
+              if (this.anims.exists(mbAnim)) miniBoss.sprite.play(mbAnim);
+            }
+            if (miniBoss.sprite) miniBoss.sprite.setTint(mbData.color);
+            this.time.delayedCall(1000, () => { if (miniBoss.sprite) miniBoss.sprite.clearTint(); });
+            this.miniBossEntity = miniBoss;
+            this.enemies.push(miniBoss);
+            this.allEntities.push(miniBoss);
+            this.seenSpecies.add(mbSp.id);
+          }
+        }
+      }
+    }
+
     // ── Boss Gauntlet check ──
     if (!this.bossEntity && shouldTriggerGauntlet(this.currentFloor, this.dungeonDef.id, this.dungeonDef.floors)) {
       this.gauntletConfig = generateGauntlet(this.currentFloor, this.dungeonDef.id, this.dungeonDef.difficulty);
@@ -2640,6 +2722,25 @@ export class DungeonScene extends Phaser.Scene {
       });
     }
 
+    // ── Mini-Boss HP Bar (orange, smaller than boss/legendary bar) ──
+    if (this.miniBossEntity && !this.bossEntity && !this.legendaryEntity) {
+      const barW = 160;
+      const barX = (GAME_WIDTH - barW) / 2;
+      const barY = 56;
+
+      this.miniBossHpBg = this.add.graphics().setScrollFactor(0).setDepth(100);
+      this.miniBossHpBg.fillStyle(0x1a1a2e, 0.95);
+      this.miniBossHpBg.fillRoundedRect(barX - 4, barY - 4, barW + 8, 22, 4);
+      this.miniBossHpBg.lineStyle(2, 0xff8800); // orange border
+      this.miniBossHpBg.strokeRoundedRect(barX - 4, barY - 4, barW + 8, 22, 4);
+
+      this.miniBossHpBar = this.add.graphics().setScrollFactor(0).setDepth(101);
+
+      this.miniBossNameText = this.add.text(GAME_WIDTH / 2, barY - 2, `◆ ${this.miniBossEntity.name} ◆`, {
+        fontSize: "9px", color: "#ff8800", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(102);
+    }
+
     // ── DOM HUD overlay: crisp text at any DPI ──
     this.initDomHud();
 
@@ -2675,6 +2776,14 @@ export class DungeonScene extends Phaser.Scene {
       this.time.delayedCall(2500, () => {
         if (this.legendaryEntity) {
           this.showLog(`★ ${this.legendaryEntity.name} appeared! ★`);
+        }
+      });
+    } else if (this.miniBossEntity && this.miniBossData) {
+      // Mini-boss entrance message
+      this.showLog(`${this.dungeonDef.name} B${this.currentFloor}F`);
+      this.time.delayedCall(600, () => {
+        if (this.miniBossEntity) {
+          this.showLog(`◆ A powerful ${this.miniBossEntity.name} lurks on this floor! ◆`);
         }
       });
     } else if (this.gauntletActive) {
@@ -3309,8 +3418,14 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     if (pct >= 100) {
-      this.explorationText.setText("FULLY EXPLORED");
+      this.explorationText.setText("\u2605 FULLY EXPLORED");
+      this.explorationText.setColor("#4ade80");
+    } else if (pct >= 75) {
+      this.explorationText.setText(`\u25C9 Explored: ${pct}%`);
       this.explorationText.setColor("#fbbf24");
+    } else if (pct >= 50) {
+      this.explorationText.setText(`\u25CE Explored: ${pct}%`);
+      this.explorationText.setColor("#60a5fa");
     } else {
       this.explorationText.setText(`Explored: ${pct}%`);
       this.explorationText.setColor("#aab0c8");
@@ -3319,6 +3434,103 @@ export class DungeonScene extends Phaser.Scene {
     this.explorationText.setPosition(mx + totalW / 2, textY);
     this.explorationText.setOrigin(0.5, 0);
     this.explorationText.setVisible(!expanded); // only show in compact mode; expanded has its own
+  }
+
+  /** Check exploration percentage and grant tier rewards when thresholds are crossed */
+  private checkExplorationRewards() {
+    const pct = this.getExplorationPercent() / 100; // 0.0–1.0
+    const newTiers = getNewTiers(this.lastExplorationPercent, pct);
+    this.lastExplorationPercent = pct;
+
+    for (const tier of newTiers) {
+      // Guard against duplicate grants on the same floor
+      const key = Math.round(tier.threshold * 100);
+      if (this.explorationRewardsGranted.has(key)) continue;
+      this.explorationRewardsGranted.add(key);
+
+      // Grant gold
+      this.gold += tier.goldBonus;
+
+      // Grant EXP and process level-ups
+      this.totalExp += tier.expBonus;
+      const levelResult = processLevelUp(this.player.stats, tier.expBonus, this.totalExp);
+      this.totalExp = levelResult.totalExp;
+      for (const r of levelResult.results) {
+        this.showLog(`Level up! Lv.${r.newLevel} HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
+        sfxLevelUp();
+      }
+
+      // Play sound
+      sfxBuff();
+
+      // Show brief announcement banner
+      this.showExplorationRewardBanner(tier);
+
+      // Log message
+      this.showLog(`${tier.icon} ${tier.label} Bonus! +${tier.goldBonus}G +${tier.expBonus} EXP`);
+
+      // Add to run log
+      this.runLog.add(
+        RunLogEvent.FloorAdvanced,
+        `${tier.label} bonus (${Math.round(tier.threshold * 100)}% explored): +${tier.goldBonus}G +${tier.expBonus} EXP`,
+        this.currentFloor,
+        this.turnManager.turn,
+      );
+    }
+
+    if (newTiers.length > 0) {
+      this.updateHUD();
+    }
+  }
+
+  /** Show a brief floating banner for an exploration reward */
+  private showExplorationRewardBanner(tier: ExplorationTier) {
+    const label = `${tier.icon} ${tier.label} Bonus!`;
+    const detail = `+${tier.goldBonus}G  +${tier.expBonus} EXP`;
+
+    // Background bar
+    const bannerBg = this.add.rectangle(GAME_WIDTH / 2, 100, 220, 36, 0x000000, 0.75)
+      .setScrollFactor(0).setDepth(250).setOrigin(0.5);
+    bannerBg.setStrokeStyle(1, Phaser.Display.Color.HexStringToColor(tier.color).color, 0.9);
+
+    const labelText = this.add.text(GAME_WIDTH / 2, 93, label, {
+      fontSize: "10px", fontFamily: "monospace", fontStyle: "bold",
+      color: tier.color, stroke: "#000000", strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(251);
+
+    const detailText = this.add.text(GAME_WIDTH / 2, 107, detail, {
+      fontSize: "8px", fontFamily: "monospace",
+      color: "#ffffff", stroke: "#000000", strokeThickness: 1,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(251);
+
+    // Slide in from top and fade out
+    bannerBg.setAlpha(0).setY(80);
+    labelText.setAlpha(0).setY(73);
+    detailText.setAlpha(0).setY(87);
+
+    this.tweens.add({
+      targets: [bannerBg, labelText, detailText],
+      y: "+=20",
+      alpha: 1,
+      duration: 300,
+      ease: "Back.easeOut",
+      onComplete: () => {
+        this.time.delayedCall(1800, () => {
+          this.tweens.add({
+            targets: [bannerBg, labelText, detailText],
+            alpha: 0,
+            y: "-=10",
+            duration: 400,
+            ease: "Sine.easeIn",
+            onComplete: () => {
+              bannerBg.destroy();
+              labelText.destroy();
+              detailText.destroy();
+            },
+          });
+        });
+      },
+    });
   }
 
   private updateMinimapLegend(
@@ -3362,10 +3574,10 @@ export class DungeonScene extends Phaser.Scene {
         this.minimapLegendTexts.push(txt);
       }
 
-      // Exploration % in expanded mode
+      // Exploration % in expanded mode (colored by tier)
       const pct = this.getExplorationPercent();
-      const pctColor = pct >= 100 ? "#fbbf24" : "#aab0c8";
-      const pctLabel = pct >= 100 ? "FULLY EXPLORED" : `Explored: ${pct}%`;
+      const pctColor = pct >= 100 ? "#4ade80" : pct >= 75 ? "#fbbf24" : pct >= 50 ? "#60a5fa" : "#aab0c8";
+      const pctLabel = pct >= 100 ? "\u2605 FULLY EXPLORED" : pct >= 75 ? `\u25C9 Explored: ${pct}%` : pct >= 50 ? `\u25CE Explored: ${pct}%` : `Explored: ${pct}%`;
       const pctTxt = this.add.text(
         mx + totalW / 2, legendY + rows * 12 + 2,
         pctLabel,
@@ -3451,10 +3663,10 @@ export class DungeonScene extends Phaser.Scene {
       this.fullMapUI.push(lt);
     }
 
-    // Exploration %
+    // Exploration % (colored by tier)
     const pct = this.getExplorationPercent();
-    const pctColor = pct >= 100 ? "#fbbf24" : "#aab0c8";
-    const pctLabel = pct >= 100 ? "FULLY EXPLORED" : `Explored: ${pct}%`;
+    const pctColor = pct >= 100 ? "#4ade80" : pct >= 75 ? "#fbbf24" : pct >= 50 ? "#60a5fa" : "#aab0c8";
+    const pctLabel = pct >= 100 ? "\u2605 FULLY EXPLORED" : pct >= 75 ? `\u25C9 Explored: ${pct}%` : pct >= 50 ? `\u25CE Explored: ${pct}%` : `Explored: ${pct}%`;
     const pctTxt = this.add.text(
       GAME_WIDTH / 2, legendY + 14, pctLabel,
       { fontSize: "8px", fontFamily: "monospace", color: pctColor, fontStyle: pct >= 100 ? "bold" : "normal" }
@@ -3613,6 +3825,30 @@ export class DungeonScene extends Phaser.Scene {
         // Stop particle effects
         if (this.legendaryParticleTimer) { this.legendaryParticleTimer.destroy(); this.legendaryParticleTimer = null; }
         if (this.legendaryParticleGraphics) { this.legendaryParticleGraphics.destroy(); this.legendaryParticleGraphics = null; }
+      }
+    }
+
+    // Mini-Boss HP bar update (orange bar)
+    if (this.miniBossEntity && this.miniBossHpBar) {
+      this.miniBossHpBar.clear();
+      if (this.miniBossEntity.alive) {
+        const mbRatio = this.miniBossEntity.stats.hp / this.miniBossEntity.stats.maxHp;
+        const barW = 160;
+        const barX = (GAME_WIDTH - barW) / 2;
+        const barY = 56;
+        const mbBarColor = mbRatio > 0.5 ? 0xff8800 : mbRatio > 0.25 ? 0xff6600 : 0xff4400;
+        const mbBarWidth = Math.max(0, Math.floor(barW * mbRatio));
+        this.miniBossHpBar.fillStyle(mbBarColor, 1);
+        this.miniBossHpBar.fillRoundedRect(barX, barY, mbBarWidth, 10, 3);
+
+        if (this.miniBossNameText) {
+          this.miniBossNameText.setText(`◆ ${this.miniBossEntity.name} — ${this.miniBossEntity.stats.hp}/${this.miniBossEntity.stats.maxHp} ◆`);
+        }
+      } else {
+        // Mini-boss defeated — hide bar
+        if (this.miniBossHpBg) this.miniBossHpBg.setVisible(false);
+        this.miniBossHpBar.setVisible(false);
+        if (this.miniBossNameText) this.miniBossNameText.setVisible(false);
       }
     }
 
@@ -7808,6 +8044,7 @@ export class DungeonScene extends Phaser.Scene {
           trap.revealed = true;
         }
         this.updateMinimap();
+        this.checkExplorationRewards();
         sfxBuff();
         this.showEventResult("The orb reveals all secrets!\nFloor map fully revealed!", "#22d3ee");
         this.showLog("Floor layout fully revealed!");
@@ -9743,6 +9980,9 @@ export class DungeonScene extends Phaser.Scene {
     this.tickShadowDance();
     this.updateHUD();
 
+    // Check exploration reward tiers after each action
+    this.checkExplorationRewards();
+
     if (!this.player.alive && !this.gameOver) {
       this.showGameOver();
     }
@@ -11054,12 +11294,14 @@ export class DungeonScene extends Phaser.Scene {
       }
 
       const isBossKill = entity.isBoss;
-      // Grant EXP (boss gives 5x, apply modifier expMult)
+      const isMiniBossKill = this.miniBossEntity === entity && entity.isMiniBoss === true;
+      // Grant EXP (boss gives 5x, mini-boss gives 3x, apply modifier expMult)
       const baseExp = expFromEnemy(entity.stats.level, this.currentFloor);
       const heldExpMult = 1 + (this.heldItemEffect.expBonus ?? 0) / 100;
       const ngExpMult = 1 + this.ngPlusBonuses.expPercent / 100;
       const talentExpMult = 1 + (this.talentEffects.expPercent ?? 0) / 100;
-      const expGain = Math.floor((isBossKill ? baseExp * 5 : baseExp) * this.modifierEffects.expMult * heldExpMult * this.difficultyMods.expMult * ngExpMult * talentExpMult);
+      const expMultForType = isBossKill ? 5 : isMiniBossKill ? 3 : 1;
+      const expGain = Math.floor((baseExp * expMultForType) * this.modifierEffects.expMult * heldExpMult * this.difficultyMods.expMult * ngExpMult * talentExpMult);
       this.totalExp += expGain;
 
       // Check if this is a legendary encounter defeat
@@ -11131,6 +11373,50 @@ export class DungeonScene extends Phaser.Scene {
         if (this.legendaryParticleGraphics) { this.legendaryParticleGraphics.destroy(); this.legendaryParticleGraphics = null; }
         // Relic drop: legendary defeat (highest chance)
         this.tryRelicDrop("legendary");
+      } else if (isMiniBossKill && this.miniBossData) {
+        // Mini-boss defeat: moderate celebration + guaranteed reward
+        sfxBossDefeat();
+        this.cameras.main.shake(300, 0.01);
+        this.cameras.main.flash(200, 255, 140, 0); // orange flash
+        this.showLog(`◆ ${entity.name} defeated! +${expGain} EXP ◆`);
+        // Run log: mini-boss defeated (use EnemyDefeated since there is no dedicated MiniBoss event)
+        this.runLog.add(RunLogEvent.EnemyDefeated, `Mini-Boss: ${entity.name}`, this.currentFloor, this.turnManager.turn);
+
+        // Grant mini-boss reward
+        const mbReward = getMiniBossReward(this.miniBossData);
+        if (mbReward.type === "gold") {
+          const mutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
+          const mbGold = Math.floor(mbReward.value * mutGoldMult);
+          this.gold += mbGold;
+          this.time.delayedCall(600, () => {
+            this.showLog(`Mini-Boss reward: ${mbGold}G!`);
+          });
+        } else if (mbReward.type === "blessing") {
+          this.time.delayedCall(600, () => {
+            const blessing = getRandomBlessing();
+            this.grantBlessing(blessing);
+            this.showLog(`Mini-Boss reward: ${blessing.name}!`);
+          });
+        } else if (mbReward.type === "relic") {
+          this.time.delayedCall(600, () => {
+            this.tryRelicDrop("boss"); // use boss-level relic drop chance
+          });
+        } else if (mbReward.type === "item") {
+          if (this.inventory.length < MAX_INVENTORY) {
+            const rewardItem = rollFloorItem();
+            const existing = this.inventory.find(s => s.item.id === rewardItem.id && rewardItem.stackable);
+            if (existing) existing.count++;
+            else this.inventory.push({ item: rewardItem, count: 1 });
+            this.time.delayedCall(600, () => {
+              this.showLog(`Mini-Boss reward: ${rewardItem.name}!`);
+              sfxItemPickup();
+            });
+          }
+        }
+
+        // Clean up mini-boss state
+        this.miniBossEntity = null;
+        this.miniBossData = null;
       } else if (isBossKill) {
         // Boss defeat: big screen shake + special message
         sfxBossDefeat();
@@ -11309,9 +11595,9 @@ export class DungeonScene extends Phaser.Scene {
         }
       }
 
-      // ── Recruitment check (bosses can't be recruited, solo/noRecruits blocks recruitment) ──
+      // ── Recruitment check (bosses/mini-bosses can't be recruited, solo/noRecruits blocks recruitment) ──
       const recruitBonus = getUpgradeBonus(loadMeta(), "recruitRate") * 5;
-      if (this.challengeMode !== "solo" && !this.modifierEffects.noRecruits && !isBossKill && entity.speciesId && this.allies.length < MAX_ALLIES && tryRecruit(this.player.stats.level, entity.stats.level, recruitBonus)) {
+      if (this.challengeMode !== "solo" && !this.modifierEffects.noRecruits && !isBossKill && !isMiniBossKill && entity.speciesId && this.allies.length < MAX_ALLIES && tryRecruit(this.player.stats.level, entity.stats.level, recruitBonus)) {
         this.time.delayedCall(800, () => {
           this.recruitEnemy(entity);
         });
@@ -11723,6 +12009,10 @@ export class DungeonScene extends Phaser.Scene {
     if (this.legendaryNameText) { this.legendaryNameText.destroy(); this.legendaryNameText = null; }
     if (this.legendaryParticleTimer) { this.legendaryParticleTimer.destroy(); this.legendaryParticleTimer = null; }
     if (this.legendaryParticleGraphics) { this.legendaryParticleGraphics.destroy(); this.legendaryParticleGraphics = null; }
+    // Clean up mini-boss HP bar
+    if (this.miniBossHpBg) { this.miniBossHpBg.destroy(); this.miniBossHpBg = null; }
+    if (this.miniBossHpBar) { this.miniBossHpBar.destroy(); this.miniBossHpBar = null; }
+    if (this.miniBossNameText) { this.miniBossNameText.destroy(); this.miniBossNameText = null; }
   }
 
   /** Recruit a defeated enemy as ally */
@@ -12277,6 +12567,9 @@ export class DungeonScene extends Phaser.Scene {
     this.tickWeather();
     this.tickEntityStatus(this.player);
     this.updateHUD();
+
+    // Check exploration reward tiers during auto-explore
+    this.checkExplorationRewards();
 
     // Check if player died from belly/status/traps
     if (!this.player.alive && !this.gameOver) {
