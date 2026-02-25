@@ -11,6 +11,8 @@ import { rollModifiers, DungeonModifier } from "../core/dungeon-modifiers";
 import { getDailyConfig } from "../core/daily-dungeon";
 import { stopBgm } from "../core/sound-manager";
 import { clearDungeonSave, saveMeta } from "../core/save-system";
+import { generateForecast, forecastToString } from "../core/weather-forecast";
+import { WeatherType } from "../core/weather";
 
 /**
  * DungeonPreviewScene — shows dungeon info before entering.
@@ -303,6 +305,36 @@ export class DungeonPreviewScene extends Phaser.Scene {
     }
 
     cy += 6;
+
+    // ── Weather Forecast ──
+    // Show predicted weather for the first few floors
+    if (this.dungeonId !== "bossRush") {
+      const forecastCount = Math.min(5, dungeon.floors);
+      const forecasts = generateForecast(this.dungeonId, 1, forecastCount, dungeon.floors);
+      // Only show if at least one floor has non-clear weather
+      const hasWeather = forecasts.some(f => f.weather !== WeatherType.None);
+      if (hasWeather) {
+        const sepW = this.add.rectangle(GAME_WIDTH / 2, cy, contentW, 1, 0x334155);
+        container.add(sepW);
+        cy += 10;
+
+        const weatherTitle = this.add.text(padX, cy, "-- Weather Forecast --", {
+          fontSize: "11px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
+        });
+        container.add(weatherTitle);
+        cy += 18;
+
+        for (const fc of forecasts) {
+          const label = forecastToString(fc);
+          const fcRow = this.add.text(padX + 10, cy, label, {
+            fontSize: "9px", color: fc.color, fontFamily: "monospace",
+          });
+          container.add(fcRow);
+          cy += 14;
+        }
+        cy += 6;
+      }
+    }
 
     // ── Modifiers Preview ──
     // For regular dungeons, roll modifiers preview

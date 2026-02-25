@@ -45,6 +45,7 @@ import {
   getRunAwayDodgeBonus, getLevitateDodgeBonus,
 } from "../core/ability-upgrade";
 import { WeatherType, WEATHERS, weatherDamageMultiplier, isWeatherImmune, rollFloorWeather, WeatherIntensity, INTENSITY_MULTIPLIER, INTENSITY_COLOR, getWeatherIntensity, shouldWeatherTransition, getWeatherSynergyBonus } from "../core/weather";
+import { generateForecast, forecastToString } from "../core/weather-forecast";
 import {
   ShopItem, ShopConfig, generateShopInventory, shouldSpawnShop,
   getItemSellPrice,
@@ -352,6 +353,7 @@ export class DungeonScene extends Phaser.Scene {
   private currentWeatherIntensity = WeatherIntensity.Mild;
   private weatherText!: Phaser.GameObjects.Text;
   private weatherIntensityHudText: Phaser.GameObjects.Text | null = null;
+  private weatherForecastHudText: Phaser.GameObjects.Text | null = null;
   private weatherOverlay: Phaser.GameObjects.Rectangle | null = null;
   private weatherParticles: Phaser.GameObjects.Graphics | null = null;
   private weatherTimer: Phaser.Time.TimerEvent | null = null;
@@ -2263,6 +2265,21 @@ export class DungeonScene extends Phaser.Scene {
         `${weatherNames[this.currentWeather]} (${intLabel})`, {
         fontSize: "8px", color: INTENSITY_COLOR[this.currentWeatherIntensity], fontFamily: "monospace",
       }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
+    }
+
+    // ── Weather Forecast HUD (next 2 floors) ──
+    this.weatherForecastHudText = null;
+    if (this.dungeonDef.id !== "bossRush") {
+      const forecastStart = this.currentFloor + 1;
+      const forecastCount = Math.min(2, Math.max(0, this.dungeonDef.floors - this.currentFloor));
+      if (forecastCount > 0) {
+        const forecasts = generateForecast(this.dungeonDef.id, forecastStart, forecastCount, this.dungeonDef.floors);
+        const lines = forecasts.map(f => forecastToString(f));
+        this.weatherForecastHudText = this.add.text(GAME_WIDTH - 10, 65,
+          lines.join("  "), {
+          fontSize: "7px", color: "#6b7280", fontFamily: "monospace",
+        }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
+      }
     }
 
     // ── Challenge Mode Badge ──

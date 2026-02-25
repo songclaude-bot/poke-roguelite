@@ -29,6 +29,10 @@ import {
 import { NPC_LIST, getNpcDialogue, NPC } from "../core/npc-dialogue";
 import { getTotalTalentPoints } from "../core/talent-tree";
 import { getForgeLevel, getForgeBonus, MAX_FORGE_LEVEL } from "../core/forge";
+import {
+  PartyPreset, MAX_PRESETS,
+  createPreset, savePresets, loadPresets, deletePreset, applyPreset,
+} from "../core/party-presets";
 
 // ── Constants ──
 const NAV_H = 52;
@@ -396,16 +400,28 @@ export class HubScene extends Phaser.Scene {
     }
 
     // Change starter button
-    const changeBtn = this.add.rectangle(240, cardY + 26, 100, 24, 0x1e3a5f, 0.9)
+    const changeBtn = this.add.rectangle(200, cardY + 26, 80, 24, 0x1e3a5f, 0.9)
       .setStrokeStyle(1, 0x60a5fa).setInteractive({ useHandCursor: true });
     this.tabContent.push(changeBtn);
-    const changeBtnT = this.add.text(240, cardY + 26, "Change", {
+    const changeBtnT = this.add.text(200, cardY + 26, "Change", {
       fontSize: "10px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5);
     this.tabContent.push(changeBtnT);
     changeBtn.on("pointerover", () => changeBtn.setFillStyle(0x2a4a6f, 1));
     changeBtn.on("pointerout", () => changeBtn.setFillStyle(0x1e3a5f, 0.9));
     changeBtn.on("pointerdown", () => this.showStarterSelect());
+
+    // Presets button
+    const presetBtn = this.add.rectangle(290, cardY + 26, 80, 24, 0x2a1a3a, 0.9)
+      .setStrokeStyle(1, 0xa855f7).setInteractive({ useHandCursor: true });
+    this.tabContent.push(presetBtn);
+    const presetBtnT = this.add.text(290, cardY + 26, "Presets", {
+      fontSize: "10px", color: "#a855f7", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5);
+    this.tabContent.push(presetBtnT);
+    presetBtn.on("pointerover", () => presetBtn.setFillStyle(0x3a2a4a, 1));
+    presetBtn.on("pointerout", () => presetBtn.setFillStyle(0x2a1a3a, 0.9));
+    presetBtn.on("pointerdown", () => this.showPresetsPanel());
 
     // ── NPC Row ──
     const npcY = cardY + cardH / 2 + 28;
@@ -1081,6 +1097,265 @@ export class HubScene extends Phaser.Scene {
       }).setOrigin(0.5).setDepth(202));
       closeBg.on("pointerdown", cleanup);
     }
+  }
+
+  // ═══════════════════════════════════════
+  // ── Party Presets Overlay ──
+  // ═══════════════════════════════════════
+
+  private showPresetsPanel() {
+    const uiItems: Phaser.GameObjects.GameObject[] = [];
+    let presets = loadPresets();
+
+    // Dark overlay
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.85)
+      .setDepth(200).setInteractive();
+    uiItems.push(overlay);
+
+    // Title
+    uiItems.push(this.add.text(GAME_WIDTH / 2, 20, "Party Presets", {
+      fontSize: "14px", color: "#a855f7", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(201));
+
+    // Close button
+    const closeBtn = this.add.rectangle(GAME_WIDTH - 24, 20, 30, 24, 0x3a1a1a, 0.9)
+      .setStrokeStyle(1, 0xef4444).setDepth(210).setInteractive({ useHandCursor: true });
+    uiItems.push(closeBtn);
+    uiItems.push(this.add.text(GAME_WIDTH - 24, 20, "\u2715", {
+      fontSize: "14px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(211));
+
+    const cleanup = () => { uiItems.forEach(o => o.destroy()); };
+    closeBtn.on("pointerdown", cleanup);
+
+    // Scrollable preset list container
+    const listItems: Phaser.GameObjects.GameObject[] = [];
+
+    const renderPresetList = () => {
+      // Clear previous list items
+      listItems.forEach(o => o.destroy());
+      listItems.length = 0;
+
+      const currentStarter = this.meta.starter ?? "mudkip";
+      const equippedItem = this.meta.equippedHeldItem;
+
+      let py = 50;
+
+      // Current setup info
+      const currentName = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
+      const itemName = equippedItem ? (getHeldItem(equippedItem)?.name ?? "None") : "None";
+      const infoT = this.add.text(GAME_WIDTH / 2, py, `Current: ${currentName} | Item: ${itemName}`, {
+        fontSize: "9px", color: "#94a3b8", fontFamily: "monospace",
+      }).setOrigin(0.5).setDepth(201);
+      uiItems.push(infoT);
+      listItems.push(infoT);
+      py += 22;
+
+      // "Save Current" button (if under max)
+      if (presets.length < MAX_PRESETS) {
+        const saveBg = this.add.rectangle(GAME_WIDTH / 2, py, BTN_W, 32, 0x1a3a2e, 0.9)
+          .setStrokeStyle(1, 0x4ade80).setDepth(201).setInteractive({ useHandCursor: true });
+        uiItems.push(saveBg);
+        listItems.push(saveBg);
+        const saveT = this.add.text(GAME_WIDTH / 2, py, "+ Save Current Setup", {
+          fontSize: "11px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+        }).setOrigin(0.5).setDepth(202);
+        uiItems.push(saveT);
+        listItems.push(saveT);
+        saveBg.on("pointerover", () => saveBg.setFillStyle(0x2a4a3e, 1));
+        saveBg.on("pointerout", () => saveBg.setFillStyle(0x1a3a2e, 0.9));
+        saveBg.on("pointerdown", () => this.showPresetNameInput((name: string) => {
+          const preset = createPreset(name, currentStarter, {}, equippedItem);
+          presets.push(preset);
+          savePresets(presets);
+          renderPresetList();
+        }));
+        py += 40;
+      } else {
+        const fullT = this.add.text(GAME_WIDTH / 2, py, `${MAX_PRESETS}/${MAX_PRESETS} presets (delete to add more)`, {
+          fontSize: "9px", color: "#64748b", fontFamily: "monospace",
+        }).setOrigin(0.5).setDepth(201);
+        uiItems.push(fullT);
+        listItems.push(fullT);
+        py += 26;
+      }
+
+      // Separator
+      const sep = this.add.rectangle(GAME_WIDTH / 2, py, BTN_W, 1, 0x334155, 0.5).setDepth(201);
+      uiItems.push(sep);
+      listItems.push(sep);
+      py += 12;
+
+      if (presets.length === 0) {
+        const emptyT = this.add.text(GAME_WIDTH / 2, py + 20, "No saved presets.\nSave your current setup above!", {
+          fontSize: "10px", color: "#555570", fontFamily: "monospace", align: "center",
+        }).setOrigin(0.5).setDepth(201);
+        uiItems.push(emptyT);
+        listItems.push(emptyT);
+        return;
+      }
+
+      // Render each preset
+      for (const preset of presets) {
+        const CARD_H = 60;
+        const cardBg = this.add.rectangle(GAME_WIDTH / 2, py + CARD_H / 2, BTN_W, CARD_H, 0x151d30, 0.95)
+          .setStrokeStyle(1, 0x334155).setDepth(201);
+        uiItems.push(cardBg);
+        listItems.push(cardBg);
+
+        // Preset name
+        const nameT = this.add.text(20, py + 8, preset.name, {
+          fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace", fontStyle: "bold",
+        }).setDepth(202);
+        uiItems.push(nameT);
+        listItems.push(nameT);
+
+        // Preset details
+        const starterDisplayName = preset.starterId.charAt(0).toUpperCase() + preset.starterId.slice(1);
+        const heldItemName = preset.equippedHeldItem ? (getHeldItem(preset.equippedHeldItem)?.name ?? "None") : "None";
+        const detailT = this.add.text(20, py + 24, `Starter: ${starterDisplayName} | Item: ${heldItemName}`, {
+          fontSize: "8px", color: "#94a3b8", fontFamily: "monospace",
+        }).setDepth(202);
+        uiItems.push(detailT);
+        listItems.push(detailT);
+
+        // Is this the current active config?
+        const isActive = preset.starterId === currentStarter &&
+          (preset.equippedHeldItem ?? undefined) === (equippedItem ?? undefined);
+
+        // Load button
+        if (!isActive) {
+          const loadBg = this.add.rectangle(GAME_WIDTH / 2 - 40, py + 46, 80, 22, 0x1e3a5f, 0.9)
+            .setStrokeStyle(1, 0x60a5fa).setDepth(202).setInteractive({ useHandCursor: true });
+          uiItems.push(loadBg);
+          listItems.push(loadBg);
+          const loadT = this.add.text(GAME_WIDTH / 2 - 40, py + 46, "Load", {
+            fontSize: "10px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
+          }).setOrigin(0.5).setDepth(203);
+          uiItems.push(loadT);
+          listItems.push(loadT);
+          loadBg.on("pointerover", () => loadBg.setFillStyle(0x2a4a6f, 1));
+          loadBg.on("pointerout", () => loadBg.setFillStyle(0x1e3a5f, 0.9));
+          loadBg.on("pointerdown", () => {
+            applyPreset(preset, this.meta);
+            saveMeta(this.meta);
+            renderPresetList();
+            // Refresh home tab behind overlay
+          });
+        } else {
+          const activeT = this.add.text(GAME_WIDTH / 2 - 40, py + 46, "Active", {
+            fontSize: "10px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+          }).setOrigin(0.5).setDepth(203);
+          uiItems.push(activeT);
+          listItems.push(activeT);
+        }
+
+        // Delete button
+        const delBg = this.add.rectangle(GAME_WIDTH / 2 + 40, py + 46, 80, 22, 0x3a1a1a, 0.9)
+          .setStrokeStyle(1, 0xef4444).setDepth(202).setInteractive({ useHandCursor: true });
+        uiItems.push(delBg);
+        listItems.push(delBg);
+        const delT = this.add.text(GAME_WIDTH / 2 + 40, py + 46, "Delete", {
+          fontSize: "10px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
+        }).setOrigin(0.5).setDepth(203);
+        uiItems.push(delT);
+        listItems.push(delT);
+        const presetId = preset.id;
+        delBg.on("pointerover", () => delBg.setFillStyle(0x4a2a2a, 1));
+        delBg.on("pointerout", () => delBg.setFillStyle(0x3a1a1a, 0.9));
+        delBg.on("pointerdown", () => {
+          presets = deletePreset(presets, presetId);
+          renderPresetList();
+        });
+
+        py += CARD_H + 8;
+      }
+    };
+
+    renderPresetList();
+  }
+
+  private showPresetNameInput(onConfirm: (name: string) => void) {
+    const uiItems: Phaser.GameObjects.GameObject[] = [];
+
+    // Sub-overlay
+    const subOverlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6)
+      .setDepth(300).setInteractive();
+    uiItems.push(subOverlay);
+
+    const panelW = 260;
+    const panelH = 130;
+    const panelX = GAME_WIDTH / 2;
+    const panelY = GAME_HEIGHT / 2 - 40;
+    const panel = this.add.rectangle(panelX, panelY, panelW, panelH, 0x151d30, 0.98)
+      .setStrokeStyle(2, 0xa855f7).setDepth(301);
+    uiItems.push(panel);
+
+    uiItems.push(this.add.text(panelX, panelY - 45, "Name Your Preset", {
+      fontSize: "12px", color: "#a855f7", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(302));
+
+    // Preset name suggestions
+    const currentStarter = this.meta.starter ?? "mudkip";
+    const starterCap = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
+    const suggestions = [
+      `${starterCap} Team`,
+      `Setup ${loadPresets().length + 1}`,
+      `${starterCap} Build`,
+    ];
+
+    let selectedName = suggestions[0];
+
+    // Display area for name
+    const nameBg = this.add.rectangle(panelX, panelY - 16, 220, 26, 0x0a0a1e, 0.95)
+      .setStrokeStyle(1, 0x667eea).setDepth(302);
+    uiItems.push(nameBg);
+    const nameDisplay = this.add.text(panelX, panelY - 16, selectedName, {
+      fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(303);
+    uiItems.push(nameDisplay);
+
+    // Suggestion buttons
+    let sx = panelX - 100;
+    for (const suggestion of suggestions) {
+      const sw = 75;
+      const sBg = this.add.rectangle(sx + sw / 2, panelY + 14, sw, 20, 0x1a1a2e, 0.9)
+        .setStrokeStyle(1, 0x334155).setDepth(302).setInteractive({ useHandCursor: true });
+      uiItems.push(sBg);
+      const sT = this.add.text(sx + sw / 2, panelY + 14, suggestion.length > 10 ? suggestion.slice(0, 9) + ".." : suggestion, {
+        fontSize: "8px", color: "#94a3b8", fontFamily: "monospace",
+      }).setOrigin(0.5).setDepth(303);
+      uiItems.push(sT);
+      const sName = suggestion;
+      sBg.on("pointerdown", () => {
+        selectedName = sName;
+        nameDisplay.setText(sName);
+      });
+      sx += sw + 6;
+    }
+
+    const cleanup = () => { uiItems.forEach(o => o.destroy()); };
+
+    // Confirm button
+    const confirmBg = this.add.rectangle(panelX - 50, panelY + 42, 90, 26, 0x1a3a2e, 0.9)
+      .setStrokeStyle(1, 0x4ade80).setDepth(302).setInteractive({ useHandCursor: true });
+    uiItems.push(confirmBg);
+    uiItems.push(this.add.text(panelX - 50, panelY + 42, "Save", {
+      fontSize: "11px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(303));
+    confirmBg.on("pointerdown", () => {
+      cleanup();
+      onConfirm(selectedName);
+    });
+
+    // Cancel button
+    const cancelBg = this.add.rectangle(panelX + 50, panelY + 42, 90, 26, 0x1a1a2e, 0.9)
+      .setStrokeStyle(1, 0x334155).setDepth(302).setInteractive({ useHandCursor: true });
+    uiItems.push(cancelBg);
+    uiItems.push(this.add.text(panelX + 50, panelY + 42, "Cancel", {
+      fontSize: "11px", color: "#94a3b8", fontFamily: "monospace",
+    }).setOrigin(0.5).setDepth(303));
+    cancelBg.on("pointerdown", cleanup);
   }
 
   // ═══════════════════════════════════════
