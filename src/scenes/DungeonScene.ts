@@ -123,6 +123,10 @@ import {
   activateBlessing, rollBlessingOrCurse, getRandomBlessing, getRandomCurse,
   serializeBlessings, deserializeBlessings,
 } from "../core/blessings";
+import {
+  ShrineType, Shrine, ShrineChoice, ShrineEffect,
+  generateShrine, shouldSpawnShrine,
+} from "../core/dungeon-shrines";
 
 interface AllyData {
   speciesId: string;
@@ -487,6 +491,16 @@ export class DungeonScene extends Phaser.Scene {
   private activeBlessings: ActiveBlessing[] = [];
   private blessingHudIcons: Phaser.GameObjects.Text[] = [];
 
+  // Shrine state (per-floor)
+  private floorShrine: Shrine | null = null;
+  private shrineTileX = -1;
+  private shrineTileY = -1;
+  private shrineUsed = false;
+  private shrineUI: Phaser.GameObjects.GameObject[] = [];
+  private shrineOpen = false;
+  private shrineGraphic: Phaser.GameObjects.Graphics | null = null;
+  private shrineMarker: Phaser.GameObjects.Text | null = null;
+
   constructor() {
     super({ key: "DungeonScene" });
   }
@@ -662,6 +676,15 @@ export class DungeonScene extends Phaser.Scene {
     // Blessing/curse state: restore from floor transition or reset on new run
     this.activeBlessings = data?.blessings ? deserializeBlessings(data.blessings) : [];
     this.blessingHudIcons = [];
+    // Reset shrine state
+    this.floorShrine = null;
+    this.shrineTileX = -1;
+    this.shrineTileY = -1;
+    this.shrineUsed = false;
+    this.shrineUI = [];
+    this.shrineOpen = false;
+    this.shrineGraphic = null;
+    this.shrineMarker = null;
     // Reset combo state on new floor
     this.recentSkillIds = [];
     this.comboDoubleDamage = false;
@@ -2043,6 +2066,38 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Shrine (15% chance, floor 2+, not boss) ──
+    if (shouldSpawnShrine(this.currentFloor, this.dungeonDef.floors, isBossFloor) && rooms.length > 2) {
+      // Pick a valid ground tile not in player room, stairs room, or any special room
+      const shrineCandidates: { x: number; y: number }[] = [];
+      for (const rm of rooms) {
+        // Skip player room, stairs room, and special rooms
+        if (playerStart.x >= rm.x && playerStart.x < rm.x + rm.w &&
+            playerStart.y >= rm.y && playerStart.y < rm.y + rm.h) continue;
+        if (stairsPos.x >= rm.x && stairsPos.x < rm.x + rm.w &&
+            stairsPos.y >= rm.y && stairsPos.y < rm.y + rm.h) continue;
+        if (rm === this.shopRoom || rm === this.monsterHouseRoom ||
+            rm === this.eventRoom || rm === this.puzzleRoom) continue;
+        // Collect interior ground tiles
+        for (let ry = rm.y + 1; ry < rm.y + rm.h - 1; ry++) {
+          for (let rx = rm.x + 1; rx < rm.x + rm.w - 1; rx++) {
+            if (terrain[ry]?.[rx] === TerrainType.GROUND) {
+              shrineCandidates.push({ x: rx, y: ry });
+            }
+          }
+        }
+      }
+      if (shrineCandidates.length > 0) {
+        const spot = shrineCandidates[Math.floor(Math.random() * shrineCandidates.length)];
+        this.shrineTileX = spot.x;
+        this.shrineTileY = spot.y;
+        this.floorShrine = generateShrine(this.currentFloor, this.dungeonDef.difficulty);
+        this.shrineUsed = false;
+        this.drawShrine();
+        this.showLog("You sense a mysterious shrine on this floor...");
+      }
+    }
+
     // ── Fog of War ──
     this.visited = Array.from({ length: height }, () => new Array(width).fill(false));
     this.currentlyVisible = Array.from({ length: height }, () => new Array(width).fill(false));
@@ -2118,7 +2173,7 @@ export class DungeonScene extends Phaser.Scene {
       callback: () => {
         // Don't count time when game is over or menus/overlays are open
         if (this.gameOver) return;
-        if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.teamPanelOpen || this.fullMapOpen || this.relicOverlayOpen) return;
+        if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.teamPanelOpen || this.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
         this.runElapsedSeconds++;
         const timeStr = this.formatTime(this.runElapsedSeconds);
         this.timerText.setText(timeStr);
@@ -2603,7 +2658,7 @@ export class DungeonScene extends Phaser.Scene {
 
       btn.on("pointerdown", () => {
         if (this.autoExploring) { this.stopAutoExplore("Stopped."); return; }
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen) return;
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
         txt.setColor("#fbbf24");
         this.time.delayedCall(150, () => txt.setColor("#8899bb"));
         this.handlePlayerAction(d.dir);
@@ -2621,7 +2676,7 @@ export class DungeonScene extends Phaser.Scene {
 
     waitBtn.on("pointerdown", () => {
       if (this.autoExploring) { this.stopAutoExplore("Stopped."); return; }
-      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen) return;
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
       waitTxt.setAlpha(0.5);
       this.time.delayedCall(150, () => waitTxt.setAlpha(1));
       this.turnManager.executeTurn(
@@ -2959,6 +3014,19 @@ export class DungeonScene extends Phaser.Scene {
         gfx.strokeRect(
           mx + pr.x * t - 1, my + pr.y * t - 1,
           pr.w * t + 2, pr.h * t + 2
+        );
+      }
+    }
+
+    // ── Shrine (purple dot, only if visited and not used) ──
+    if (this.floorShrine && !this.shrineUsed && this.shrineTileX >= 0) {
+      if (this.visited[this.shrineTileY]?.[this.shrineTileX]) {
+        const shrineColor = this.floorShrine.color;
+        gfx.fillStyle(shrineColor, 1);
+        const shrp = expanded ? 1 : 0;
+        gfx.fillRect(
+          mx + this.shrineTileX * t - shrp, my + this.shrineTileY * t - shrp,
+          t + shrp * 2, t + shrp * 2
         );
       }
     }
@@ -3453,7 +3521,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeMenu();
       return;
     }
-    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen) return;
+    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
 
     sfxMenuOpen();
     this.menuOpen = true;
@@ -3519,7 +3587,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeTeamPanel();
       return;
     }
-    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.gameOver || this.fullMapOpen || this.relicOverlayOpen) return;
+    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.gameOver || this.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
 
     const liveAllies = this.allies.filter(a => a.alive);
     if (liveAllies.length === 0) {
@@ -6798,6 +6866,338 @@ export class DungeonScene extends Phaser.Scene {
     this.shopOpen = false;
   }
 
+  // ── Shrine System ──
+
+  /** Draw the shrine visual on the dungeon floor */
+  private drawShrine() {
+    if (this.shrineTileX < 0 || !this.floorShrine) return;
+    const shrine = this.floorShrine;
+
+    // Diamond glow graphic at the shrine tile
+    this.shrineGraphic = this.add.graphics().setDepth(5);
+    const cx = this.shrineTileX * TILE_DISPLAY + TILE_DISPLAY / 2;
+    const cy = this.shrineTileY * TILE_DISPLAY + TILE_DISPLAY / 2;
+    // Glow circle
+    this.shrineGraphic.fillStyle(shrine.color, 0.25);
+    this.shrineGraphic.fillCircle(cx, cy, TILE_DISPLAY * 0.6);
+    // Inner diamond shape
+    this.shrineGraphic.fillStyle(shrine.color, 0.5);
+    this.shrineGraphic.fillPoints([
+      new Phaser.Geom.Point(cx, cy - 14),
+      new Phaser.Geom.Point(cx + 10, cy),
+      new Phaser.Geom.Point(cx, cy + 14),
+      new Phaser.Geom.Point(cx - 10, cy),
+    ], true);
+    // Border
+    this.shrineGraphic.lineStyle(1, shrine.color, 0.8);
+    this.shrineGraphic.strokePoints([
+      new Phaser.Geom.Point(cx, cy - 14),
+      new Phaser.Geom.Point(cx + 10, cy),
+      new Phaser.Geom.Point(cx, cy + 14),
+      new Phaser.Geom.Point(cx - 10, cy),
+    ], true);
+
+    // Shrine marker icon with pulse animation
+    this.shrineMarker = this.add.text(cx, cy - 12, shrine.icon, {
+      fontSize: "16px", fontFamily: "monospace",
+      stroke: "#000000", strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(8);
+
+    this.tweens.add({
+      targets: this.shrineMarker,
+      scaleX: { from: 1, to: 1.3 },
+      scaleY: { from: 1, to: 1.3 },
+      alpha: { from: 1, to: 0.6 },
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+  }
+
+  /** Check if player stepped on the shrine tile */
+  private checkShrine() {
+    if (!this.floorShrine || this.shrineUsed || this.shrineOpen) return;
+    if (this.player.tileX === this.shrineTileX && this.player.tileY === this.shrineTileY) {
+      this.openShrineUI();
+    }
+  }
+
+  /** Open the shrine choice overlay */
+  private openShrineUI() {
+    if (this.shrineOpen || !this.floorShrine || this.shrineUsed) return;
+    sfxMenuOpen();
+    this.shrineOpen = true;
+    this.stopAutoExplore();
+
+    const shrine = this.floorShrine;
+
+    // Dim overlay
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75)
+      .setScrollFactor(0).setDepth(200).setInteractive();
+    this.shrineUI.push(overlay);
+
+    // Shrine title
+    const clrHex = `#${shrine.color.toString(16).padStart(6, "0")}`;
+    const titleText = this.add.text(GAME_WIDTH / 2, 55, `${shrine.icon} ${shrine.name}`, {
+      fontSize: "16px", color: clrHex, fontFamily: "monospace", fontStyle: "bold",
+      stroke: "#000000", strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    this.shrineUI.push(titleText);
+
+    // Decorative line
+    const line = this.add.graphics().setScrollFactor(0).setDepth(201);
+    line.lineStyle(1, shrine.color, 0.5);
+    line.lineBetween(GAME_WIDTH / 2 - 120, 77, GAME_WIDTH / 2 + 120, 77);
+    this.shrineUI.push(line);
+
+    // Description
+    const descText = this.add.text(GAME_WIDTH / 2, 100, shrine.description, {
+      fontSize: "10px", color: "#c0c8e0", fontFamily: "monospace",
+      wordWrap: { width: 280 }, align: "center", lineSpacing: 4,
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
+    this.shrineUI.push(descText);
+
+    // Choice buttons
+    const choiceStartY = 210;
+    for (let i = 0; i < shrine.choices.length; i++) {
+      const choice = shrine.choices[i];
+      const cy = choiceStartY + i * 80;
+
+      // Button background
+      const btnColor = Phaser.Display.Color.HexStringToColor(choice.color).color;
+      const btnBg = this.add.rectangle(GAME_WIDTH / 2, cy, 280, 60, 0x1a1a2e, 0.95)
+        .setScrollFactor(0).setDepth(201).setInteractive()
+        .setStrokeStyle(1, btnColor, 0.6);
+      this.shrineUI.push(btnBg);
+
+      // Choice label
+      const labelText = this.add.text(GAME_WIDTH / 2, cy - 12, choice.label, {
+        fontSize: "12px", color: choice.color, fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+      this.shrineUI.push(labelText);
+
+      // Choice description
+      const choiceDesc = this.add.text(GAME_WIDTH / 2, cy + 8, choice.description, {
+        fontSize: "9px", color: "#888ea8", fontFamily: "monospace",
+        wordWrap: { width: 250 }, align: "center",
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(202);
+      this.shrineUI.push(choiceDesc);
+
+      // Hover effects
+      btnBg.on("pointerover", () => {
+        btnBg.setStrokeStyle(2, 0xfbbf24, 1);
+        labelText.setColor("#ffffff");
+      });
+      btnBg.on("pointerout", () => {
+        btnBg.setStrokeStyle(1, btnColor, 0.6);
+        labelText.setColor(choice.color);
+      });
+
+      // Click handler
+      btnBg.on("pointerdown", () => {
+        this.applyShrineEffect(choice);
+      });
+    }
+  }
+
+  /** Close shrine overlay */
+  private closeShrineUI() {
+    for (const obj of this.shrineUI) obj.destroy();
+    this.shrineUI = [];
+    this.shrineOpen = false;
+  }
+
+  /** Show a brief result message after shrine use */
+  private showShrineResult(message: string, color = "#4ade80") {
+    this.closeShrineUI();
+    this.shrineUsed = true;
+
+    // Remove shrine visuals
+    if (this.shrineGraphic) {
+      this.shrineGraphic.destroy();
+      this.shrineGraphic = null;
+    }
+    if (this.shrineMarker) {
+      this.shrineMarker.destroy();
+      this.shrineMarker = null;
+    }
+
+    // Brief result overlay
+    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6)
+      .setScrollFactor(0).setDepth(200).setInteractive();
+
+    const resultText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, message, {
+      fontSize: "12px", color, fontFamily: "monospace", fontStyle: "bold",
+      wordWrap: { width: 280 }, align: "center",
+      stroke: "#000000", strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    // Auto-dismiss after 1.5 seconds
+    this.time.delayedCall(1500, () => {
+      overlay.destroy();
+      resultText.destroy();
+      this.updateHUD();
+      this.updateMinimap();
+    });
+  }
+
+  /** Apply the chosen shrine effect */
+  private applyShrineEffect(choice: ShrineChoice) {
+    const eff = choice.effect;
+
+    switch (eff.type) {
+      case "heal": {
+        if (eff.value === 0) {
+          // "Leave" / "Walk Away" — no effect
+          this.closeShrineUI();
+          this.shrineUsed = true;
+          // Remove shrine visuals
+          if (this.shrineGraphic) { this.shrineGraphic.destroy(); this.shrineGraphic = null; }
+          if (this.shrineMarker) { this.shrineMarker.destroy(); this.shrineMarker = null; }
+          this.showLog("You left the shrine.");
+          return;
+        }
+        if (eff.value === -1) {
+          // Full heal
+          this.player.stats.hp = this.player.stats.maxHp;
+          sfxHeal();
+          this.showShrineResult("The shrine's light washes over you.\nHP fully restored!", "#22c55e");
+          this.showLog("The shrine fully healed your HP!");
+        } else if (eff.value && eff.value > 0) {
+          // Percentage heal
+          const healAmt = Math.floor(this.player.stats.maxHp * (eff.value / 100));
+          this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + healAmt);
+          sfxHeal();
+          this.showShrineResult(`Restored ${healAmt} HP!`, "#22c55e");
+          this.showLog(`The shrine restored ${healAmt} HP!`);
+        }
+        break;
+      }
+
+      case "hpSacrifice": {
+        const sacrificeAmt = Math.floor(this.player.stats.maxHp * ((eff.value ?? 25) / 100));
+        if (this.player.stats.hp <= sacrificeAmt) {
+          this.showLog("Not enough HP to sacrifice!");
+          return; // Don't close — let player pick another option
+        }
+        this.player.stats.hp -= sacrificeAmt;
+        if (eff.blessing) {
+          this.grantBlessing(eff.blessing);
+        }
+        this.showShrineResult(`Sacrificed ${sacrificeAmt} HP.\nBlessing granted!`, "#f97316");
+        this.showLog(`You sacrificed ${sacrificeAmt} HP at the shrine!`);
+        break;
+      }
+
+      case "bellySacrifice": {
+        const bellyCost = eff.value ?? 30;
+        if (this.belly < bellyCost) {
+          this.showLog("Not enough belly to sacrifice!");
+          return; // Don't close
+        }
+        this.belly -= bellyCost;
+        // Give gold (look at the shrine's second choice label for gold amount)
+        const goldAmt = this.floorShrine?.type === ShrineType.Sacrifice
+          ? Math.floor(100 + this.currentFloor * 15 + this.dungeonDef.difficulty * 20)
+          : 150;
+        this.gold += goldAmt;
+        this.showShrineResult(`Sacrificed ${bellyCost} belly.\nGained ${goldAmt}G!`, "#fbbf24");
+        this.showLog(`Sacrificed belly at the shrine. Gained ${goldAmt}G!`);
+        break;
+      }
+
+      case "gold": {
+        const goldAmt = eff.value ?? 100;
+        this.gold += goldAmt;
+        this.showShrineResult(`Found ${goldAmt} gold!`, "#fbbf24");
+        this.showLog(`The shrine granted ${goldAmt} gold!`);
+        break;
+      }
+
+      case "blessing": {
+        if (eff.blessing) {
+          this.grantBlessing(eff.blessing);
+          this.showShrineResult(`Blessed!\n${eff.blessing.name}`, "#4ade80");
+        } else {
+          const b = getRandomBlessing();
+          this.grantBlessing(b);
+          this.showShrineResult(`Blessed!\n${b.name}`, "#4ade80");
+        }
+        break;
+      }
+
+      case "curse": {
+        if (eff.blessing) {
+          this.grantBlessing(eff.blessing);
+          this.showShrineResult(`Cursed!\n${eff.blessing.name}`, "#ef4444");
+        } else {
+          const c = getRandomCurse();
+          this.grantBlessing(c);
+          this.showShrineResult(`Cursed!\n${c.name}`, "#ef4444");
+        }
+        break;
+      }
+
+      case "random": {
+        // 50/50 blessing or curse (gamble)
+        const rolled = eff.blessing ?? rollBlessingOrCurse();
+        this.grantBlessing(rolled);
+        if (rolled.isCurse) {
+          this.showShrineResult(`Bad luck!\n${rolled.name}`, "#ef4444");
+          this.showLog(`The gamble shrine cursed you: ${rolled.name}`);
+        } else {
+          this.showShrineResult(`Lucky!\n${rolled.name}`, "#4ade80");
+          this.showLog(`The gamble shrine blessed you: ${rolled.name}`);
+        }
+        break;
+      }
+
+      case "restorePP": {
+        for (const sk of this.player.skills) {
+          sk.currentPp = sk.pp;
+        }
+        sfxHeal();
+        this.showShrineResult("All skill PP restored!", "#38bdf8");
+        this.showLog("The shrine restored all your PP!");
+        break;
+      }
+
+      case "exp": {
+        const expAmt = eff.value ?? 50;
+        this.totalExp += expAmt;
+        const lvlResult = processLevelUp(this.player.stats, expAmt, this.totalExp);
+        this.totalExp = lvlResult.totalExp;
+        this.showShrineResult(`Gained ${expAmt} EXP!`, "#c084fc");
+        this.showLog(`The shrine granted ${expAmt} EXP!`);
+        break;
+      }
+
+      case "learnSkill": {
+        // For now, just grant EXP as a placeholder
+        const expAmtSk = eff.value ?? 50;
+        this.totalExp += expAmtSk;
+        const lvlResultSk = processLevelUp(this.player.stats, expAmtSk, this.totalExp);
+        this.totalExp = lvlResultSk.totalExp;
+        this.showShrineResult(`Gained ${expAmtSk} EXP from ancient knowledge!`, "#38bdf8");
+        this.showLog(`The shrine imparted ancient knowledge: ${expAmtSk} EXP!`);
+        break;
+      }
+
+      case "item": {
+        // Reserved for future use
+        this.showShrineResult("Nothing happened.", "#888888");
+        break;
+      }
+
+      default: {
+        this.closeShrineUI();
+        this.shrineUsed = true;
+        break;
+      }
+    }
+  }
+
   // ── Event Room System ──
 
   private checkEventRoom() {
@@ -8795,6 +9195,7 @@ export class DungeonScene extends Phaser.Scene {
       this.checkEventRoom();
       this.checkPuzzleRoom();
       this.checkSecretRoom();
+      this.checkShrine();
     }
 
     // Belly drain per turn (movement or attack)
@@ -10908,6 +11309,7 @@ export class DungeonScene extends Phaser.Scene {
     this.checkMonsterHouse();
     this.checkEventRoom();
     this.checkPuzzleRoom();
+    this.checkShrine();
 
     // Belly drain, weather, status
     this.tickBelly();
