@@ -15,6 +15,14 @@ export enum ComboEffect {
   HealBurst = "healBurst",          // heal 30% HP
   SpeedBoost = "speedBoost",        // get 2 actions next turn
   CritGuarantee = "critGuarantee",  // next attack is guaranteed crit
+  ElementalStorm = "elementalStorm",       // AoE 200% ATK damage to all visible enemies
+  NaturesWrath = "naturesWrath",           // Heal 30% HP + ATK boost 3 turns
+  ShadowDance = "shadowDance",             // 100% dodge for next 2 turns
+  IronWallCombo = "ironWallCombo",         // DEF +50% for 5 turns
+  FairyRing = "fairyRing",                 // Remove negative status + heal 20% HP
+  DragonsRage = "dragonsRage",             // Next attack deals 3x damage
+  BlizzardRush = "blizzardRush",           // Freeze all adjacent enemies
+  ToxicChain = "toxicChain",               // Badly Poison all enemies in room
 }
 
 /** How a combo slot matches a skill */
@@ -162,6 +170,106 @@ const SKILL_COMBOS: SkillCombo[] = [
     effect: ComboEffect.DoubleDamage,
     description: "Three Dragon moves in a row: next skill deals 2x damage!",
   },
+  // 11. Elemental Storm: Fire + Water + Electric in any order → AoE 200% ATK to all visible enemies
+  //     All 6 permutations so the combo triggers regardless of order
+  ...[
+    [PokemonType.Fire, PokemonType.Water, PokemonType.Electric],
+    [PokemonType.Fire, PokemonType.Electric, PokemonType.Water],
+    [PokemonType.Water, PokemonType.Fire, PokemonType.Electric],
+    [PokemonType.Water, PokemonType.Electric, PokemonType.Fire],
+    [PokemonType.Electric, PokemonType.Fire, PokemonType.Water],
+    [PokemonType.Electric, PokemonType.Water, PokemonType.Fire],
+  ].map((types): SkillCombo => ({
+    id: "elementalStorm",
+    name: "Elemental Storm",
+    slots: types.map(t => ({ mode: MatchMode.ByType, value: t })),
+    effect: ComboEffect.ElementalStorm,
+    description: "Fire + Water + Electric: devastating storm hits all enemies for 200% ATK!",
+  })),
+  // 12. Nature's Wrath: Grass + Ground + Rock → Heal 30% HP + ATK boost 3 turns
+  {
+    id: "naturesWrath",
+    name: "Nature's Wrath",
+    slots: [
+      { mode: MatchMode.ByType, value: PokemonType.Grass },
+      { mode: MatchMode.ByType, value: PokemonType.Ground },
+      { mode: MatchMode.ByType, value: PokemonType.Rock },
+    ],
+    effect: ComboEffect.NaturesWrath,
+    description: "Grass + Ground + Rock: heal 30% HP and boost ATK for 3 turns!",
+  },
+  // 13. Shadow Dance: Dark + Ghost + Dark → 100% dodge for next 2 turns
+  {
+    id: "shadowDance",
+    name: "Shadow Dance",
+    slots: [
+      { mode: MatchMode.ByType, value: PokemonType.Dark },
+      { mode: MatchMode.ByType, value: PokemonType.Ghost },
+      { mode: MatchMode.ByType, value: PokemonType.Dark },
+    ],
+    effect: ComboEffect.ShadowDance,
+    description: "Dark + Ghost + Dark: become untouchable! 100% dodge for 2 turns!",
+  },
+  // 14. Iron Wall Combo: Steel + Rock + Fighting → DEF +50% for 5 turns
+  {
+    id: "ironWallCombo",
+    name: "Iron Wall",
+    slots: [
+      { mode: MatchMode.ByType, value: PokemonType.Steel },
+      { mode: MatchMode.ByType, value: PokemonType.Rock },
+      { mode: MatchMode.ByType, value: PokemonType.Fighting },
+    ],
+    effect: ComboEffect.IronWallCombo,
+    description: "Steel + Rock + Fighting: DEF +50% for 5 turns!",
+  },
+  // 15. Fairy Ring: Fairy + Psychic + Normal → Remove negative status + heal 20% HP
+  {
+    id: "fairyRing",
+    name: "Fairy Ring",
+    slots: [
+      { mode: MatchMode.ByType, value: PokemonType.Fairy },
+      { mode: MatchMode.ByType, value: PokemonType.Psychic },
+      { mode: MatchMode.ByType, value: PokemonType.Normal },
+    ],
+    effect: ComboEffect.FairyRing,
+    description: "Fairy + Psychic + Normal: cleanse all ailments and heal 20% HP!",
+  },
+  // 16. Dragon's Rage: Dragon + Fire + Dragon → Next attack deals 3x damage
+  {
+    id: "dragonsRage",
+    name: "Dragon's Rage",
+    slots: [
+      { mode: MatchMode.ByType, value: PokemonType.Dragon },
+      { mode: MatchMode.ByType, value: PokemonType.Fire },
+      { mode: MatchMode.ByType, value: PokemonType.Dragon },
+    ],
+    effect: ComboEffect.DragonsRage,
+    description: "Dragon + Fire + Dragon: next attack deals 3x damage!",
+  },
+  // 17. Blizzard Rush: Ice + Ice + Water → Freeze all adjacent enemies
+  {
+    id: "blizzardRush",
+    name: "Blizzard Rush",
+    slots: [
+      { mode: MatchMode.ByType, value: PokemonType.Ice },
+      { mode: MatchMode.ByType, value: PokemonType.Ice },
+      { mode: MatchMode.ByType, value: PokemonType.Water },
+    ],
+    effect: ComboEffect.BlizzardRush,
+    description: "Ice + Ice + Water: freeze all adjacent enemies solid!",
+  },
+  // 18. Toxic Chain: Poison + Poison + Dark → Badly Poison all enemies in room
+  {
+    id: "toxicChain",
+    name: "Toxic Chain",
+    slots: [
+      { mode: MatchMode.ByType, value: PokemonType.Poison },
+      { mode: MatchMode.ByType, value: PokemonType.Poison },
+      { mode: MatchMode.ByType, value: PokemonType.Dark },
+    ],
+    effect: ComboEffect.ToxicChain,
+    description: "Poison + Poison + Dark: badly poison all enemies in the room!",
+  },
 ];
 
 // ─── Matching Logic ─────────────────────────────────────────────────────────
@@ -241,6 +349,10 @@ export function checkCombo(recentSkills: string[]): SkillCombo | null {
       if (t1.type === PokemonType.Electric) continue;
       // Avoid overlapping with dragonFury
       if (t1.type === PokemonType.Dragon) continue;
+      // Avoid overlapping with blizzardRush (Ice + Ice + Water)
+      if (t1.type === PokemonType.Ice) continue;
+      // Avoid overlapping with toxicChain (Poison + Poison + Dark)
+      if (t1.type === PokemonType.Poison) continue;
     }
 
     // Special case for "thunderSurge": don't trigger if both are exact-ID combos
@@ -252,7 +364,12 @@ export function checkCombo(recentSkills: string[]): SkillCombo | null {
   return null;
 }
 
-/** Get all available combos for display in help */
+/** Get all available combos for display in help (deduplicated by id) */
 export function getAvailableCombos(): SkillCombo[] {
-  return [...SKILL_COMBOS];
+  const seen = new Set<string>();
+  return SKILL_COMBOS.filter(c => {
+    if (seen.has(c.id)) return false;
+    seen.add(c.id);
+    return true;
+  });
 }

@@ -454,6 +454,8 @@ export class DungeonScene extends Phaser.Scene {
   private comboDoubleDamage = false;      // next skill does 2x damage
   private comboCritGuarantee = false;     // next attack is guaranteed crit
   private comboSpeedBoost = false;        // get 2 actions next turn
+  private comboDragonsRage = false;       // next attack deals 3x damage (Dragon's Rage)
+  private comboShadowDanceTurns = 0;      // 100% dodge turns remaining (Shadow Dance)
 
   // Score Chain state
   private scoreChain: ScoreChain = createScoreChain();
@@ -718,6 +720,8 @@ export class DungeonScene extends Phaser.Scene {
     this.comboDoubleDamage = false;
     this.comboCritGuarantee = false;
     this.comboSpeedBoost = false;
+    this.comboDragonsRage = false;
+    this.comboShadowDanceTurns = 0;
     // Score chain persists across floors; create fresh on new run
     this.scoreChain = data?.scoreChain ?? createScoreChain();
     this.chainHudText = null;
@@ -5586,9 +5590,10 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
 
-    // Ability: Levitate — immune to ground-based traps (Spike, Warp, Blast)
+    // Ability: Levitate — immune to ground-based traps (Spike, Warp, Blast, Sticky, Hunger)
     if (this.player.ability === AbilityId.Levitate &&
-        (ft.trap.type === TrapType.Spike || ft.trap.type === TrapType.Warp || ft.trap.type === TrapType.Blast)) {
+        (ft.trap.type === TrapType.Spike || ft.trap.type === TrapType.Warp || ft.trap.type === TrapType.Blast ||
+         ft.trap.type === TrapType.Sticky || ft.trap.type === TrapType.Hunger)) {
       this.showLog(`Stepped on a ${ft.trap.name}! Levitate avoided it!`);
       this.drawTrap(ft);
       this.updateHUD();
@@ -5718,6 +5723,96 @@ export class DungeonScene extends Phaser.Scene {
         } else {
           this.showLog("No skills to seal!");
         }
+        break;
+      }
+      case TrapType.Sticky: {
+        // Reduce belly by 5 as a simplified sticky penalty
+        this.belly = Math.max(0, this.belly - 5);
+        this.showLog("Sticky goo drains your energy! Belly -5!");
+        if (this.player.sprite) this.player.sprite.setTint(0xf59e0b);
+        this.time.delayedCall(400, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
+        break;
+      }
+      case TrapType.Hunger: {
+        // Drain 20 belly instantly
+        this.belly = Math.max(0, this.belly - 20);
+        this.showLog("Extreme hunger strikes! Belly -20!");
+        if (this.player.sprite) this.player.sprite.setTint(0x92400e);
+        this.time.delayedCall(400, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
+        break;
+      }
+      case TrapType.Summon: {
+        // Spawn 2 enemies around the player
+        const summonSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
+          ? this.getEndlessEnemies(this.currentFloor)
+          : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
+        const summonSpecies = summonSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
+        if (summonSpecies.length > 0) {
+          const adjOffsets = [{x:0,y:-1},{x:1,y:0},{x:0,y:1},{x:-1,y:0},{x:1,y:-1},{x:1,y:1},{x:-1,y:1},{x:-1,y:-1}];
+          let spawned = 0;
+          for (const off of adjOffsets) {
+            if (spawned >= 2) break;
+            const sx = this.player.tileX + off.x;
+            const sy = this.player.tileY + off.y;
+            if (sx < 0 || sx >= this.dungeon.width || sy < 0 || sy >= this.dungeon.height) continue;
+            if (this.dungeon.terrain[sy]?.[sx] !== TerrainType.GROUND) continue;
+            if (this.allEntities.some(e => e.alive && e.tileX === sx && e.tileY === sy)) continue;
+            const sp = summonSpecies[Math.floor(Math.random() * summonSpecies.length)];
+            const summonStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
+            if (this.difficultyMods.enemyHpMult !== 1) {
+              summonStats.hp = Math.floor(summonStats.hp * this.difficultyMods.enemyHpMult);
+              summonStats.maxHp = Math.floor(summonStats.maxHp * this.difficultyMods.enemyHpMult);
+            }
+            if (this.difficultyMods.enemyAtkMult !== 1) {
+              summonStats.atk = Math.floor(summonStats.atk * this.difficultyMods.enemyAtkMult);
+            }
+            const summonEnemy: Entity = {
+              tileX: sx, tileY: sy,
+              facing: Direction.Down,
+              stats: { ...summonStats },
+              alive: true,
+              spriteKey: sp.spriteKey,
+              name: sp.name,
+              types: sp.types,
+              attackType: sp.attackType,
+              skills: createSpeciesSkills(sp),
+              statusEffects: [],
+              speciesId: sp.spriteKey,
+              ability: SPECIES_ABILITIES[sp.spriteKey],
+            };
+            const seTex = `${sp.spriteKey}-idle`;
+            if (this.textures.exists(seTex)) {
+              summonEnemy.sprite = this.add.sprite(
+                this.tileToPixelX(sx), this.tileToPixelY(sy), seTex
+              );
+              summonEnemy.sprite.setScale(TILE_SCALE).setDepth(9);
+              const seAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+              if (this.anims.exists(seAnim)) summonEnemy.sprite.play(seAnim);
+            }
+            this.enemies.push(summonEnemy);
+            this.allEntities.push(summonEnemy);
+            this.seenSpecies.add(sp.spriteKey);
+            spawned++;
+          }
+          if (spawned > 0) {
+            this.showLog(`${spawned} enemies appeared!`);
+            this.cameras.main.flash(200, 255, 50, 50);
+          } else {
+            this.showLog("The trap fizzled...");
+          }
+        }
+        break;
+      }
+      case TrapType.Grudge: {
+        // Apply Cursed status for 8 turns
+        if (!this.player.statusEffects.some(s => s.type === SkillEffect.Cursed)) {
+          this.player.statusEffects.push({ type: SkillEffect.Cursed, turnsLeft: 8 });
+          this.showLog("A dark curse falls upon you!");
+        } else {
+          this.showLog("The curse deepens...");
+        }
+        if (this.player.sprite) this.player.sprite.setTint(0x581c87);
+        this.time.delayedCall(400, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
         break;
       }
     }
@@ -9645,6 +9740,7 @@ export class DungeonScene extends Phaser.Scene {
 
     // Tick status effects (burn damage + wear-off messages)
     this.tickEntityStatus(this.player);
+    this.tickShadowDance();
     this.updateHUD();
 
     if (!this.player.alive && !this.gameOver) {
@@ -9699,10 +9795,22 @@ export class DungeonScene extends Phaser.Scene {
     this.tickBelly();
     this.tickWeather();
     this.tickEntityStatus(this.player);
+    this.tickShadowDance();
     this.updateHUD();
 
     if (!this.player.alive && !this.gameOver) {
       this.showGameOver();
+    }
+  }
+
+  /** Decrement Shadow Dance dodge turns and notify when expired */
+  private tickShadowDance() {
+    if (this.comboShadowDanceTurns > 0) {
+      this.comboShadowDanceTurns--;
+      if (this.comboShadowDanceTurns <= 0) {
+        this.showLog("Shadow Dance wore off!");
+        if (this.player.sprite) this.player.sprite.setAlpha(1.0);
+      }
     }
   }
 
@@ -9794,6 +9902,144 @@ export class DungeonScene extends Phaser.Scene {
         this.comboCritGuarantee = true;
         this.showLog("Next attack is a guaranteed critical hit!");
         break;
+
+      case ComboEffect.ElementalStorm: {
+        // AoE 200% ATK damage to all visible enemies
+        const stormDmg = Math.max(1, Math.floor(getEffectiveAtk(this.player) * 2.0));
+        let stormHits = 0;
+        for (const enemy of this.enemies) {
+          if (!enemy.alive) continue;
+          const dist = chebyshevDist(this.player.tileX, this.player.tileY, enemy.tileX, enemy.tileY);
+          if (dist <= 6) {
+            enemy.stats.hp = Math.max(0, enemy.stats.hp - stormDmg);
+            stormHits++;
+            if (enemy.sprite) {
+              this.showDamagePopup(enemy.sprite.x, enemy.sprite.y, stormDmg, 2.0);
+              this.showEnemyHpBar(enemy);
+              this.flashEntity(enemy, 2.0);
+            }
+            this.checkDeath(enemy);
+          }
+        }
+        if (stormHits > 0) {
+          this.showLog(`Elemental Storm hit ${stormHits} enemies for ${stormDmg} damage each!`);
+        }
+        break;
+      }
+
+      case ComboEffect.NaturesWrath: {
+        // Heal 30% max HP + ATK boost for 3 turns
+        const wrathHeal = Math.floor(this.player.stats.maxHp * 0.3);
+        this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + wrathHeal);
+        if (this.player.sprite) {
+          this.showHealPopup(this.player.sprite.x, this.player.sprite.y, wrathHeal);
+          this.player.sprite.setTint(0x44ff44);
+          this.time.delayedCall(300, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
+        }
+        // Add ATK boost for 3 turns (uses existing AtkUp status effect)
+        this.player.statusEffects = this.player.statusEffects.filter(s => s.type !== SkillEffect.AtkUp);
+        this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 3 });
+        this.showLog(`Nature's Wrath restored ${wrathHeal} HP and boosted ATK for 3 turns!`);
+        break;
+      }
+
+      case ComboEffect.ShadowDance:
+        // 100% dodge for next 2 turns
+        this.comboShadowDanceTurns = 2;
+        this.showLog("Shadow Dance! You will dodge all attacks for 2 turns!");
+        if (this.player.sprite) {
+          this.player.sprite.setAlpha(0.5);
+          this.time.delayedCall(400, () => { if (this.player.sprite) this.player.sprite.setAlpha(1.0); });
+        }
+        break;
+
+      case ComboEffect.IronWallCombo: {
+        // DEF +50% for 5 turns (uses existing DefUp status effect)
+        this.player.statusEffects = this.player.statusEffects.filter(s => s.type !== SkillEffect.DefUp);
+        this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 5 });
+        this.showLog("Iron Wall! DEF +50% for 5 turns!");
+        break;
+      }
+
+      case ComboEffect.FairyRing: {
+        // Remove all negative status effects + heal 20% HP
+        const negativeEffects = [
+          SkillEffect.Burn, SkillEffect.Paralyze, SkillEffect.Frozen,
+          SkillEffect.BadlyPoisoned, SkillEffect.Flinch, SkillEffect.Drowsy, SkillEffect.Cursed,
+        ];
+        const removedCount = this.player.statusEffects.filter(s => negativeEffects.includes(s.type)).length;
+        this.player.statusEffects = this.player.statusEffects.filter(s => !negativeEffects.includes(s.type));
+        const fairyHeal = Math.floor(this.player.stats.maxHp * 0.2);
+        this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + fairyHeal);
+        if (this.player.sprite) {
+          this.showHealPopup(this.player.sprite.x, this.player.sprite.y, fairyHeal);
+          this.player.sprite.setTint(0xffaaff);
+          this.time.delayedCall(300, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
+        }
+        this.updateStatusTint(this.player);
+        let fairyMsg = `Fairy Ring healed ${fairyHeal} HP`;
+        if (removedCount > 0) fairyMsg += ` and removed ${removedCount} ailment${removedCount > 1 ? "s" : ""}`;
+        fairyMsg += "!";
+        this.showLog(fairyMsg);
+        break;
+      }
+
+      case ComboEffect.DragonsRage:
+        // Next attack deals 3x damage
+        this.comboDragonsRage = true;
+        this.showLog("Dragon's Rage! Next attack deals 3x damage!");
+        break;
+
+      case ComboEffect.BlizzardRush: {
+        // Freeze all adjacent enemies (Chebyshev dist <= 1)
+        let frozenCount = 0;
+        for (const enemy of this.enemies) {
+          if (!enemy.alive) continue;
+          const dist = chebyshevDist(this.player.tileX, this.player.tileY, enemy.tileX, enemy.tileY);
+          if (dist <= 1) {
+            if (!enemy.statusEffects.some(s => s.type === SkillEffect.Frozen)) {
+              const frozenTurns = 2 + Math.floor(Math.random() * 2); // 2-3 turns
+              enemy.statusEffects.push({ type: SkillEffect.Frozen, turnsLeft: frozenTurns });
+              frozenCount++;
+              if (enemy.sprite) {
+                enemy.sprite.setTint(0x88ccff);
+                this.time.delayedCall(300, () => { if (enemy.sprite) this.updateStatusTint(enemy); });
+              }
+            }
+          }
+        }
+        if (frozenCount > 0) {
+          this.showLog(`Blizzard Rush froze ${frozenCount} adjacent enem${frozenCount > 1 ? "ies" : "y"}!`);
+        } else {
+          this.showLog("Blizzard Rush! No adjacent enemies to freeze.");
+        }
+        break;
+      }
+
+      case ComboEffect.ToxicChain: {
+        // Apply Badly Poisoned to all enemies in room
+        let poisonedCount = 0;
+        for (const enemy of this.enemies) {
+          if (!enemy.alive) continue;
+          const dist = chebyshevDist(this.player.tileX, this.player.tileY, enemy.tileX, enemy.tileY);
+          if (dist <= 5) { // room-ish radius
+            if (!enemy.statusEffects.some(s => s.type === SkillEffect.BadlyPoisoned)) {
+              enemy.statusEffects.push({ type: SkillEffect.BadlyPoisoned, turnsLeft: 8, poisonCounter: 0 });
+              poisonedCount++;
+              if (enemy.sprite) {
+                enemy.sprite.setTint(0x9944cc);
+                this.time.delayedCall(300, () => { if (enemy.sprite) this.updateStatusTint(enemy); });
+              }
+            }
+          }
+        }
+        if (poisonedCount > 0) {
+          this.showLog(`Toxic Chain badly poisoned ${poisonedCount} enem${poisonedCount > 1 ? "ies" : "y"} in the room!`);
+        } else {
+          this.showLog("Toxic Chain! No enemies to poison nearby.");
+        }
+        break;
+      }
     }
 
     this.updateHUD();
@@ -9889,6 +10135,18 @@ export class DungeonScene extends Phaser.Scene {
         : directionToPlayer(attacker, this.player);
       attacker.facing = dir;
       attacker.sprite!.play(`${attacker.spriteKey}-idle-${dir}`);
+
+      // Shadow Dance combo: 100% dodge for player
+      if (defender === this.player && this.comboShadowDanceTurns > 0) {
+        sfxDodge();
+        this.showLog(`${defender.name} dodged with Shadow Dance!`);
+        if (defender.sprite) {
+          this.showDamagePopup(defender.sprite.x, defender.sprite.y, 0, 1, "Shadow Dance!");
+        }
+        this.updateHUD();
+        this.time.delayedCall(250, resolve);
+        return;
+      }
 
       // Held item + ability dodge chance (defender is player)
       let dodgeChance = this.heldItemEffect.dodgeChance ?? 0;
@@ -10109,6 +10367,15 @@ export class DungeonScene extends Phaser.Scene {
         }
 
         if (skill.power > 0) {
+          // Shadow Dance combo: 100% dodge for player against enemy skills
+          if (target === this.player && this.comboShadowDanceTurns > 0) {
+            sfxDodge();
+            this.showLog(`${target.name} dodged ${user.name}'s ${skill.name} with Shadow Dance!`);
+            if (target.sprite) {
+              this.showDamagePopup(target.sprite.x, target.sprite.y, 0, 1, "Shadow Dance!");
+            }
+            continue;
+          }
           // Held item + ability dodge chance (target is player, attacker is enemy)
           let skillDodge = this.heldItemEffect.dodgeChance ?? 0;
           if (target.ability === AbilityId.RunAway) skillDodge += getRunAwayDodgeBonus(target.abilityLevel ?? 1) * 100;
@@ -10146,8 +10413,9 @@ export class DungeonScene extends Phaser.Scene {
           const skillCritChance = (this.heldItemEffect.critChance ?? 0) + (user === this.player ? (this.relicEffects.critBonus ?? 0) : 0);
           const skillIsCrit = user === this.player && (this.comboCritGuarantee || (skillCritChance > 0 && Math.random() * 100 < skillCritChance));
           const skillCritMult = skillIsCrit ? 1.5 : 1.0;
-          // Skill Combo: double damage multiplier
-          const comboMult = (user === this.player && this.comboDoubleDamage) ? 2.0 : 1.0;
+          // Skill Combo: damage multiplier (Dragon's Rage 3x > DoubleDamage 2x)
+          const comboMult = (user === this.player && this.comboDragonsRage) ? 3.0
+            : (user === this.player && this.comboDoubleDamage) ? 2.0 : 1.0;
           // Relic: Wide Glass — type advantage bonus
           const skillRelicTypeAdvMult = (user === this.player && effectiveness >= 2.0 && (this.relicEffects.typeAdvantageBonus ?? 0) > 0) ? (1 + this.relicEffects.typeAdvantageBonus) : 1.0;
           // Apply difficulty playerDamageMult when target is the player
@@ -10236,6 +10504,7 @@ export class DungeonScene extends Phaser.Scene {
       if (user === this.player) {
         if (this.comboDoubleDamage) this.comboDoubleDamage = false;
         if (this.comboCritGuarantee) this.comboCritGuarantee = false;
+        if (this.comboDragonsRage) this.comboDragonsRage = false;
       }
 
       if (totalHits === 0 && skill.power > 0) {

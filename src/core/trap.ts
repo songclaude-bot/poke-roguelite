@@ -12,6 +12,10 @@ export enum TrapType {
   Blast = "blast",          // 25% max HP damage in 3x3 area
   Trip = "trip",            // Drop a random item from inventory
   Seal = "seal",            // Disable a random skill for 10 turns
+  Sticky = "sticky",        // Makes an item sticky (belly penalty)
+  Hunger = "hunger",        // Drains 20 belly instantly
+  Summon = "summon",        // Spawns 2 enemies around the player
+  Grudge = "grudge",        // Applies Cursed status for 8 turns
 }
 
 export interface TrapDef {
@@ -87,6 +91,38 @@ export const TRAPS: Record<TrapType, TrapDef> = {
     color: "#6366f1",
     hexColor: 0x6366f1,
     description: "Seals a skill!",
+  },
+  [TrapType.Sticky]: {
+    type: TrapType.Sticky,
+    name: "Sticky Trap",
+    symbol: "●",
+    color: "#f59e0b",
+    hexColor: 0xf59e0b,
+    description: "Something sticky!",
+  },
+  [TrapType.Hunger]: {
+    type: TrapType.Hunger,
+    name: "Hunger Trap",
+    symbol: "◇",
+    color: "#92400e",
+    hexColor: 0x92400e,
+    description: "Drains your belly!",
+  },
+  [TrapType.Summon]: {
+    type: TrapType.Summon,
+    name: "Summon Trap",
+    symbol: "★",
+    color: "#ef4444",
+    hexColor: 0xef4444,
+    description: "Enemies appear!",
+  },
+  [TrapType.Grudge]: {
+    type: TrapType.Grudge,
+    name: "Grudge Trap",
+    symbol: "✝",
+    color: "#581c87",
+    hexColor: 0x581c87,
+    description: "A dark curse!",
   },
 };
 
