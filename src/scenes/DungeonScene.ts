@@ -106,6 +106,14 @@ import {
   shouldSpawnSecretRoom, generateSecretRoom,
 } from "../core/secret-rooms";
 import { getAggregatedTalentEffects } from "../core/talent-tree";
+import {
+  Relic, RelicRarity, RELIC_DB, MAX_RELICS,
+  rollRelicDrop, getRelicRarityColor, getAggregatedRelicEffects, hasRelicEffect,
+} from "../core/relics";
+import {
+  RunLog, RunLogEvent, RunLogEntry,
+  createRunLog, calculatePerformanceGrade, gradeColor,
+} from "../core/run-log";
 
 interface AllyData {
   speciesId: string;
@@ -450,13 +458,24 @@ export class DungeonScene extends Phaser.Scene {
   private secretRoomUI: Phaser.GameObjects.GameObject[] = [];       // WarpHub UI overlay
   private secretWarpOpen = false;                                    // WarpHub overlay is open
 
+  // Relic Artifact state (run-specific, max 3)
+  private activeRelics: Relic[] = [];
+  private relicEffects: Record<string, number> = {};  // aggregated relic effects cache
+  private relicHudIcons: Phaser.GameObjects.Text[] = [];
+  private relicOverlayOpen = false;
+  private relicOverlayUI: Phaser.GameObjects.GameObject[] = [];
+  private focusSashUsed = false;  // Focus Sash: one lethal-hit save per run
+
+  // Run Log — battle log tracking all significant events across the run
+  private runLog: RunLog = createRunLog();
+
   constructor() {
     super({ key: "DungeonScene" });
   }
 
   private persistentAllies: AllyData[] | null = null;
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number; scoreChain?: ScoreChain; legendaryEncountered?: boolean; questItemsCollected?: number; questItemsUsed?: boolean }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number; scoreChain?: ScoreChain; legendaryEncountered?: boolean; questItemsCollected?: number; questItemsUsed?: boolean; relics?: Relic[]; runLogEntries?: RunLogEntry[] }) {
     // Load D-Pad side preference
     try {
       const side = localStorage.getItem("poke-roguelite-dpadSide");
@@ -605,6 +624,21 @@ export class DungeonScene extends Phaser.Scene {
       this.questItemsCollected = 0;
       this.questItemsUsed = false;
     }
+
+    // Relic state: restore from floor transition or reset on new run
+    if (data?.relics && data.relics.length > 0) {
+      this.activeRelics = data.relics;
+      this.relicEffects = getAggregatedRelicEffects(this.activeRelics);
+    } else {
+      this.activeRelics = [];
+      this.relicEffects = {};
+    }
+    this.focusSashUsed = false;
+    this.relicHudIcons = [];
+    this.relicOverlayOpen = false;
+    this.relicOverlayUI = [];
+    // Run log: restore from floor transition or create fresh on new run
+    this.runLog = data?.runLogEntries ? RunLog.deserialize(data.runLogEntries) : createRunLog();
     // Reset combo state on new floor
     this.recentSkillIds = [];
     this.comboDoubleDamage = false;
@@ -776,7 +810,6 @@ export class DungeonScene extends Phaser.Scene {
     // Load dungeon tileset
     this.load.image(this.dungeonDef.tilesetKey, this.dungeonDef.tilesetPath);
 
-    // Sprite dex map for all pokemon
     const spriteMap: Record<string, string> = {
       mudkip: "0258", zubat: "0041", shellos: "0422", corsola: "0222", geodude: "0074",
       pikachu: "0025", voltorb: "0100", magnemite: "0081",
@@ -2041,7 +2074,7 @@ export class DungeonScene extends Phaser.Scene {
       callback: () => {
         // Don't count time when game is over or menus/overlays are open
         if (this.gameOver) return;
-        if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.teamPanelOpen || this.fullMapOpen) return;
+        if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.teamPanelOpen || this.fullMapOpen || this.relicOverlayOpen) return;
         this.runElapsedSeconds++;
         const timeStr = this.formatTime(this.runElapsedSeconds);
         this.timerText.setText(timeStr);
@@ -2086,6 +2119,8 @@ export class DungeonScene extends Phaser.Scene {
       this.weatherText.setColor(INTENSITY_COLOR[this.currentWeatherIntensity]);
       sfxWeatherChange();
       this.showLog(`The weather is ${wd.name} (${intLabel})!`);
+      // Run log: weather on floor start
+      this.runLog.add(RunLogEvent.WeatherChanged, wd.name, this.currentFloor, this.turnManager.turn);
     }
     this.setupWeatherVisuals();
     this.setupStatusFlashAnimations();
@@ -2206,6 +2241,10 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Mutation HUD Badges (left side, below timer text) ──
     if (this.floorMutations.length > 0) {
+      // Run log: mutations active on this floor
+      for (const m of this.floorMutations) {
+        this.runLog.add(RunLogEvent.MutationActive, m.name, this.currentFloor, this.turnManager.turn);
+      }
       const mutBaseY = 64; // below timer text
       for (let mi = 0; mi < this.floorMutations.length; mi++) {
         const mut = this.floorMutations[mi];
@@ -2390,6 +2429,7 @@ export class DungeonScene extends Phaser.Scene {
     this.initDomHud();
 
     this.updateHUD();
+    this.updateRelicHUD();
 
     // Boss floor entrance message
     if (this.bossEntity) {
@@ -2512,7 +2552,7 @@ export class DungeonScene extends Phaser.Scene {
 
       btn.on("pointerdown", () => {
         if (this.autoExploring) { this.stopAutoExplore("Stopped."); return; }
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen) return;
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen) return;
         txt.setColor("#fbbf24");
         this.time.delayedCall(150, () => txt.setColor("#8899bb"));
         this.handlePlayerAction(d.dir);
@@ -2530,7 +2570,7 @@ export class DungeonScene extends Phaser.Scene {
 
     waitBtn.on("pointerdown", () => {
       if (this.autoExploring) { this.stopAutoExplore("Stopped."); return; }
-      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen) return;
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen) return;
       waitTxt.setAlpha(0.5);
       this.time.delayedCall(150, () => waitTxt.setAlpha(1));
       this.turnManager.executeTurn(
@@ -2578,13 +2618,17 @@ export class DungeonScene extends Phaser.Scene {
       { col: 0, row: 1 }, { col: 1, row: 1 },
     ];
 
+    // Relic: Choice Band — only the first skill can be used
+    const choiceBandLimit = (this.relicEffects.skillLimit ?? 0) > 0;
+
     for (let i = 0; i < 4; i++) {
       const skill = skills[i];
       const pos = positions[i];
       const px = baseX + pos.col * cellW;
       const py = baseY + pos.row * cellH;
-      const label = skill ? `${skill.name}\n${skill.currentPp}/${skill.pp}` : "---";
-      const color = skill && skill.currentPp > 0 ? "#667eea" : "#444460";
+      const isLocked = choiceBandLimit && i > 0 && !!skill;
+      const label = skill ? (isLocked ? `${skill.name}\nLOCKED` : `${skill.name}\n${skill.currentPp}/${skill.pp}`) : "---";
+      const color = isLocked ? "#ff4444" : (skill && skill.currentPp > 0 ? "#667eea" : "#444460");
 
       const btn = this.add.text(px, py, label, {
         fontSize: "9px", color, fontFamily: "monospace",
@@ -2595,6 +2639,10 @@ export class DungeonScene extends Phaser.Scene {
 
       btn.on("pointerdown", () => {
         if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.fullMapOpen) return;
+        if (choiceBandLimit && i > 0) {
+          this.showLog("Choice Band: Only 1st skill allowed!");
+          return;
+        }
         if (!skill || skill.currentPp <= 0) {
           this.showLog("No PP left!");
           return;
@@ -3353,7 +3401,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeMenu();
       return;
     }
-    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen) return;
+    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen) return;
 
     sfxMenuOpen();
     this.menuOpen = true;
@@ -3419,7 +3467,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeTeamPanel();
       return;
     }
-    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.gameOver || this.fullMapOpen) return;
+    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.gameOver || this.fullMapOpen || this.relicOverlayOpen) return;
 
     const liveAllies = this.allies.filter(a => a.alive);
     if (liveAllies.length === 0) {
@@ -3932,7 +3980,7 @@ export class DungeonScene extends Phaser.Scene {
     for (let i = 0; i < 4; i++) {
       hud.skillBtns[i].addEventListener("pointerdown", (e: Event) => {
         e.stopPropagation();
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.fullMapOpen) return;
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.fullMapOpen || this.relicOverlayOpen) return;
         const skill = this.player.skills[i];
         if (!skill || skill.currentPp <= 0) {
           this.showLog("No PP left!");
@@ -4146,6 +4194,8 @@ export class DungeonScene extends Phaser.Scene {
     fi.sprite.destroy();
     this.floorItems.splice(idx, 1);
     this.showLog(`Picked up ${fi.item.name}!`);
+    // Run log: item picked up
+    this.runLog.add(RunLogEvent.ItemPickedUp, fi.item.name, this.currentFloor, this.turnManager.turn);
     this.updateQuickSlotLabel();
     this.questItemsCollected++;
 
@@ -4164,7 +4214,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private openBag() {
-    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen) return;
+    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen) return;
     sfxMenuOpen();
     this.bagOpen = true;
 
@@ -4300,6 +4350,8 @@ export class DungeonScene extends Phaser.Scene {
 
     const item = stack.item;
     this.lastUsedItemId = item.id;
+    // Run log: item used
+    this.runLog.add(RunLogEvent.ItemUsed, item.name, this.currentFloor, this.turnManager.turn);
     this.questItemsUsed = true;
     sfxHeal();
 
@@ -4382,7 +4434,8 @@ export class DungeonScene extends Phaser.Scene {
         const enchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
         const escMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
         const escTalentGoldMult = 1 + (this.talentEffects.goldPercent ?? 0) / 100;
-        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult * this.difficultyMods.goldMult * ngEscGoldMult * enchGoldMult * escMutGoldMult * escTalentGoldMult);
+        const escRelicGoldMult = 1 + (this.relicEffects.goldMult ?? 0);
+        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult * this.difficultyMods.goldMult * ngEscGoldMult * enchGoldMult * escMutGoldMult * escTalentGoldMult * escRelicGoldMult);
         this.cameras.main.fadeOut(500);
         this.time.delayedCall(600, () => {
           this.scene.start("HubScene", {
@@ -4965,6 +5018,8 @@ export class DungeonScene extends Phaser.Scene {
 
     // Tier-up animation: brief scale pop + flash when tier changes
     if (tier !== this.lastChainTier && this.lastChainTier !== "") {
+      // Run log: chain tier up
+      this.runLog.add(RunLogEvent.ChainTierUp, tier, this.currentFloor, this.turnManager.turn);
       // Scale pop
       this.tweens.add({
         targets: this.chainHudText,
@@ -5688,6 +5743,18 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Relic: Regeneration (Life Dew / Leftovers) ──
+    if (this.player.alive && (this.relicEffects.regenAmount ?? 0) > 0 && (this.relicEffects.regenInterval ?? 0) > 0) {
+      const relicRegenInterval = this.relicEffects.regenInterval;
+      const relicRegenAmount = this.relicEffects.regenAmount;
+      if (this.floorTurns > 0 && this.floorTurns % relicRegenInterval === 0 && this.player.stats.hp < this.player.stats.maxHp) {
+        this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + relicRegenAmount);
+        if (this.player.sprite) {
+          this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, 0, 1, `+${relicRegenAmount} Relic`);
+        }
+      }
+    }
+
     // ── Floor Mutation: CursedFloor — lose 1 HP every N turns ──
     if (hasMutation(this.floorMutations, MutationType.CursedFloor) && this.player.alive) {
       const interval = getMutationEffect(MutationType.CursedFloor, "curseInterval") || 10;
@@ -5746,6 +5813,8 @@ export class DungeonScene extends Phaser.Scene {
       this.weatherText.setColor(INTENSITY_COLOR[this.currentWeatherIntensity]);
       sfxWeatherChange();
       this.showLog(`The weather is now ${wd.name} (${intLabel})!`);
+      // Run log: weather changed mid-floor
+      this.runLog.add(RunLogEvent.WeatherChanged, wd.name, this.currentFloor, this.turnManager.turn);
     } else {
       this.weatherText.setText("");
     }
@@ -5928,6 +5997,8 @@ export class DungeonScene extends Phaser.Scene {
       if (!this.shopWelcomeShown) {
         this.shopWelcomeShown = true;
         this.showLog("Welcome to the Shop!");
+        // Run log: shop visited
+        this.runLog.add(RunLogEvent.ShopVisited, "Kecleon Shop", this.currentFloor, this.turnManager.turn);
         sfxShop();
       }
       if (this.shopItems.length > 0) {
@@ -7659,6 +7730,8 @@ export class DungeonScene extends Phaser.Scene {
     if (!this.puzzleData) return;
     this.puzzleSolved = true;
     this.puzzleActive = false;
+    // Run log: puzzle solved
+    this.runLog.add(RunLogEvent.PuzzleSolved, this.puzzleData.type, this.currentFloor, this.turnManager.turn);
 
     const reward = getPuzzleReward(this.puzzleData);
 
@@ -7875,6 +7948,9 @@ export class DungeonScene extends Phaser.Scene {
     sfxStairs();
     this.showLog(`Went to B${this.currentFloor + 1}F!`);
 
+    // Run log: floor advance
+    this.runLog.add(RunLogEvent.FloorAdvanced, `Advanced to B${this.currentFloor + 1}F`, this.currentFloor, this.turnManager.turn);
+
     // Pass modifier IDs through floor transitions
     const modifierIds = this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined;
 
@@ -7901,6 +7977,8 @@ export class DungeonScene extends Phaser.Scene {
         legendaryEncountered: this.legendaryEncountered,
         questItemsCollected: this.questItemsCollected,
         questItemsUsed: this.questItemsUsed,
+        relics: this.activeRelics,
+        runLogEntries: this.runLog.serialize(),
       });
     });
   }
@@ -7910,6 +7988,8 @@ export class DungeonScene extends Phaser.Scene {
     stopBgm();
     sfxVictory();
     clearDungeonSave();
+    // Run log: dungeon cleared
+    this.runLog.add(RunLogEvent.DungeonCleared, `${this.dungeonDef.name} cleared!`, this.currentFloor, this.turnManager.turn);
 
     // Boss bonus: +50% gold if dungeon has a boss; Boss Rush always counts as boss dungeon
     const baseGold = goldFromRun(this.currentFloor, this.enemiesDefeated, true);
@@ -7921,7 +8001,8 @@ export class DungeonScene extends Phaser.Scene {
     const hasBoss = this.dungeonDef.boss || this.isBossRush;
     const clearMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
     const clearTalentGoldMult = 1 + (this.talentEffects.goldPercent ?? 0) / 100;
-    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * this.difficultyMods.goldMult * clearEnchGoldMult * clearMutGoldMult * clearTalentGoldMult);
+    const clearRelicGoldMult = 1 + (this.relicEffects.goldMult ?? 0);
+    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * this.difficultyMods.goldMult * clearEnchGoldMult * clearMutGoldMult * clearTalentGoldMult * clearRelicGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -8050,7 +8131,13 @@ export class DungeonScene extends Phaser.Scene {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 107, "[Return to Town]", {
+    // Performance grade
+    const clearGrade = calculatePerformanceGrade(this.runLog.getSummaryStats(), true, this.dungeonDef.floors, this.turnManager.turn);
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 96, `Grade: ${clearGrade}`, {
+      fontSize: "13px", color: gradeColor(clearGrade), fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 113, "[Return to Town]", {
       fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
@@ -8071,12 +8158,20 @@ export class DungeonScene extends Phaser.Scene {
     });
 
     // Run Again button
-    const runAgainText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 129, "[Run Again]", {
+    const runAgainText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 135, "[Run Again]", {
       fontSize: "14px", color: "#f59e0b", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
     runAgainText.on("pointerdown", () => {
       this.quickRetry(gold, true);
+    });
+
+    // Run Summary button
+    const summaryBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 157, "[Run Summary]", {
+      fontSize: "11px", color: "#a855f7", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
+    summaryBtn.on("pointerdown", () => {
+      this.showRunSummary(true, this.dungeonDef.floors);
     });
 
     this.tweens.add({
@@ -8092,13 +8187,16 @@ export class DungeonScene extends Phaser.Scene {
     stopBgm();
     sfxGameOver();
     clearDungeonSave();
+    // Run log: player died
+    this.runLog.add(RunLogEvent.PlayerDied, `Fainted on B${this.currentFloor}F`, this.currentFloor, this.turnManager.turn);
 
     const goHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
     const ngGoGoldMult = 1 + this.ngPlusBonuses.goldPercent / 100;
     const goEnchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
     const goMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
     const goTalentGoldMult = 1 + (this.talentEffects.goldPercent ?? 0) / 100;
-    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult * ngGoGoldMult * goEnchGoldMult * goMutGoldMult * goTalentGoldMult);
+    const goRelicGoldMult = 1 + (this.relicEffects.goldMult ?? 0);
+    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult * ngGoGoldMult * goEnchGoldMult * goMutGoldMult * goTalentGoldMult * goRelicGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -8193,7 +8291,13 @@ export class DungeonScene extends Phaser.Scene {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 82, "[Return to Town]", {
+    // Performance grade
+    const goGrade = calculatePerformanceGrade(this.runLog.getSummaryStats(), false, this.dungeonDef.floors, this.turnManager.turn);
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 72, `Grade: ${goGrade}`, {
+      fontSize: "13px", color: gradeColor(goGrade), fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+
+    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 90, "[Return to Town]", {
       fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
@@ -8214,13 +8318,194 @@ export class DungeonScene extends Phaser.Scene {
     });
 
     // Quick Retry button
-    const retryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 104, "[Quick Retry]", {
+    const retryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 112, "[Quick Retry]", {
       fontSize: "14px", color: "#f59e0b", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
 
     retryText.on("pointerdown", () => {
       this.quickRetry(gold, false);
     });
+
+    // Run Summary button
+    const goSummaryBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 134, "[Run Summary]", {
+      fontSize: "11px", color: "#a855f7", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
+    goSummaryBtn.on("pointerdown", () => {
+      this.showRunSummary(false, this.dungeonDef.floors);
+    });
+  }
+
+  /**
+   * Run Summary overlay — shows detailed stats, notable events, timeline, and performance grade.
+   */
+  private showRunSummary(cleared: boolean, totalFloors: number) {
+    const stats = this.runLog.getSummaryStats();
+    const grade = calculatePerformanceGrade(stats, cleared, totalFloors, this.turnManager.turn);
+    const notable = this.runLog.getNotableEvents();
+    const timeline = this.runLog.getTimeline();
+
+    // Full-screen overlay
+    const bg = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2,
+      GAME_WIDTH, GAME_HEIGHT,
+      0x0a0a1a, 0.95
+    ).setScrollFactor(0).setDepth(300).setInteractive();
+
+    const uiElements: Phaser.GameObjects.GameObject[] = [bg];
+
+    // Title + grade
+    const gradeStr = `Grade: ${grade}`;
+    const titleEl = this.add.text(GAME_WIDTH / 2, 30, "RUN SUMMARY", {
+      fontSize: "16px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+    uiElements.push(titleEl);
+
+    const gradeEl = this.add.text(GAME_WIDTH / 2, 50, gradeStr, {
+      fontSize: "22px", color: gradeColor(grade), fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+    uiElements.push(gradeEl);
+
+    // Grade pulse animation
+    this.tweens.add({
+      targets: gradeEl,
+      scaleX: 1.15, scaleY: 1.15,
+      duration: 600, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
+    });
+
+    // Key stats section
+    const statsLines = [
+      `Enemies Defeated: ${stats.totalEnemiesDefeated}`,
+      `Damage Dealt: ${stats.totalDamageDealt}`,
+      `Damage Taken: ${stats.totalDamageTaken}`,
+      `Items Used: ${stats.totalItemsUsed}  Picked Up: ${stats.totalItemsPickedUp}`,
+      `Skills Used: ${stats.totalSkillsUsed}  Unique: ${stats.uniqueSkillsUsed}`,
+      `Level Ups: ${stats.levelUps}`,
+      `Floors: ${stats.floorsExplored}`,
+      stats.bestChainTier ? `Best Chain: ${stats.bestChainTier}` : "",
+    ].filter(Boolean).join("\n");
+
+    const statsEl = this.add.text(GAME_WIDTH / 2, 75, statsLines, {
+      fontSize: "9px", color: "#cbd5e1", fontFamily: "monospace", align: "center",
+      lineSpacing: 2,
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(301);
+    uiElements.push(statsEl);
+
+    // Notable events section
+    let notableY = 160;
+    if (stats.bossesDefeated > 0 || stats.legendariesDefeated > 0 || stats.secretRoomsFound > 0 ||
+        stats.puzzlesSolved > 0 || stats.gauntletsCleared > 0 || stats.shopsVisited > 0) {
+      const notableHeader = this.add.text(GAME_WIDTH / 2, notableY, "NOTABLE EVENTS", {
+        fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+      uiElements.push(notableHeader);
+      notableY += 15;
+
+      const notableLines: string[] = [];
+      if (stats.bossesDefeated > 0) notableLines.push(`Bosses Defeated: ${stats.bossesDefeated}`);
+      if (stats.legendariesDefeated > 0) notableLines.push(`Legendaries Defeated: ${stats.legendariesDefeated}`);
+      if (stats.secretRoomsFound > 0) notableLines.push(`Secret Rooms: ${stats.secretRoomsFound}`);
+      if (stats.puzzlesSolved > 0) notableLines.push(`Puzzles Solved: ${stats.puzzlesSolved}`);
+      if (stats.gauntletsCleared > 0) notableLines.push(`Gauntlets Cleared: ${stats.gauntletsCleared}`);
+      if (stats.shopsVisited > 0) notableLines.push(`Shops Visited: ${stats.shopsVisited}`);
+      if (stats.weatherChanges > 0) notableLines.push(`Weather Changes: ${stats.weatherChanges}`);
+      if (stats.mutationsEncountered > 0) notableLines.push(`Mutations: ${stats.mutationsEncountered}`);
+
+      const notableEl = this.add.text(GAME_WIDTH / 2, notableY, notableLines.join("\n"), {
+        fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
+        lineSpacing: 2,
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(301);
+      uiElements.push(notableEl);
+      notableY += notableLines.length * 12 + 10;
+    }
+
+    // Timeline section (scrollable)
+    if (timeline.length > 0) {
+      const timelineHeader = this.add.text(GAME_WIDTH / 2, notableY, "TIMELINE", {
+        fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+      uiElements.push(timelineHeader);
+      notableY += 16;
+
+      // Build timeline text lines
+      const timelineLines: string[] = [];
+      for (const entry of timeline) {
+        timelineLines.push(`--- B${entry.floor}F ---`);
+        for (const ev of entry.events) {
+          timelineLines.push(`  ${ev}`);
+        }
+      }
+
+      // Clamp viewable area: show timeline in a scrollable mask area
+      const timelineAreaHeight = GAME_HEIGHT - notableY - 50;
+      const maxVisibleLines = Math.floor(timelineAreaHeight / 11);
+      let scrollOffset = 0;
+      const totalLines = timelineLines.length;
+
+      const renderTimeline = () => {
+        // Remove previous timeline text elements
+        const toRemove = uiElements.filter(el => (el as any).__isTimelineLine);
+        for (const el of toRemove) {
+          el.destroy();
+          uiElements.splice(uiElements.indexOf(el), 1);
+        }
+
+        const visibleLines = timelineLines.slice(scrollOffset, scrollOffset + maxVisibleLines);
+        for (let i = 0; i < visibleLines.length; i++) {
+          const line = visibleLines[i];
+          const isFloorHeader = line.startsWith("---");
+          const lineEl = this.add.text(20, notableY + i * 11, line, {
+            fontSize: "8px",
+            color: isFloorHeader ? "#fbbf24" : "#94a3b8",
+            fontFamily: "monospace",
+            fontStyle: isFloorHeader ? "bold" : "normal",
+          }).setScrollFactor(0).setDepth(301);
+          (lineEl as any).__isTimelineLine = true;
+          uiElements.push(lineEl);
+        }
+
+        // Scroll indicator
+        if (totalLines > maxVisibleLines) {
+          const pct = Math.round((scrollOffset / Math.max(1, totalLines - maxVisibleLines)) * 100);
+          const scrollIndicator = this.add.text(GAME_WIDTH - 15, notableY, `${pct}%`, {
+            fontSize: "8px", color: "#6b7280", fontFamily: "monospace",
+          }).setOrigin(1, 0).setScrollFactor(0).setDepth(301);
+          (scrollIndicator as any).__isTimelineLine = true;
+          uiElements.push(scrollIndicator);
+        }
+      };
+
+      renderTimeline();
+
+      // Scroll buttons (if needed)
+      if (totalLines > maxVisibleLines) {
+        const scrollUpBtn = this.add.text(GAME_WIDTH - 20, notableY + 12, "[^]", {
+          fontSize: "10px", color: "#60a5fa", fontFamily: "monospace",
+        }).setOrigin(1, 0).setScrollFactor(0).setDepth(302).setInteractive();
+        scrollUpBtn.on("pointerdown", () => {
+          scrollOffset = Math.max(0, scrollOffset - 5);
+          renderTimeline();
+        });
+        uiElements.push(scrollUpBtn);
+
+        const scrollDownBtn = this.add.text(GAME_WIDTH - 20, GAME_HEIGHT - 55, "[v]", {
+          fontSize: "10px", color: "#60a5fa", fontFamily: "monospace",
+        }).setOrigin(1, 0).setScrollFactor(0).setDepth(302).setInteractive();
+        scrollDownBtn.on("pointerdown", () => {
+          scrollOffset = Math.min(totalLines - maxVisibleLines, scrollOffset + 5);
+          renderTimeline();
+        });
+        uiElements.push(scrollDownBtn);
+      }
+    }
+
+    // Close button
+    const closeBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 30, "[Close]", {
+      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(302).setInteractive();
+    closeBtn.on("pointerdown", () => {
+      for (const el of uiElements) el.destroy();
+    });
+    uiElements.push(closeBtn);
   }
 
   /**
@@ -8453,6 +8738,13 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
 
+    // Relic: Swift Feather — extra turn chance
+    if ((this.relicEffects.extraTurnChance ?? 0) > 0 && Math.random() < this.relicEffects.extraTurnChance) {
+      this.showLog("Swift Feather! Extra action!");
+      this.updateHUD();
+      return;
+    }
+
     this.tickBelly();
     this.tickWeather();
     this.tickEntityStatus(this.player);
@@ -8666,8 +8958,11 @@ export class DungeonScene extends Phaser.Scene {
       const effectiveness = getEffectiveness(attacker.attackType, defender.types);
       const effText = effectivenessText(effectiveness);
 
-      const atk = getEffectiveAtk(attacker);
-      const def = getEffectiveDef(defender);
+      let atk = getEffectiveAtk(attacker);
+      let def = getEffectiveDef(defender);
+      // Relic: ATK/DEF multipliers (player only)
+      if (attacker === this.player) atk = Math.floor(atk * (1 + (this.relicEffects.atkMult ?? 0)));
+      if (defender === this.player) def = Math.floor(def * (1 + (this.relicEffects.defMult ?? 0)));
       const baseDmg = Math.max(1, atk - Math.floor(def / 2));
       // Ability: Torrent — scaled by ability level
       let abilityMult = 1.0;
@@ -8686,13 +8981,15 @@ export class DungeonScene extends Phaser.Scene {
       const synergyBonus = (attacker === this.player)
         ? 1.0 + getWeatherSynergyBonus(this.currentWeather, attacker.attackType)
         : 1.0;
-      // Held item: crit chance (attacker is player)
-      const critChance = this.heldItemEffect.critChance ?? 0;
+      // Held item + Relic: crit chance (attacker is player)
+      const critChance = (this.heldItemEffect.critChance ?? 0) + (attacker === this.player ? (this.relicEffects.critBonus ?? 0) : 0);
       const isCrit = attacker === this.player && critChance > 0 && Math.random() * 100 < critChance;
       const critMult = isCrit ? 1.5 : 1.0;
+      // Relic: Wide Glass — type advantage bonus (player attacking with super effective)
+      const relicTypeAdvMult = (attacker === this.player && effectiveness >= 2.0 && (this.relicEffects.typeAdvantageBonus ?? 0) > 0) ? (1 + this.relicEffects.typeAdvantageBonus) : 1.0;
       // Apply difficulty playerDamageMult when defender is the player
       const diffDmgMult = defender === this.player ? this.difficultyMods.playerDamageMult : 1.0;
-      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * scaledWMult * synergyBonus * critMult * diffDmgMult));
+      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * scaledWMult * synergyBonus * critMult * relicTypeAdvMult * diffDmgMult));
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
       // Sound effects based on effectiveness
@@ -8715,6 +9012,22 @@ export class DungeonScene extends Phaser.Scene {
       if (scaledWMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
       if (synergyBonus > 1.0) logMsg += " (Weather Synergy!)";
       this.showLog(logMsg);
+
+      // Run log: damage dealt/taken (basic attack)
+      if (attacker === this.player) {
+        this.runLog.add(RunLogEvent.DamageDealt, `${dmg}`, this.currentFloor, this.turnManager.turn);
+      } else if (defender === this.player) {
+        this.runLog.add(RunLogEvent.DamageTaken, `${dmg}`, this.currentFloor, this.turnManager.turn);
+      }
+
+      // Relic: Shell Bell — heal % of damage dealt (player attacking)
+      if (attacker === this.player && dmg > 0 && (this.relicEffects.lifeStealPercent ?? 0) > 0) {
+        const shellHeal = Math.max(1, Math.floor(dmg * this.relicEffects.lifeStealPercent / 100));
+        if (this.player.stats.hp < this.player.stats.maxHp) {
+          this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + shellHeal);
+          if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, shellHeal);
+        }
+      }
 
       // Score chain: type-effective basic attack by player
       if (attacker === this.player && effectiveness >= 2.0) {
@@ -8771,6 +9084,11 @@ export class DungeonScene extends Phaser.Scene {
       user.sprite!.play(`${user.spriteKey}-idle-${dir}`);
 
       sfxSkill();
+
+      // Run log: skill used (only player skills)
+      if (user === this.player) {
+        this.runLog.add(RunLogEvent.SkillUsed, skill.name, this.currentFloor, this.turnManager.turn);
+      }
 
       // Self-targeting (buff/heal)
       if (skill.range === SkillRange.Self) {
@@ -8831,9 +9149,12 @@ export class DungeonScene extends Phaser.Scene {
 
           const effectiveness = getEffectiveness(skill.type, target.types);
           const effText = effectivenessText(effectiveness);
-          const atk = getEffectiveAtk(user);
-          const def = getEffectiveDef(target);
-          const baseDmg = Math.max(1, Math.floor(skill.power * atk / 10) - Math.floor(def / 2));
+          let skillAtk = getEffectiveAtk(user);
+          let skillDef = getEffectiveDef(target);
+          // Relic: ATK/DEF multipliers (player only)
+          if (user === this.player) skillAtk = Math.floor(skillAtk * (1 + (this.relicEffects.atkMult ?? 0)));
+          if (target === this.player) skillDef = Math.floor(skillDef * (1 + (this.relicEffects.defMult ?? 0)));
+          const baseDmg = Math.max(1, Math.floor(skill.power * skillAtk / 10) - Math.floor(skillDef / 2));
           const wMult = weatherDamageMultiplier(this.currentWeather, skill.type);
           // Weather intensity scales the weather multiplier deviation from 1.0
           const skillIntensityMult = INTENSITY_MULTIPLIER[this.currentWeatherIntensity];
@@ -8842,15 +9163,17 @@ export class DungeonScene extends Phaser.Scene {
           const skillSynergyBonus = (user === this.player)
             ? 1.0 + getWeatherSynergyBonus(this.currentWeather, user.attackType)
             : 1.0;
-          // Held item: crit chance (user is player)
-          const skillCritChance = this.heldItemEffect.critChance ?? 0;
+          // Held item + Relic: crit chance (user is player)
+          const skillCritChance = (this.heldItemEffect.critChance ?? 0) + (user === this.player ? (this.relicEffects.critBonus ?? 0) : 0);
           const skillIsCrit = user === this.player && (this.comboCritGuarantee || (skillCritChance > 0 && Math.random() * 100 < skillCritChance));
           const skillCritMult = skillIsCrit ? 1.5 : 1.0;
           // Skill Combo: double damage multiplier
           const comboMult = (user === this.player && this.comboDoubleDamage) ? 2.0 : 1.0;
+          // Relic: Wide Glass — type advantage bonus
+          const skillRelicTypeAdvMult = (user === this.player && effectiveness >= 2.0 && (this.relicEffects.typeAdvantageBonus ?? 0) > 0) ? (1 + this.relicEffects.typeAdvantageBonus) : 1.0;
           // Apply difficulty playerDamageMult when target is the player
           const skillDiffDmgMult = target === this.player ? this.difficultyMods.playerDamageMult : 1.0;
-          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * skillScaledWMult * skillSynergyBonus * skillCritMult * comboMult * skillDiffDmgMult));
+          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * skillScaledWMult * skillSynergyBonus * skillCritMult * comboMult * skillRelicTypeAdvMult * skillDiffDmgMult));
           target.stats.hp = Math.max(0, target.stats.hp - dmg);
 
           this.flashEntity(target, effectiveness);
@@ -8868,6 +9191,22 @@ export class DungeonScene extends Phaser.Scene {
           if (skillScaledWMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
           if (skillSynergyBonus > 1.0) logMsg += " (Weather Synergy!)";
           this.showLog(logMsg);
+
+          // Run log: damage dealt/taken (skill attack)
+          if (user === this.player) {
+            this.runLog.add(RunLogEvent.DamageDealt, `${dmg}`, this.currentFloor, this.turnManager.turn);
+          } else if (target === this.player) {
+            this.runLog.add(RunLogEvent.DamageTaken, `${dmg}`, this.currentFloor, this.turnManager.turn);
+          }
+
+          // Relic: Shell Bell — heal % of damage dealt (player using skill)
+          if (user === this.player && dmg > 0 && (this.relicEffects.lifeStealPercent ?? 0) > 0) {
+            const skillShellHeal = Math.max(1, Math.floor(dmg * this.relicEffects.lifeStealPercent / 100));
+            if (this.player.stats.hp < this.player.stats.maxHp) {
+              this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + skillShellHeal);
+              if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, skillShellHeal);
+            }
+          }
 
           // Score chain: type-effective hit by player
           if (user === this.player && effectiveness >= 2.0) {
@@ -9344,6 +9683,19 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
 
+    // Relic: Focus Sash — survive lethal hit once per run at 1 HP (player only)
+    if (entity === this.player && !this.focusSashUsed && hasRelicEffect(this.activeRelics, "focusSash")) {
+      entity.stats.hp = 1;
+      this.focusSashUsed = true;
+      this.showLog("Focus Sash held on! Survived at 1 HP!");
+      if (entity.sprite) {
+        entity.sprite.setTint(0xa855f7);
+        this.cameras.main.shake(300, 0.01);
+        this.time.delayedCall(500, () => { if (entity.sprite) entity.sprite.clearTint(); });
+      }
+      return;
+    }
+
     // Player: check revive seed
     if (entity === this.player) {
       if (this.tryRevive()) return;
@@ -9371,6 +9723,8 @@ export class DungeonScene extends Phaser.Scene {
     } else {
       // Enemy defeated — track for gold
       this.enemiesDefeated++;
+      // Run log: enemy defeated
+      this.runLog.add(RunLogEvent.EnemyDefeated, entity.name, this.currentFloor, this.turnManager.turn);
 
       // Score chain: enemy kill
       {
@@ -9404,6 +9758,8 @@ export class DungeonScene extends Phaser.Scene {
         this.cameras.main.shake(600, 0.02);
         this.cameras.main.flash(500, 255, 215, 0); // golden flash
         this.showLog(`★ You defeated ${entity.name}! ★`);
+        // Run log: legendary defeated
+        this.runLog.add(RunLogEvent.LegendaryDefeated, entity.name, this.currentFloor, this.turnManager.turn);
 
         // Award legendary gold reward (GoldenAge mutation multiplier)
         const legMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
@@ -9460,15 +9816,21 @@ export class DungeonScene extends Phaser.Scene {
         // Stop particle effects
         if (this.legendaryParticleTimer) { this.legendaryParticleTimer.destroy(); this.legendaryParticleTimer = null; }
         if (this.legendaryParticleGraphics) { this.legendaryParticleGraphics.destroy(); this.legendaryParticleGraphics = null; }
+        // Relic drop: legendary defeat (highest chance)
+        this.tryRelicDrop("legendary");
       } else if (isBossKill) {
         // Boss defeat: big screen shake + special message
         sfxBossDefeat();
         this.cameras.main.shake(500, 0.015);
         this.showLog(`★ BOSS DEFEATED! ${entity.name} fell! +${expGain} EXP ★`);
+        // Run log: boss defeated
+        this.runLog.add(RunLogEvent.BossDefeated, entity.name, this.currentFloor, this.turnManager.turn);
         this.bossEntity = null;
         this.cameras.main.flash(300, 255, 255, 200);
         // Track bosses defeated for Boss Rush
         if (this.isBossRush) this.bossesDefeated++;
+        // Relic drop: boss defeat
+        this.tryRelicDrop("boss");
       } else {
         this.showLog(`${entity.name} fainted! +${expGain} EXP`);
       }
@@ -9484,6 +9846,8 @@ export class DungeonScene extends Phaser.Scene {
         this.time.delayedCall(500, () => {
           sfxLevelUp();
           this.showLog(`Level up! Lv.${r.newLevel}! HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
+          // Run log: level up
+          this.runLog.add(RunLogEvent.LevelUp, `Lv.${r.newLevel}`, this.currentFloor, this.turnManager.turn);
           if (this.player.sprite) {
             this.player.sprite.setTint(0xffff44);
             // Scale bounce animation
@@ -9874,6 +10238,9 @@ export class DungeonScene extends Phaser.Scene {
       this.gauntletStairsLocked = false;
       this.bossEntity = null;
 
+      // Run log: gauntlet cleared
+      this.runLog.add(RunLogEvent.GauntletCleared, `${this.gauntletTotalWavesCleared} waves`, this.currentFloor, this.turnManager.turn);
+
       // "GAUNTLET COMPLETE!" gold celebration text
       const completeText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30,
         "GAUNTLET COMPLETE!",
@@ -9917,6 +10284,9 @@ export class DungeonScene extends Phaser.Scene {
 
       // Remove vignette and wave HUD
       this.cleanupGauntletHUD();
+
+      // Relic drop: gauntlet clear
+      this.tryRelicDrop("gauntlet");
 
       this.updateHUD();
     }
@@ -10332,7 +10702,7 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     if (this.turnManager.isBusy || !this.player.alive || this.gameOver ||
-        this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen) return;
+        this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen) return;
 
     // Check stop conditions before even starting
     const preCheck = this.checkAutoExploreStop();
@@ -10703,6 +11073,8 @@ export class DungeonScene extends Phaser.Scene {
     // Open the secret wall — change it to ground
     this.dungeon.terrain[targetY][targetX] = TerrainType.GROUND;
     this.secretRoomDiscovered = true;
+    // Run log: secret room found
+    this.runLog.add(RunLogEvent.SecretRoomFound, this.secretRoomData?.type ?? "Secret Room", this.currentFloor, this.turnManager.turn);
 
     // Stop shimmer
     if (this.secretWallShimmerTimer) {
@@ -11214,6 +11586,8 @@ export class DungeonScene extends Phaser.Scene {
         legendaryEncountered: this.legendaryEncountered,
         questItemsCollected: this.questItemsCollected,
         questItemsUsed: this.questItemsUsed,
+        relics: this.activeRelics,
+        runLogEntries: this.runLog.serialize(),
       });
     });
   }
@@ -11229,5 +11603,168 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
     this.secretRoomUI = [];
+  }
+
+  // ── Relic Artifact System ──
+  private tryRelicDrop(dropType: "boss" | "gauntlet" | "legendary") {
+    const relic = rollRelicDrop(this.currentFloor, this.dungeonDef.difficulty, dropType);
+    if (!relic || this.gameOver) return;
+    this.time.delayedCall(dropType === "legendary" ? 3000 : 1500, () => this.showRelicFoundOverlay(relic));
+  }
+
+  private showRelicFoundOverlay(relic: Relic) {
+    if (this.gameOver) return;
+    this.relicOverlayOpen = true;
+    const ui: Phaser.GameObjects.GameObject[] = [];
+    ui.push(this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75).setScrollFactor(0).setDepth(400).setInteractive());
+    const tc = getRelicRarityColor(relic.rarity);
+    ui.push(this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 80, "Relic Found!", { fontSize: "18px", color: tc, fontFamily: "monospace", fontStyle: "bold", stroke: "#000000", strokeThickness: 4 }).setOrigin(0.5).setScrollFactor(0).setDepth(401));
+    const ib = this.add.graphics().setScrollFactor(0).setDepth(401);
+    ib.fillStyle(relic.color, 0.3); ib.fillRoundedRect(GAME_WIDTH / 2 - 20, GAME_HEIGHT / 2 - 65, 40, 40, 8);
+    ib.lineStyle(2, relic.color, 1); ib.strokeRoundedRect(GAME_WIDTH / 2 - 20, GAME_HEIGHT / 2 - 65, 40, 40, 8);
+    ui.push(ib);
+    ui.push(this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 45, relic.icon, { fontSize: "20px", color: tc, fontFamily: "monospace", fontStyle: "bold" }).setOrigin(0.5).setScrollFactor(0).setDepth(402));
+    ui.push(this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 15, relic.name, { fontSize: "14px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold" }).setOrigin(0.5).setScrollFactor(0).setDepth(401));
+    ui.push(this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 2, relic.rarity, { fontSize: "10px", color: tc, fontFamily: "monospace" }).setOrigin(0.5).setScrollFactor(0).setDepth(401));
+    ui.push(this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 20, relic.description, { fontSize: "10px", color: "#d4d4d8", fontFamily: "monospace", wordWrap: { width: 260 }, align: "center" }).setOrigin(0.5).setScrollFactor(0).setDepth(401));
+    if (this.activeRelics.length < MAX_RELICS) {
+      const takeBtn = this.add.text(GAME_WIDTH / 2 - 60, GAME_HEIGHT / 2 + 55, "[Take]", { fontSize: "14px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold", backgroundColor: "#1a2e1acc", padding: { x: 10, y: 5 } }).setOrigin(0.5).setScrollFactor(0).setDepth(402).setInteractive();
+      ui.push(takeBtn);
+      const leaveBtn = this.add.text(GAME_WIDTH / 2 + 60, GAME_HEIGHT / 2 + 55, "[Leave]", { fontSize: "14px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold", backgroundColor: "#2e1a1acc", padding: { x: 10, y: 5 } }).setOrigin(0.5).setScrollFactor(0).setDepth(402).setInteractive();
+      ui.push(leaveBtn);
+      takeBtn.on("pointerdown", () => { this.addRelic(relic); this.closeRelicOverlay(); this.spawnRelicVFX(relic); });
+      leaveBtn.on("pointerdown", () => { this.closeRelicOverlay(); this.showLog("Left the relic behind."); });
+    } else {
+      ui.push(this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 45, "Inventory full! Swap a relic:", { fontSize: "9px", color: "#fbbf24", fontFamily: "monospace" }).setOrigin(0.5).setScrollFactor(0).setDepth(401));
+      for (let ri = 0; ri < this.activeRelics.length; ri++) {
+        const existing = this.activeRelics[ri];
+        const ec = getRelicRarityColor(existing.rarity);
+        const swapBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 65 + ri * 22, `${existing.icon} ${existing.name} (${existing.rarity})`, { fontSize: "10px", color: ec, fontFamily: "monospace", backgroundColor: "#1a1a2ecc", padding: { x: 6, y: 2 } }).setOrigin(0.5).setScrollFactor(0).setDepth(402).setInteractive();
+        ui.push(swapBtn);
+        const swapIdx = ri;
+        swapBtn.on("pointerdown", () => {
+          const old = this.activeRelics[swapIdx];
+          this.activeRelics[swapIdx] = relic;
+          this.relicEffects = getAggregatedRelicEffects(this.activeRelics);
+          this.showLog(`Swapped ${old.name} for ${relic.name}!`);
+          this.closeRelicOverlay(); this.spawnRelicVFX(relic); this.updateRelicHUD();
+          if (old.effect.hpMult && old.effect.hpMult > 0) {
+            const loss = Math.floor(this.player.stats.maxHp * old.effect.hpMult / (1 + old.effect.hpMult));
+            this.player.stats.maxHp -= loss;
+            this.player.stats.hp = Math.min(this.player.stats.hp, this.player.stats.maxHp);
+          }
+          if (relic.effect.hpMult && relic.effect.hpMult > 0) {
+            const gain = Math.floor(this.player.stats.maxHp * relic.effect.hpMult);
+            this.player.stats.maxHp += gain; this.player.stats.hp += gain;
+          }
+          if (relic.effect.focusSash) this.focusSashUsed = false;
+          this.createSkillButtons(); this.updateHUD();
+        });
+      }
+      const leaveBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 65 + this.activeRelics.length * 22 + 5, "[Leave]", { fontSize: "12px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold", backgroundColor: "#2e1a1acc", padding: { x: 10, y: 4 } }).setOrigin(0.5).setScrollFactor(0).setDepth(402).setInteractive();
+      ui.push(leaveBtn);
+      leaveBtn.on("pointerdown", () => { this.closeRelicOverlay(); this.showLog("Left the relic behind."); });
+    }
+    this.relicOverlayUI = ui;
+  }
+
+  private closeRelicOverlay() {
+    this.relicOverlayOpen = false;
+    for (const obj of this.relicOverlayUI) {
+      if (obj && (obj as Phaser.GameObjects.GameObject).scene) obj.destroy();
+    }
+    this.relicOverlayUI = [];
+  }
+
+  private addRelic(relic: Relic) {
+    this.activeRelics.push(relic);
+    this.relicEffects = getAggregatedRelicEffects(this.activeRelics);
+    this.showLog(`Obtained ${relic.name}! (${relic.rarity})`);
+    if (relic.effect.hpMult && relic.effect.hpMult > 0) {
+      const hpGain = Math.floor(this.player.stats.maxHp * relic.effect.hpMult);
+      this.player.stats.maxHp += hpGain;
+      this.player.stats.hp += hpGain;
+      this.showLog(`Max HP increased by ${hpGain}!`);
+    }
+    if (relic.effect.focusSash) this.focusSashUsed = false;
+    this.updateRelicHUD();
+    this.createSkillButtons();
+    this.updateHUD();
+  }
+
+  private updateRelicHUD() {
+    for (const ic of this.relicHudIcons) { if (ic && ic.scene) ic.destroy(); }
+    this.relicHudIcons = [];
+    if (this.activeRelics.length === 0) return;
+    for (let i = 0; i < this.activeRelics.length; i++) {
+      const r = this.activeRelics[i];
+      const clr = getRelicRarityColor(r.rarity);
+      const ic = this.add.text(8 + i * 18, 64, r.icon, {
+        fontSize: "12px", color: clr, fontFamily: "monospace", fontStyle: "bold",
+        backgroundColor: "#0a0a0fcc", padding: { x: 2, y: 1 },
+      }).setScrollFactor(0).setDepth(100).setInteractive();
+      ic.on("pointerdown", () => this.showRelicInfoPopup(r));
+      this.relicHudIcons.push(ic);
+    }
+  }
+
+  private showRelicInfoPopup(relic: Relic) {
+    const clr = getRelicRarityColor(relic.rarity);
+    const popup = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2,
+      `${relic.icon} ${relic.name}\n${relic.rarity}\n${relic.description}`, {
+      fontSize: "11px", color: clr, fontFamily: "monospace", fontStyle: "bold",
+      backgroundColor: "#0a0a0fee", padding: { x: 12, y: 8 },
+      wordWrap: { width: 250 }, align: "center",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(500);
+    popup.setInteractive();
+    popup.on("pointerdown", () => popup.destroy());
+    this.time.delayedCall(2000, () => { if (popup.scene) popup.destroy(); });
+  }
+
+  private spawnRelicVFX(relic: Relic) {
+    const px = this.player.sprite?.x ?? GAME_WIDTH / 2;
+    const py = this.player.sprite?.y ?? GAME_HEIGHT / 2;
+    switch (relic.rarity) {
+      case RelicRarity.Common:
+        for (let i = 0; i < 8; i++) {
+          const g = this.add.graphics().setDepth(300);
+          g.fillStyle(0x4ade80, 0.9);
+          g.fillCircle(px + (Math.random() - 0.5) * 30, py + (Math.random() - 0.5) * 20, 2 + Math.random() * 2);
+          this.tweens.add({ targets: g, y: -30 - Math.random() * 40, alpha: { from: 1, to: 0 }, duration: 600 + Math.random() * 400, ease: "Quad.easeOut", onComplete: () => g.destroy() });
+        }
+        break;
+      case RelicRarity.Rare:
+        for (let i = 0; i < 12; i++) {
+          const angle = (Math.PI * 2 / 12) * i;
+          const g = this.add.graphics().setDepth(300);
+          g.fillStyle(0x60a5fa, 1); g.fillCircle(px, py, 2);
+          this.tweens.add({ targets: g, x: Math.cos(angle) * 40, y: Math.sin(angle) * 40, alpha: { from: 1, to: 0 }, scaleX: { from: 1, to: 0.3 }, scaleY: { from: 1, to: 0.3 }, duration: 500 + Math.random() * 300, ease: "Quad.easeOut", onComplete: () => g.destroy() });
+        }
+        break;
+      case RelicRarity.Epic:
+        for (let i = 0; i < 15; i++) {
+          const g = this.add.graphics().setDepth(300);
+          const angle = (Math.PI * 2 / 15) * i;
+          const rd = 5 + Math.random() * 15;
+          g.fillStyle(0xa855f7, 0.9);
+          g.fillCircle(px + Math.cos(angle) * rd, py + Math.sin(angle) * rd, 2 + Math.random() * 2);
+          this.tweens.add({ targets: g, x: Math.cos(angle + Math.PI) * 20, y: -50 - Math.random() * 30, alpha: { from: 1, to: 0 }, duration: 800 + Math.random() * 400, ease: "Cubic.easeOut", onComplete: () => g.destroy() });
+        }
+        this.cameras.main.flash(300, 168, 85, 247);
+        break;
+      case RelicRarity.Legendary:
+        this.cameras.main.shake(400, 0.015);
+        this.cameras.main.flash(500, 251, 191, 36);
+        const vfxColors = [0xfbbf24, 0xfde68a, 0xffffff, 0xf59e0b];
+        for (let i = 0; i < 25; i++) {
+          const c = vfxColors[Math.floor(Math.random() * vfxColors.length)];
+          const g = this.add.graphics().setDepth(300);
+          g.fillStyle(c, 1); g.fillCircle(px, py, 2 + Math.random() * 3);
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 30 + Math.random() * 60;
+          this.tweens.add({ targets: g, x: Math.cos(angle) * dist, y: Math.sin(angle) * dist - 20, alpha: { from: 1, to: 0 }, scaleX: { from: 1.2, to: 0.2 }, scaleY: { from: 1.2, to: 0.2 }, duration: 700 + Math.random() * 500, ease: "Quad.easeOut", onComplete: () => g.destroy() });
+        }
+        break;
+    }
   }
 }
