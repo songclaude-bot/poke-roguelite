@@ -3960,6 +3960,169 @@ export class DungeonScene extends Phaser.Scene {
         });
         break;
       }
+      // ── Base throwable/stat items ──
+      case "pebble": {
+        const dx = DIR_DX[this.player.facing];
+        const dy = DIR_DY[this.player.facing];
+        const tx = this.player.tileX + dx;
+        const ty = this.player.tileY + dy;
+        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
+        if (target) {
+          target.stats.hp = Math.max(0, target.stats.hp - 15);
+          this.flashEntity(target, 2.0);
+          this.showLog(`Pebble hit ${target.name}! 15 dmg!`);
+          this.checkDeath(target);
+        } else {
+          this.showLog("Pebble missed! No enemy in front.");
+        }
+        break;
+      }
+      case "gravelrock": {
+        const dx = DIR_DX[this.player.facing];
+        const dy = DIR_DY[this.player.facing];
+        const tx = this.player.tileX + dx;
+        const ty = this.player.tileY + dy;
+        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
+        if (target) {
+          target.stats.hp = Math.max(0, target.stats.hp - 25);
+          this.flashEntity(target, 2.0);
+          this.showLog(`Gravelrock hit ${target.name}! 25 dmg!`);
+          this.checkDeath(target);
+        } else {
+          this.showLog("Gravelrock missed! No enemy in front.");
+        }
+        break;
+      }
+      case "xAttack": {
+        this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 10 });
+        sfxBuff();
+        this.showLog("Used X-Attack! ATK boosted for 10 turns!");
+        break;
+      }
+      case "xDefend": {
+        this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
+        sfxBuff();
+        this.showLog("Used X-Defend! DEF boosted for 10 turns!");
+        break;
+      }
+      // ── Upgraded (Synthesized) Items ──
+      case "megaOranBerry": {
+        const heal = Math.min(80, this.player.stats.maxHp - this.player.stats.hp);
+        this.player.stats.hp += heal;
+        this.showLog(`Used Mega Oran Berry! Restored ${heal} HP.`);
+        if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
+        if (this.scoreChain.currentMultiplier > 1.0) {
+          resetChain(this.scoreChain);
+          this.showLog("Chain reset (healed).");
+          this.updateChainHUD();
+        }
+        break;
+      }
+      case "megaSitrusBerry": {
+        const heal = Math.min(150, this.player.stats.maxHp - this.player.stats.hp);
+        this.player.stats.hp += heal;
+        this.showLog(`Used Mega Sitrus Berry! Restored ${heal} HP.`);
+        if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
+        if (this.scoreChain.currentMultiplier > 1.0) {
+          resetChain(this.scoreChain);
+          this.showLog("Chain reset (healed).");
+          this.updateChainHUD();
+        }
+        break;
+      }
+      case "goldenApple": {
+        const restore = Math.min(200, this.maxBelly - this.belly);
+        this.belly += restore;
+        this.resetBellyWarnings();
+        this.showLog(`Ate a Golden Apple! Belly +${restore}. (${Math.floor(this.belly)}/${this.maxBelly})`);
+        break;
+      }
+      case "crystalPebble": {
+        const dx = DIR_DX[this.player.facing];
+        const dy = DIR_DY[this.player.facing];
+        const tx = this.player.tileX + dx;
+        const ty = this.player.tileY + dy;
+        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
+        if (target) {
+          target.stats.hp = Math.max(0, target.stats.hp - 30);
+          this.flashEntity(target, 2.0);
+          this.showLog(`Crystal Pebble hit ${target.name}! 30 dmg!`);
+          this.checkDeath(target);
+        } else {
+          this.showLog("Crystal Pebble missed! No enemy in front.");
+        }
+        break;
+      }
+      case "meteorRock": {
+        const dx = DIR_DX[this.player.facing];
+        const dy = DIR_DY[this.player.facing];
+        const tx = this.player.tileX + dx;
+        const ty = this.player.tileY + dy;
+        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
+        if (target) {
+          target.stats.hp = Math.max(0, target.stats.hp - 50);
+          this.flashEntity(target, 2.0);
+          this.showLog(`Meteor Rock hit ${target.name}! 50 dmg!`);
+          this.checkDeath(target);
+        } else {
+          this.showLog("Meteor Rock missed! No enemy in front.");
+        }
+        break;
+      }
+      case "autoReviver": {
+        // Auto-use on death — just show message
+        this.showLog("Auto Reviver will activate instantly if you faint.");
+        return; // Don't consume
+      }
+      case "megaElixir": {
+        for (const sk of this.player.skills) {
+          sk.currentPp = sk.pp + 10;
+        }
+        this.showLog("Used Mega Elixir! All PP restored + 10 bonus PP!");
+        break;
+      }
+      case "megaBlastSeed": {
+        const dx = DIR_DX[this.player.facing];
+        const dy = DIR_DY[this.player.facing];
+        const tx = this.player.tileX + dx;
+        const ty = this.player.tileY + dy;
+        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
+        if (target) {
+          target.stats.hp = Math.max(0, target.stats.hp - 80);
+          this.flashEntity(target, 2.0);
+          this.showLog(`Mega Blast Seed hit ${target.name}! 80 dmg!`);
+          this.checkDeath(target);
+        } else {
+          this.showLog("Mega Blast Seed missed! No enemy in front.");
+        }
+        break;
+      }
+      case "deepSleepSeed": {
+        const dx = DIR_DX[this.player.facing];
+        const dy = DIR_DY[this.player.facing];
+        const tx = this.player.tileX + dx;
+        const ty = this.player.tileY + dy;
+        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
+        if (target) {
+          target.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 8 });
+          this.showLog(`Deep Sleep Seed hit ${target.name}! Deep sleep for 8 turns!`);
+        } else {
+          this.showLog("Deep Sleep Seed missed! No enemy in front.");
+        }
+        break;
+      }
+      case "megaXAttack": {
+        this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 15 });
+        sfxBuff();
+        this.showLog("Used Mega X-Attack! ATK greatly boosted for 15 turns!");
+        break;
+      }
+      case "megaXDefend": {
+        this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 15 });
+        sfxBuff();
+        this.showLog("Used Mega X-Defend! DEF greatly boosted for 15 turns!");
+        break;
+      }
       default: {
         // TM handling
         if (item.tmSkillId) {
@@ -4021,8 +4184,29 @@ export class DungeonScene extends Phaser.Scene {
     this.updateHUD();
   }
 
-  /** Check for revive seed or Phoenix enchantment on death */
+  /** Check for auto reviver, revive seed, or Phoenix enchantment on death */
   private tryRevive(): boolean {
+    // 0. Auto Reviver (upgraded item) — 75% HP, golden flash
+    const autoIdx = this.inventory.findIndex(s => s.item.id === "autoReviver");
+    if (autoIdx !== -1) {
+      const stack = this.inventory[autoIdx];
+      stack.count--;
+      if (stack.count <= 0) this.inventory.splice(autoIdx, 1);
+
+      this.player.stats.hp = Math.floor(this.player.stats.maxHp * 0.75);
+      this.player.alive = true;
+      if (this.player.sprite) {
+        this.player.sprite.setAlpha(1);
+        this.player.sprite.setTint(0xffdd44);
+        this.time.delayedCall(500, () => {
+          if (this.player.sprite) this.player.sprite.clearTint();
+        });
+      }
+      this.cameras.main.flash(400, 255, 215, 0);
+      this.showLog("Auto Reviver activated! Instantly restored to 75% HP!");
+      return true;
+    }
+
     // 1. Revive Seed (item) — 50% HP
     const idx = this.inventory.findIndex(s => s.item.id === "reviveSeed");
     if (idx !== -1) {
@@ -6048,7 +6232,7 @@ export class DungeonScene extends Phaser.Scene {
 
       case "traveler_feed": {
         // Check if player has an Apple
-        const appleIdx = this.inventory.findIndex(s => s.item.id === "apple" || s.item.id === "bigApple");
+        const appleIdx = this.inventory.findIndex(s => s.item.id === "apple" || s.item.id === "bigApple" || s.item.id === "goldenApple");
         if (appleIdx === -1) {
           this.showLog("You don't have any Apples!");
           return; // Don't close UI
