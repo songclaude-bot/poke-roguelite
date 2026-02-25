@@ -29,6 +29,11 @@ export enum SkillEffect {
   Heal = "heal",           // Restore HP
   Burn = "burn",           // DoT: 5 dmg/turn for 5 turns
   Paralyze = "paralyze",   // 50% chance to skip turn for 3 turns
+  Frozen = "frozen",       // Cannot move for 2-3 turns, 20% thaw/turn, fire thaws instantly
+  BadlyPoisoned = "badlyPoisoned", // Increasing dmg each turn (1,2,3,4...)
+  Flinch = "flinch",       // Skip one turn, auto-removed after
+  Drowsy = "drowsy",       // 30% chance to fall asleep (skip) each turn for 3 turns
+  Cursed = "cursed",       // Lose 25% max HP every 4 turns for 8 turns
 }
 
 export interface Skill {

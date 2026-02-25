@@ -31,6 +31,10 @@ export interface EntityStats {
 export interface StatusEffect {
   type: SkillEffect;
   turnsLeft: number;
+  /** Badly Poisoned: tracks escalating damage (1, 2, 3, ...) */
+  poisonCounter?: number;
+  /** Cursed: tracks turns elapsed since curse started (triggers every 4 turns) */
+  curseTick?: number;
 }
 
 export interface Entity {
@@ -91,12 +95,33 @@ const STATUS_WORE_OFF_LABEL: Record<string, string> = {
   [SkillEffect.Paralyze]: "Paralysis",
   [SkillEffect.AtkUp]: "ATK boost",
   [SkillEffect.DefUp]: "DEF boost",
+  [SkillEffect.Frozen]: "Freeze",
+  [SkillEffect.BadlyPoisoned]: "Bad Poison",
+  [SkillEffect.Flinch]: "Flinch",
+  [SkillEffect.Drowsy]: "Drowsiness",
+  [SkillEffect.Cursed]: "Curse",
 };
 
 /** Tick status effects at end of turn, remove expired ones */
 export function tickStatusEffects(entity: Entity): string[] {
   const messages: string[] = [];
   entity.statusEffects = entity.statusEffects.filter(s => {
+    // Frozen: 20% chance to thaw early each turn
+    if (s.type === SkillEffect.Frozen && Math.random() < 0.2) {
+      messages.push(`${entity.name} thawed out!`);
+      return false;
+    }
+
+    // Badly Poisoned: increment damage counter each tick
+    if (s.type === SkillEffect.BadlyPoisoned) {
+      s.poisonCounter = (s.poisonCounter ?? 0) + 1;
+    }
+
+    // Cursed: increment curse tick counter
+    if (s.type === SkillEffect.Cursed) {
+      s.curseTick = (s.curseTick ?? 0) + 1;
+    }
+
     s.turnsLeft--;
     if (s.turnsLeft <= 0) {
       const label = STATUS_WORE_OFF_LABEL[s.type] ?? s.type;
@@ -111,6 +136,53 @@ export function tickStatusEffects(entity: Entity): string[] {
 /** Check if entity is paralyzed (50% skip) */
 export function isParalyzed(entity: Entity): boolean {
   return entity.statusEffects.some(s => s.type === SkillEffect.Paralyze) && Math.random() < 0.5;
+}
+
+/** Check if entity is frozen (always skip while frozen) */
+export function isFrozen(entity: Entity): boolean {
+  return entity.statusEffects.some(s => s.type === SkillEffect.Frozen);
+}
+
+/** Check if entity flinched (skip one turn, auto-remove) */
+export function isFlinched(entity: Entity): boolean {
+  const flinch = entity.statusEffects.find(s => s.type === SkillEffect.Flinch);
+  if (flinch) {
+    // Remove flinch immediately after checking — it's a one-turn effect
+    entity.statusEffects = entity.statusEffects.filter(s => s.type !== SkillEffect.Flinch);
+    return true;
+  }
+  return false;
+}
+
+/** Check if drowsy entity falls asleep this turn (30% chance) */
+export function isDrowsySleep(entity: Entity): boolean {
+  return entity.statusEffects.some(s => s.type === SkillEffect.Drowsy) && Math.random() < 0.3;
+}
+
+/** Remove freeze status (e.g. when hit by fire) */
+export function thawEntity(entity: Entity): boolean {
+  const wasFrozen = entity.statusEffects.some(s => s.type === SkillEffect.Frozen);
+  if (wasFrozen) {
+    entity.statusEffects = entity.statusEffects.filter(s => s.type !== SkillEffect.Frozen);
+  }
+  return wasFrozen;
+}
+
+/** Get the current badly poisoned damage for this tick */
+export function getBadlyPoisonedDamage(entity: Entity): number {
+  const bp = entity.statusEffects.find(s => s.type === SkillEffect.BadlyPoisoned);
+  return bp ? (bp.poisonCounter ?? 1) : 0;
+}
+
+/** Check if cursed entity should take damage this tick (every 4 turns) */
+export function getCurseDamage(entity: Entity): number {
+  const curse = entity.statusEffects.find(s => s.type === SkillEffect.Cursed);
+  if (!curse) return 0;
+  // Damage triggers every 4 ticks
+  if ((curse.curseTick ?? 0) % 4 === 0 && (curse.curseTick ?? 0) > 0) {
+    return Math.max(1, Math.floor(entity.stats.maxHp * 0.25));
+  }
+  return 0;
 }
 
 /**

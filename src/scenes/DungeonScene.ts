@@ -14,6 +14,7 @@ import { TurnManager } from "../core/turn-manager";
 import {
   Entity, canMoveTo, canMoveDiagonal, chebyshevDist,
   getEffectiveAtk, getEffectiveDef, tickStatusEffects, isParalyzed, StatusEffect,
+  isFrozen, isFlinched, isDrowsySleep, thawEntity, getBadlyPoisonedDamage, getCurseDamage,
   AllyTactic,
 } from "../core/entity";
 import { getEnemyMoveDirection, isAdjacentToPlayer, directionToPlayer } from "../core/enemy-ai";
@@ -22,6 +23,7 @@ import { PokemonType, getEffectiveness, effectivenessText } from "../core/type-c
 import { Skill, SkillRange, SkillEffect, SKILL_DB, createSkill } from "../core/skill";
 import { getSkillTargetTiles } from "../core/skill-targeting";
 import { getEvolution } from "../core/evolution";
+import { distributeAllyExp, AllyLevelUpResult } from "../core/ally-evolution";
 import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY, ITEM_DB } from "../core/item";
 import { SPECIES, PokemonSpecies, createSpeciesSkills, getLearnableSkill } from "../core/pokemon-data";
 import { DungeonDef, BossDef, getDungeon, getDungeonFloorEnemies, CHALLENGE_MODES } from "../core/dungeon-data";
@@ -5181,6 +5183,11 @@ export class DungeonScene extends Phaser.Scene {
       [SkillEffect.Paralyze]: { label: "PAR", color: "#ffdd44" },
       [SkillEffect.AtkUp]: { label: "ATK\u2191", color: "#ff8844" },
       [SkillEffect.DefUp]: { label: "DEF\u2191", color: "#4488ff" },
+      [SkillEffect.Frozen]: { label: "FRZ", color: "#88ccff" },
+      [SkillEffect.BadlyPoisoned]: { label: "TOX", color: "#9944cc" },
+      [SkillEffect.Flinch]: { label: "FLN", color: "#ffaa88" },
+      [SkillEffect.Drowsy]: { label: "DRW", color: "#ccaadd" },
+      [SkillEffect.Cursed]: { label: "CRS", color: "#aa44aa" },
     };
 
     for (const se of effects) {
@@ -5206,13 +5213,26 @@ export class DungeonScene extends Phaser.Scene {
     if (!entity.sprite) return;
     const hasBurn = entity.statusEffects.some(s => s.type === SkillEffect.Burn);
     const hasPara = entity.statusEffects.some(s => s.type === SkillEffect.Paralyze);
+    const hasFrozen = entity.statusEffects.some(s => s.type === SkillEffect.Frozen);
+    const hasBadlyPoisoned = entity.statusEffects.some(s => s.type === SkillEffect.BadlyPoisoned);
+    const hasDrowsy = entity.statusEffects.some(s => s.type === SkillEffect.Drowsy);
+    const hasCursed = entity.statusEffects.some(s => s.type === SkillEffect.Cursed);
     const hasAtkUp = entity.statusEffects.some(s => s.type === SkillEffect.AtkUp);
     const hasDefUp = entity.statusEffects.some(s => s.type === SkillEffect.DefUp);
 
-    if (hasBurn) {
+    // Priority: Frozen > Cursed > Burn > BadlyPoisoned > Paralyze > Drowsy > buffs
+    if (hasFrozen) {
+      entity.sprite.setTint(0x88ccff); // Ice blue for frozen
+    } else if (hasCursed) {
+      entity.sprite.setTint(0x553366); // Dark purple for curse
+    } else if (hasBurn) {
       entity.sprite.setTint(0xff8844); // Orange-red for burn
+    } else if (hasBadlyPoisoned) {
+      entity.sprite.setTint(0x9944cc); // Purple for bad poison
     } else if (hasPara) {
       entity.sprite.setTint(0xffff44); // Yellow for paralysis
+    } else if (hasDrowsy) {
+      entity.sprite.setTint(0xccaadd); // Light purple for drowsy
     } else if (hasAtkUp && hasDefUp) {
       entity.sprite.setTint(0x44ffff); // Cyan for both buffs
     } else if (hasAtkUp) {
@@ -5238,6 +5258,32 @@ export class DungeonScene extends Phaser.Scene {
         this.showDamagePopup(entity.sprite.x, entity.sprite.y, burnDmg, 1.0);
       }
       this.showLog(`${entity.name} is hurt by its burn!`);
+      if (entity.stats.hp <= 0) {
+        entity.alive = false;
+      }
+    }
+
+    // Apply Badly Poisoned damage (escalating: 1, 2, 3, 4... per turn)
+    const bpDmg = getBadlyPoisonedDamage(entity);
+    if (bpDmg > 0 && entity.alive) {
+      entity.stats.hp = Math.max(0, entity.stats.hp - bpDmg);
+      if (entity.sprite) {
+        this.showDamagePopup(entity.sprite.x, entity.sprite.y, bpDmg, 1.0);
+      }
+      this.showLog(`${entity.name} is hurt by bad poison! (${bpDmg} dmg)`);
+      if (entity.stats.hp <= 0) {
+        entity.alive = false;
+      }
+    }
+
+    // Apply Curse damage (25% max HP every 4 turns)
+    const curseDmg = getCurseDamage(entity);
+    if (curseDmg > 0 && entity.alive) {
+      entity.stats.hp = Math.max(0, entity.stats.hp - curseDmg);
+      if (entity.sprite) {
+        this.showDamagePopup(entity.sprite.x, entity.sprite.y, curseDmg, 1.0);
+      }
+      this.showLog(`${entity.name} is afflicted by the curse! (${curseDmg} dmg)`);
       if (entity.stats.hp <= 0) {
         entity.alive = false;
       }
@@ -5337,6 +5383,62 @@ export class DungeonScene extends Phaser.Scene {
       },
     });
     this.statusFlashTimers.push(paraTimer);
+
+    // Frozen pulse timer — every 2.5 seconds, pulse ice-blue on frozen entities
+    const frozenTimer = this.time.addEvent({
+      delay: 2500,
+      loop: true,
+      callback: () => {
+        const allEnts = [this.player, ...this.allies, ...this.enemies];
+        for (const ent of allEnts) {
+          if (!ent.alive || !ent.sprite) continue;
+          if (!ent.statusEffects.some(s => s.type === SkillEffect.Frozen)) continue;
+          ent.sprite.setTint(0x44aaff);
+          this.time.delayedCall(200, () => {
+            if (ent.sprite && ent.alive) this.updateStatusTint(ent);
+          });
+        }
+      },
+    });
+    this.statusFlashTimers.push(frozenTimer);
+
+    // Badly Poisoned pulse timer — every 2 seconds, purple pulse
+    const toxicTimer = this.time.addEvent({
+      delay: 2000,
+      startAt: 500,
+      loop: true,
+      callback: () => {
+        const allEnts = [this.player, ...this.allies, ...this.enemies];
+        for (const ent of allEnts) {
+          if (!ent.alive || !ent.sprite) continue;
+          if (!ent.statusEffects.some(s => s.type === SkillEffect.BadlyPoisoned)) continue;
+          ent.sprite.setTint(0x7722aa);
+          this.time.delayedCall(150, () => {
+            if (ent.sprite && ent.alive) this.updateStatusTint(ent);
+          });
+        }
+      },
+    });
+    this.statusFlashTimers.push(toxicTimer);
+
+    // Cursed pulse timer — every 3 seconds, dark flash
+    const curseTimer = this.time.addEvent({
+      delay: 3000,
+      startAt: 1500,
+      loop: true,
+      callback: () => {
+        const allEnts = [this.player, ...this.allies, ...this.enemies];
+        for (const ent of allEnts) {
+          if (!ent.alive || !ent.sprite) continue;
+          if (!ent.statusEffects.some(s => s.type === SkillEffect.Cursed)) continue;
+          ent.sprite.setTint(0x331144);
+          this.time.delayedCall(200, () => {
+            if (ent.sprite && ent.alive) this.updateStatusTint(ent);
+          });
+        }
+      },
+    });
+    this.statusFlashTimers.push(curseTimer);
   }
 
   // ── Stairs ──
@@ -9134,6 +9236,42 @@ export class DungeonScene extends Phaser.Scene {
   private async handlePlayerAction(dir: Direction) {
     this.player.facing = dir;
 
+    // Check Frozen — cannot act
+    if (isFrozen(this.player)) {
+      this.showLog(`${this.player.name} is frozen solid and can't move!`);
+      await this.turnManager.executeTurn(
+        () => Promise.resolve(),
+        [...this.getAllyActions(), ...this.getEnemyActions()]
+      );
+      this.tickEntityStatus(this.player);
+      this.updateHUD();
+      return;
+    }
+
+    // Check Flinch — skip one turn
+    if (isFlinched(this.player)) {
+      this.showLog(`${this.player.name} flinched and couldn't move!`);
+      await this.turnManager.executeTurn(
+        () => Promise.resolve(),
+        [...this.getAllyActions(), ...this.getEnemyActions()]
+      );
+      this.tickEntityStatus(this.player);
+      this.updateHUD();
+      return;
+    }
+
+    // Check Drowsy — 30% chance to fall asleep (skip turn)
+    if (isDrowsySleep(this.player)) {
+      this.showLog(`${this.player.name} is drowsy and fell asleep!`);
+      await this.turnManager.executeTurn(
+        () => Promise.resolve(),
+        [...this.getAllyActions(), ...this.getEnemyActions()]
+      );
+      this.tickEntityStatus(this.player);
+      this.updateHUD();
+      return;
+    }
+
     // Check if there's an enemy in the target direction → basic attack
     const targetX = this.player.tileX + DIR_DX[dir];
     const targetY = this.player.tileY + DIR_DY[dir];
@@ -9510,6 +9648,12 @@ export class DungeonScene extends Phaser.Scene {
       const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * scaledWMult * synergyBonus * critMult * relicTypeAdvMult * diffDmgMult));
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
+      // Fire-type attacks thaw frozen targets
+      if (attacker.attackType === PokemonType.Fire && thawEntity(defender)) {
+        this.showLog(`${defender.name} was thawed by the fire attack!`);
+        this.updateStatusTint(defender);
+      }
+
       // Sound effects based on effectiveness
       if (isCrit) sfxCritical();
       else if (effectiveness >= 2) sfxSuperEffective();
@@ -9694,6 +9838,12 @@ export class DungeonScene extends Phaser.Scene {
           const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * skillScaledWMult * skillSynergyBonus * skillCritMult * comboMult * skillRelicTypeAdvMult * skillDiffDmgMult));
           target.stats.hp = Math.max(0, target.stats.hp - dmg);
 
+          // Fire-type skills thaw frozen targets
+          if (skill.type === PokemonType.Fire && thawEntity(target)) {
+            this.showLog(`${target.name} was thawed by the fire attack!`);
+            this.updateStatusTint(target);
+          }
+
           this.flashEntity(target, effectiveness);
           if (skillIsCrit) this.showCritFlash(target);
           if (target.sprite) {
@@ -9852,8 +10002,12 @@ export class DungeonScene extends Phaser.Scene {
     if (Math.random() * 100 > chance) return;
 
     // ShieldDust: immune to harmful secondary effects from enemy skills
+    const harmfulEffects = [
+      SkillEffect.Paralyze, SkillEffect.Burn, SkillEffect.Frozen,
+      SkillEffect.BadlyPoisoned, SkillEffect.Flinch, SkillEffect.Drowsy, SkillEffect.Cursed,
+    ];
     if (target.ability === AbilityId.ShieldDust && user !== target &&
-        (skill.effect === SkillEffect.Paralyze || skill.effect === SkillEffect.Burn)) {
+        harmfulEffects.includes(skill.effect)) {
       this.showLog(`${target.name}'s Shield Dust blocked the effect!`);
       return;
     }
@@ -9898,6 +10052,51 @@ export class DungeonScene extends Phaser.Scene {
         if (!target.statusEffects.some(s => s.type === SkillEffect.Burn)) {
           target.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
           this.showLog(`${target.name} was burned! (5 turns)`);
+        }
+        break;
+
+      case SkillEffect.Frozen: {
+        if (!target.statusEffects.some(s => s.type === SkillEffect.Frozen)) {
+          const frozenTurns = 2 + Math.floor(Math.random() * 2); // 2-3 turns
+          target.statusEffects.push({ type: SkillEffect.Frozen, turnsLeft: frozenTurns });
+          this.showLog(`${target.name} was frozen solid! (${frozenTurns} turns)`);
+          if (target.sprite) target.sprite.setTint(0x88ccff);
+          this.time.delayedCall(300, () => { if (target.sprite) this.updateStatusTint(target); });
+        }
+        break;
+      }
+
+      case SkillEffect.BadlyPoisoned:
+        if (!target.statusEffects.some(s => s.type === SkillEffect.BadlyPoisoned)) {
+          target.statusEffects.push({ type: SkillEffect.BadlyPoisoned, turnsLeft: 8, poisonCounter: 0 });
+          this.showLog(`${target.name} was badly poisoned! (8 turns)`);
+          if (target.sprite) target.sprite.setTint(0x9944cc);
+          this.time.delayedCall(300, () => { if (target.sprite) this.updateStatusTint(target); });
+        }
+        break;
+
+      case SkillEffect.Flinch:
+        if (!target.statusEffects.some(s => s.type === SkillEffect.Flinch)) {
+          target.statusEffects.push({ type: SkillEffect.Flinch, turnsLeft: 1 });
+          this.showLog(`${target.name} flinched!`);
+        }
+        break;
+
+      case SkillEffect.Drowsy:
+        if (!target.statusEffects.some(s => s.type === SkillEffect.Drowsy)) {
+          target.statusEffects.push({ type: SkillEffect.Drowsy, turnsLeft: 3 });
+          this.showLog(`${target.name} became drowsy! (3 turns)`);
+          if (target.sprite) target.sprite.setTint(0xccaadd);
+          this.time.delayedCall(300, () => { if (target.sprite) this.updateStatusTint(target); });
+        }
+        break;
+
+      case SkillEffect.Cursed:
+        if (!target.statusEffects.some(s => s.type === SkillEffect.Cursed)) {
+          target.statusEffects.push({ type: SkillEffect.Cursed, turnsLeft: 8, curseTick: 0 });
+          this.showLog(`${target.name} was cursed! (8 turns)`);
+          if (target.sprite) target.sprite.setTint(0x553366);
+          this.time.delayedCall(300, () => { if (target.sprite) this.updateStatusTint(target); });
         }
         break;
     }
@@ -10434,6 +10633,63 @@ export class DungeonScene extends Phaser.Scene {
         });
       }
 
+      // ── Ally EXP sharing + level up + evolution ──
+      if (this.allies.length > 0) {
+        const allyResults = distributeAllyExp(this.allies, expGain);
+        for (const ar of allyResults) {
+          const ally = ar.ally;
+          // Show level-up effects for each level gained
+          for (const lvl of ar.levelUps) {
+            this.time.delayedCall(600, () => {
+              sfxLevelUp();
+              this.showLog(`${ally.name} leveled up! Lv.${lvl.newLevel}! HP+${lvl.hpGain} ATK+${lvl.atkGain} DEF+${lvl.defGain}`);
+              if (ally.sprite) {
+                ally.sprite.setTint(0xffff44);
+                this.tweens.add({
+                  targets: ally.sprite,
+                  scaleX: TILE_SCALE * 1.3, scaleY: TILE_SCALE * 1.3,
+                  duration: 200, yoyo: true, ease: "Quad.easeOut",
+                });
+                this.time.delayedCall(600, () => { if (ally.sprite) ally.sprite.clearTint(); });
+                this.showStatPopup(ally.sprite.x - 16, ally.sprite.y - 20, `HP+${lvl.hpGain}`, "#4ade80", 0);
+                this.showStatPopup(ally.sprite.x, ally.sprite.y - 20, `ATK+${lvl.atkGain}`, "#f87171", 200);
+                this.showStatPopup(ally.sprite.x + 16, ally.sprite.y - 20, `DEF+${lvl.defGain}`, "#60a5fa", 400);
+              }
+              this.updateHUD();
+            });
+          }
+          // Show evolution animation if evolved
+          if (ar.evolution) {
+            const evo = ar.evolution;
+            this.time.delayedCall(1400, () => {
+              sfxEvolution();
+              this.cameras.main.flash(600, 255, 255, 255);
+              this.showLog(`${evo.oldName} evolved into ${evo.newName}!`);
+              if (evo.newSkill) {
+                this.showLog(`${evo.newName} learned ${evo.newSkill}!`);
+              }
+              // Update sprite to new species
+              const newSp = SPECIES[evo.newSpeciesId];
+              if (ally.sprite && newSp) {
+                const newIdleTex = `${newSp.spriteKey}-idle`;
+                if (this.textures.exists(newIdleTex)) {
+                  ally.sprite.setTexture(newIdleTex);
+                  const newIdleAnim = `${newSp.spriteKey}-idle-${ally.facing}`;
+                  if (this.anims.exists(newIdleAnim)) ally.sprite.play(newIdleAnim);
+                }
+                // Evolution scale bounce
+                this.tweens.add({
+                  targets: ally.sprite,
+                  scaleX: TILE_SCALE * 1.5, scaleY: TILE_SCALE * 1.5,
+                  duration: 400, yoyo: true, ease: "Quad.easeInOut",
+                });
+              }
+              this.updateHUD();
+            });
+          }
+        }
+      }
+
       // ── Ability: Pickup — chance scaled by ability level (disabled in No Items challenge) ──
       if (this.challengeMode !== "noItems" && this.player.ability === AbilityId.Pickup && Math.random() < getPickupChance(this.player.abilityLevel ?? 1)) {
         if (this.inventory.length < MAX_INVENTORY) {
@@ -10929,6 +11185,27 @@ export class DungeonScene extends Phaser.Scene {
             return;
           }
 
+          // Check Frozen
+          if (isFrozen(enemy)) {
+            this.showLog(`${enemy.name} is frozen solid!`);
+            this.tickEntityStatus(enemy);
+            return;
+          }
+
+          // Check Flinch
+          if (isFlinched(enemy)) {
+            this.showLog(`${enemy.name} flinched!`);
+            this.tickEntityStatus(enemy);
+            return;
+          }
+
+          // Check Drowsy
+          if (isDrowsySleep(enemy)) {
+            this.showLog(`${enemy.name} is drowsy and fell asleep!`);
+            this.tickEntityStatus(enemy);
+            return;
+          }
+
           // Tick enemy status effects
           this.tickEntityStatus(enemy);
 
@@ -10993,6 +11270,9 @@ export class DungeonScene extends Phaser.Scene {
         return async () => {
           if (!ally.alive || !this.player.alive) return;
           if (isParalyzed(ally)) return;
+          if (isFrozen(ally)) { this.tickEntityStatus(ally); return; }
+          if (isFlinched(ally)) { this.tickEntityStatus(ally); return; }
+          if (isDrowsySleep(ally)) { this.tickEntityStatus(ally); return; }
           this.tickEntityStatus(ally);
 
           // Party position determines follow distance (0 = closest, 3 = farthest)
