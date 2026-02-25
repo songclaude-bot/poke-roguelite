@@ -3872,6 +3872,8 @@ export class DungeonScene extends Phaser.Scene {
     // Hide original Phaser skill buttons & action buttons
     for (const btn of this.skillButtons) btn.setAlpha(0).disableInteractive();
     if (this.quickSlotBtn) this.quickSlotBtn.setAlpha(0).disableInteractive();
+    if (this.pickupBtnPhaser) this.pickupBtnPhaser.setAlpha(0).disableInteractive();
+    if (this.teamBtnPhaser) this.teamBtnPhaser.setAlpha(0).disableInteractive();
   }
 
   /** Sync DOM HUD text from Phaser text values */
