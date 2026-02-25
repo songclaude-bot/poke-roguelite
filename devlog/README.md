@@ -1453,3 +1453,26 @@
 - **퀘스트**: 일일 + 도전 미션 + 자동 추적
 - **NPC**: 6종 진행도 반응 대화 + 타자기 효과
 - **라이브**: https://songclaude-bot.github.io/poke-roguelite/
+
+---
+
+## Phase 36: 비밀 방 + 탤런트 트리
+
+### 36-1. 던전 비밀 방 (Phase 284)
+- 날짜: 2026-02-25
+- 5종 비밀 방: TreasureVault, HealingSpring, SkillShrine, TrainingRoom, WarpHub
+- 가벽 뒤 숨겨진 입구 (3초마다 미세 반짝 힌트)
+- 5% 확률/층, 3층 이상
+- 골드 미니맵 표시 (발견 후)
+
+### 36-2. 탤런트 트리 시스템 (Phase 285)
+- 날짜: 2026-02-25
+- 4 카테고리 × 5 노드 = 20 탤런트
+- Offense(공격)/Defense(방어)/Utility(유틸)/Exploration(탐험)
+- 골드 투자로 영구 보너스 (ATK/DEF/HP/골드/경험치/아이템/배/시야)
+- TalentTreeScene + 허브 버튼 추가
+
+### v4.4.0 마일스톤
+- **비밀 방**: 5종 히든 룸 + 벽 반짝 힌트 + 워프 허브
+- **탤런트 트리**: 20노드 영구 성장 시스템
+- **라이브**: https://songclaude-bot.github.io/poke-roguelite/
