@@ -25,6 +25,7 @@ import { getSkillTargetTiles } from "../core/skill-targeting";
 import { getEvolution } from "../core/evolution";
 import { distributeAllyExp, AllyLevelUpResult } from "../core/ally-evolution";
 import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY, ITEM_DB, ItemCategory } from "../core/item";
+import { getAffinityMultiplier, getItemAffinity } from "../core/item-affinity";
 import { getTypeGem, TypeGem } from "../core/type-gems";
 import { SPECIES, PokemonSpecies, createSpeciesSkills, getLearnableSkill } from "../core/pokemon-data";
 import { DungeonDef, BossDef, getDungeon, getDungeonFloorEnemies, CHALLENGE_MODES } from "../core/dungeon-data";
@@ -145,6 +146,10 @@ import {
 import {
   MiniBoss, shouldSpawnMiniBoss, rollMiniBoss, getMiniBossReward,
 } from "../core/mini-bosses";
+import {
+  loadJournal, recordDungeonEntry, recordDungeonClear,
+  recordDungeonDefeat, recordSpeciesEncountered,
+} from "../core/dungeon-journal";
 
 interface AllyData {
   speciesId: string;
@@ -605,6 +610,12 @@ export class DungeonScene extends Phaser.Scene {
     this.dungeonDef = getDungeon(data?.dungeonId ?? "beachCave");
     const isNewRun = (data?.floor ?? 1) === 1 && !data?.hp;
     this.currentFloor = data?.floor ?? 1;
+
+    // Journal: record dungeon entry on new runs
+    if (isNewRun) {
+      const journal = loadJournal();
+      recordDungeonEntry(journal, this.dungeonDef.id);
+    }
 
     // Endless dungeon: dynamically scale difficulty and items based on floor
     if (this.dungeonDef.id === "endlessDungeon") {
@@ -4834,9 +4845,11 @@ export class DungeonScene extends Phaser.Scene {
 
     switch (item.id) {
       case "oranBerry": {
-        const heal = Math.min(30, this.player.stats.maxHp - this.player.stats.hp);
+        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
+        const baseHeal = Math.floor(30 * affinityMult);
+        const heal = Math.min(baseHeal, this.player.stats.maxHp - this.player.stats.hp);
         this.player.stats.hp += heal;
-        this.showLog(`Used Oran Berry! Restored ${heal} HP.`);
+        this.showLog(`Used Oran Berry! Restored ${heal} HP.${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
         if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
         // Score chain: healing item resets chain
         if (this.scoreChain.currentMultiplier > 1.0) {
@@ -4847,10 +4860,11 @@ export class DungeonScene extends Phaser.Scene {
         break;
       }
       case "sitrusBerry": {
-        const heal = Math.floor(this.player.stats.maxHp * 0.5);
+        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
+        const heal = Math.floor(this.player.stats.maxHp * 0.5 * affinityMult);
         const actual = Math.min(heal, this.player.stats.maxHp - this.player.stats.hp);
         this.player.stats.hp += actual;
-        this.showLog(`Used Sitrus Berry! Restored ${actual} HP.`);
+        this.showLog(`Used Sitrus Berry! Restored ${actual} HP.${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
         if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, actual);
         // Score chain: healing item resets chain
         if (this.scoreChain.currentMultiplier > 1.0) {
@@ -4873,15 +4887,17 @@ export class DungeonScene extends Phaser.Scene {
       }
       case "blastSeed": {
         // Damage first enemy in facing direction
+        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
+        const dmg = Math.floor(40 * affinityMult);
         const dx = DIR_DX[this.player.facing];
         const dy = DIR_DY[this.player.facing];
         const tx = this.player.tileX + dx;
         const ty = this.player.tileY + dy;
         const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
         if (target) {
-          target.stats.hp = Math.max(0, target.stats.hp - 40);
+          target.stats.hp = Math.max(0, target.stats.hp - dmg);
           this.flashEntity(target, 2.0);
-          this.showLog(`Blast Seed hit ${target.name}! 40 dmg!`);
+          this.showLog(`Blast Seed hit ${target.name}! ${dmg} dmg!${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
           this.checkDeath(target);
         } else {
           this.showLog("Blast Seed missed! No enemy in front.");
@@ -4944,10 +4960,11 @@ export class DungeonScene extends Phaser.Scene {
         break;
       }
       case "apple": {
-        const restore = Math.min(50, this.maxBelly - this.belly);
+        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
+        const restore = Math.min(Math.floor(50 * affinityMult), this.maxBelly - this.belly);
         this.belly += restore;
         this.resetBellyWarnings();
-        this.showLog(`Ate an Apple! Belly +${restore}. (${Math.floor(this.belly)}/${this.maxBelly})`);
+        this.showLog(`Ate an Apple! Belly +${restore}. (${Math.floor(this.belly)}/${this.maxBelly})${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
         break;
       }
       case "bigApple": {
@@ -4957,10 +4974,11 @@ export class DungeonScene extends Phaser.Scene {
         break;
       }
       case "grimyFood": {
-        const grimyRestore = Math.min(30, this.maxBelly - this.belly);
+        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
+        const grimyRestore = Math.min(Math.floor(30 * affinityMult), this.maxBelly - this.belly);
         this.belly += grimyRestore;
         this.resetBellyWarnings();
-        this.showLog(`Ate Grimy Food... Belly +${grimyRestore}. (${Math.floor(this.belly)}/${this.maxBelly})`);
+        this.showLog(`Ate Grimy Food... Belly +${grimyRestore}. (${Math.floor(this.belly)}/${this.maxBelly})${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
         // 50% chance to cause Burn (poison-like DoT)
         if (Math.random() < 0.5) {
           if (!this.player.statusEffects.some(s => s.type === SkillEffect.Burn)) {
@@ -5032,9 +5050,11 @@ export class DungeonScene extends Phaser.Scene {
       }
       case "healSeed": {
         this.player.statusEffects = [];
-        const heal = Math.min(20, this.player.stats.maxHp - this.player.stats.hp);
+        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
+        const baseHeal = Math.floor(20 * affinityMult);
+        const heal = Math.min(baseHeal, this.player.stats.maxHp - this.player.stats.hp);
         this.player.stats.hp += heal;
-        this.showLog(`Used Heal Seed! Status cleared, restored ${heal} HP.`);
+        this.showLog(`Used Heal Seed! Status cleared, restored ${heal} HP.${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
         if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
         break;
       }
@@ -5131,9 +5151,11 @@ export class DungeonScene extends Phaser.Scene {
       }
       // ── Upgraded (Synthesized) Items ──
       case "megaOranBerry": {
-        const heal = Math.min(80, this.player.stats.maxHp - this.player.stats.hp);
+        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
+        const baseHeal = Math.floor(80 * affinityMult);
+        const heal = Math.min(baseHeal, this.player.stats.maxHp - this.player.stats.hp);
         this.player.stats.hp += heal;
-        this.showLog(`Used Mega Oran Berry! Restored ${heal} HP.`);
+        this.showLog(`Used Mega Oran Berry! Restored ${heal} HP.${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
         if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
         if (this.scoreChain.currentMultiplier > 1.0) {
           resetChain(this.scoreChain);
@@ -5143,9 +5165,11 @@ export class DungeonScene extends Phaser.Scene {
         break;
       }
       case "megaSitrusBerry": {
-        const heal = Math.min(150, this.player.stats.maxHp - this.player.stats.hp);
+        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
+        const baseHeal = Math.floor(150 * affinityMult);
+        const heal = Math.min(baseHeal, this.player.stats.maxHp - this.player.stats.hp);
         this.player.stats.hp += heal;
-        this.showLog(`Used Mega Sitrus Berry! Restored ${heal} HP.`);
+        this.showLog(`Used Mega Sitrus Berry! Restored ${heal} HP.${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
         if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
         if (this.scoreChain.currentMultiplier > 1.0) {
           resetChain(this.scoreChain);
@@ -5155,10 +5179,11 @@ export class DungeonScene extends Phaser.Scene {
         break;
       }
       case "goldenApple": {
-        const restore = Math.min(200, this.maxBelly - this.belly);
+        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
+        const restore = Math.min(Math.floor(200 * affinityMult), this.maxBelly - this.belly);
         this.belly += restore;
         this.resetBellyWarnings();
-        this.showLog(`Ate a Golden Apple! Belly +${restore}. (${Math.floor(this.belly)}/${this.maxBelly})`);
+        this.showLog(`Ate a Golden Apple! Belly +${restore}. (${Math.floor(this.belly)}/${this.maxBelly})${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
         break;
       }
       case "crystalPebble": {
@@ -5206,15 +5231,17 @@ export class DungeonScene extends Phaser.Scene {
         break;
       }
       case "megaBlastSeed": {
+        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
+        const dmg = Math.floor(80 * affinityMult);
         const dx = DIR_DX[this.player.facing];
         const dy = DIR_DY[this.player.facing];
         const tx = this.player.tileX + dx;
         const ty = this.player.tileY + dy;
         const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
         if (target) {
-          target.stats.hp = Math.max(0, target.stats.hp - 80);
+          target.stats.hp = Math.max(0, target.stats.hp - dmg);
           this.flashEntity(target, 2.0);
-          this.showLog(`Mega Blast Seed hit ${target.name}! 80 dmg!`);
+          this.showLog(`Mega Blast Seed hit ${target.name}! ${dmg} dmg!${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
           this.checkDeath(target);
         } else {
           this.showLog("Mega Blast Seed missed! No enemy in front.");
@@ -9129,6 +9156,15 @@ export class DungeonScene extends Phaser.Scene {
       difficulty: isNonNormalDifficulty(this.difficultyLevel) ? this.difficultyLevel : undefined,
     });
 
+    // Journal: record dungeon clear with species encountered
+    {
+      const clearJournal = loadJournal();
+      recordDungeonClear(clearJournal, this.dungeonDef.id, this.dungeonDef.floors, this.runElapsedSeconds, this.enemiesDefeated, gold);
+      for (const sid of this.seenSpecies) {
+        recordSpeciesEncountered(clearJournal, this.dungeonDef.id, sid);
+      }
+    }
+
     // Run counter for this dungeon
     const clearMeta = loadMeta();
     const clearDungeonRunCount = (clearMeta.dungeonRunCounts ?? {})[this.dungeonDef.id] ?? 0;
@@ -9442,6 +9478,15 @@ export class DungeonScene extends Phaser.Scene {
     const goTalentGoldMult = 1 + (this.talentEffects.goldPercent ?? 0) / 100;
     const goRelicGoldMult = 1 + (this.relicEffects.goldMult ?? 0);
     const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult * ngGoGoldMult * goEnchGoldMult * goMutGoldMult * goTalentGoldMult * goRelicGoldMult);
+
+    // Journal: record dungeon defeat with species encountered
+    {
+      const defeatJournal = loadJournal();
+      recordDungeonDefeat(defeatJournal, this.dungeonDef.id, this.currentFloor, this.enemiesDefeated, gold);
+      for (const sid of this.seenSpecies) {
+        recordSpeciesEncountered(defeatJournal, this.dungeonDef.id, sid);
+      }
+    }
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -9798,6 +9843,19 @@ export class DungeonScene extends Phaser.Scene {
       if (!meta.clearedDungeons) meta.clearedDungeons = [];
       if (!meta.clearedDungeons.includes(this.dungeonDef.id)) {
         meta.clearedDungeons.push(this.dungeonDef.id);
+      }
+    }
+
+    // Journal: record quick-retry run results
+    {
+      const qrJournal = loadJournal();
+      if (cleared) {
+        recordDungeonClear(qrJournal, this.dungeonDef.id, this.dungeonDef.floors, this.runElapsedSeconds, this.enemiesDefeated, gold);
+      } else {
+        recordDungeonDefeat(qrJournal, this.dungeonDef.id, this.currentFloor, this.enemiesDefeated, gold);
+      }
+      for (const sid of this.seenSpecies) {
+        recordSpeciesEncountered(qrJournal, this.dungeonDef.id, sid);
       }
     }
 

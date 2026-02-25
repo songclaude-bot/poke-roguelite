@@ -891,6 +891,7 @@ export class HubScene extends Phaser.Scene {
       { label: "Records & Achievements", desc: "Stats, achievements, milestones", color: "#60a5fa", bgColor: 0x0a1a2a, scene: "AchievementScene" },
       { label: "Quest Board", desc: "Daily & challenge quests", color: "#10b981", bgColor: 0x0a2a1a, scene: "QuestBoardScene", badge: claimableCount },
       { label: "Hall of Fame", desc: "Best run scores & times", color: "#fbbf24", bgColor: 0x2a2a1a, scene: "LeaderboardScene" },
+      { label: "Dungeon Journal", desc: "Exploration history & bestiary", color: "#f97316", bgColor: 0x2a1a0a, scene: "JournalScene" },
     ];
 
     let iy = 50;
