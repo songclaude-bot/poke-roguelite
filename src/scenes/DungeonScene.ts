@@ -114,6 +114,10 @@ import {
   RunLog, RunLogEvent, RunLogEntry,
   createRunLog, calculatePerformanceGrade, gradeColor,
 } from "../core/run-log";
+import {
+  EnemyVariant, rollEnemyVariant, getVariantConfig, getVariantColor,
+  getVariantHexColor, getVariantName, isSpecialVariant,
+} from "../core/enemy-variants";
 
 interface AllyData {
   speciesId: string;
@@ -466,6 +470,11 @@ export class DungeonScene extends Phaser.Scene {
   private relicOverlayUI: Phaser.GameObjects.GameObject[] = [];
   private focusSashUsed = false;  // Focus Sash: one lethal-hit save per run
 
+  // Enemy Variant tracking (Entity reference -> variant type, separate from Entity interface)
+  private enemyVariantMap = new Map<Entity, EnemyVariant>();
+  // Graphics objects for variant aura effects (keyed by entity for cleanup)
+  private variantAuraGraphics = new Map<Entity, Phaser.GameObjects.Graphics>();
+
   // Run Log — battle log tracking all significant events across the run
   private runLog: RunLog = createRunLog();
 
@@ -585,6 +594,8 @@ export class DungeonScene extends Phaser.Scene {
     this.allies = [];
     this.allEntities = [];
     this.floorItems = [];
+    this.enemyVariantMap = new Map();
+    this.variantAuraGraphics = new Map();
     this.gameOver = false;
     this.bossEntity = null;
     this.bossHpBar = null;
@@ -1347,13 +1358,23 @@ export class DungeonScene extends Phaser.Scene {
           const enemyTypes = this.typeShiftType ? [this.typeShiftType] : sp.types;
           const enemyAttackType = this.typeShiftType ?? sp.attackType;
 
+          // ── Roll enemy variant ──
+          const variant = rollEnemyVariant(this.currentFloor, this.dungeonDef.difficulty);
+          const vConfig = getVariantConfig(variant);
+
+          // Apply variant stat multipliers
+          enemyStats.hp = Math.floor(enemyStats.hp * vConfig.hpMult);
+          enemyStats.maxHp = Math.floor(enemyStats.maxHp * vConfig.hpMult);
+          enemyStats.atk = Math.floor(enemyStats.atk * vConfig.atkMult);
+          enemyStats.def = Math.floor(enemyStats.def * vConfig.defMult);
+
           const enemy: Entity = {
             tileX: ex, tileY: ey,
             facing: Direction.Down,
             stats: { ...enemyStats },
             alive: true,
             spriteKey: sp.spriteKey,
-            name: sp.name,
+            name: getVariantName(sp.name, variant),
             types: enemyTypes,
             attackType: enemyAttackType,
             skills: createSpeciesSkills(sp),
@@ -1369,10 +1390,21 @@ export class DungeonScene extends Phaser.Scene {
             const giantScale = hasMutation(this.floorMutations, MutationType.GiantEnemies)
               ? TILE_SCALE * getMutationEffect(MutationType.GiantEnemies, "enemySpriteScale")
               : TILE_SCALE;
-            enemy.sprite.setScale(giantScale).setDepth(9);
+            enemy.sprite.setScale(giantScale * vConfig.spriteScale).setDepth(9);
             const eAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
             if (this.anims.exists(eAnim)) enemy.sprite.play(eAnim);
+
+            // Apply variant tint
+            if (isSpecialVariant(variant)) {
+              enemy.sprite.setTint(vConfig.tint);
+            }
           }
+
+          // Track variant in separate map (keeps Entity interface clean)
+          if (isSpecialVariant(variant)) {
+            this.enemyVariantMap.set(enemy, variant);
+          }
+
           this.enemies.push(enemy);
           this.allEntities.push(enemy);
           this.seenSpecies.add(sp.id); // Pokedex tracking
@@ -8007,30 +8039,37 @@ export class DungeonScene extends Phaser.Scene {
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
       GAME_WIDTH, GAME_HEIGHT,
-      0x000000, 0.7
+      0x000000, 0.85
     ).setScrollFactor(0).setDepth(200);
 
-    const titleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, "DUNGEON CLEAR!", {
+    // Use top-down layout to avoid overlap
+    let clearY = 60;
+
+    const titleText = this.add.text(GAME_WIDTH / 2, clearY, "DUNGEON CLEAR!", {
       fontSize: "20px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 15, `${this.dungeonDef.name} B${this.dungeonDef.floors}F cleared!`, {
-      fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10, `Earned ${gold} Gold!`, {
-      fontSize: "13px", color: "#fde68a", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    clearY += 30;
 
     // Challenge mode info on clear screen
     if (this.challengeMode) {
       const chDef = CHALLENGE_MODES.find(c => c.id === this.challengeMode);
       if (chDef) {
-        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, `Challenge: ${chDef.name}`, {
+        this.add.text(GAME_WIDTH / 2, clearY, `Challenge: ${chDef.name}`, {
           fontSize: "10px", color: chDef.color, fontFamily: "monospace", fontStyle: "bold",
         }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+        clearY += 18;
       }
     }
+
+    this.add.text(GAME_WIDTH / 2, clearY, `${this.dungeonDef.name} B${this.dungeonDef.floors}F cleared!`, {
+      fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    clearY += 24;
+
+    this.add.text(GAME_WIDTH / 2, clearY, `Earned ${gold} Gold!`, {
+      fontSize: "13px", color: "#fde68a", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    clearY += 22;
 
     // Daily dungeon: calculate and save score
     let dailyScoreValue = 0;
@@ -8097,15 +8136,17 @@ export class DungeonScene extends Phaser.Scene {
     const bestStr = isNewBest
       ? `Best: ${this.formatTime(runTime)}`
       : `Best: ${this.formatTime(prevBest!)}`;
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 28, `${timeStr}    ${bestStr}`, {
+    this.add.text(GAME_WIDTH / 2, clearY, `${timeStr}    ${bestStr}`, {
       fontSize: "10px", color: "#94a3b8", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    clearY += 16;
 
     // "New Best Time!" banner
     if (isNewBest) {
-      this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 40, "New Best Time!", {
+      this.add.text(GAME_WIDTH / 2, clearY, "New Best Time!", {
         fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
       }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+      clearY += 16;
     }
 
     // Chain bonus display
@@ -8127,21 +8168,32 @@ export class DungeonScene extends Phaser.Scene {
       clearChainStr,
       `Score: ${clearRunScore}`,
     ].filter(Boolean).join("\n");
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 55, clearStats, {
+    clearY += 4;
+    const statsText = this.add.text(GAME_WIDTH / 2, clearY, clearStats, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
+    clearY += statsText.height + 10;
 
     // Performance grade
     const clearGrade = calculatePerformanceGrade(this.runLog.getSummaryStats(), true, this.dungeonDef.floors, this.turnManager.turn);
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 96, `Grade: ${clearGrade}`, {
+    this.add.text(GAME_WIDTH / 2, clearY, `Grade: ${clearGrade}`, {
       fontSize: "13px", color: gradeColor(clearGrade), fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    clearY += 24;
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 113, "[Return to Town]", {
-      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
+    // Buttons at bottom — use fixed positions from bottom
+    const btnY1 = Math.max(clearY, GAME_HEIGHT - 120);
+    const btnW = 200;
+    const btnH = 32;
 
-    restartText.on("pointerdown", () => {
+    const townBtnBg = this.add.rectangle(GAME_WIDTH / 2, btnY1, btnW, btnH, 0x1e40af, 0.9)
+      .setStrokeStyle(1, 0x60a5fa).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
+    const townBtnText = this.add.text(GAME_WIDTH / 2, btnY1, "Return to Town", {
+      fontSize: "13px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+    townBtnBg.on("pointerover", () => townBtnBg.setFillStyle(0x2563eb, 1));
+    townBtnBg.on("pointerout", () => townBtnBg.setFillStyle(0x1e40af, 0.9));
+    townBtnBg.on("pointerdown", () => {
       this.scene.start("HubScene", {
         gold,
         cleared: true,
@@ -8157,27 +8209,33 @@ export class DungeonScene extends Phaser.Scene {
       });
     });
 
-    // Run Again button
-    const runAgainText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 135, "[Run Again]", {
-      fontSize: "14px", color: "#f59e0b", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
-
-    runAgainText.on("pointerdown", () => {
+    const btnY2 = btnY1 + btnH + 6;
+    const retryBtnBg = this.add.rectangle(GAME_WIDTH / 2, btnY2, btnW, btnH, 0x92400e, 0.9)
+      .setStrokeStyle(1, 0xf59e0b).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
+    this.add.text(GAME_WIDTH / 2, btnY2, "Run Again", {
+      fontSize: "13px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+    retryBtnBg.on("pointerover", () => retryBtnBg.setFillStyle(0xb45309, 1));
+    retryBtnBg.on("pointerout", () => retryBtnBg.setFillStyle(0x92400e, 0.9));
+    retryBtnBg.on("pointerdown", () => {
       this.quickRetry(gold, true);
     });
 
-    // Run Summary button
-    const summaryBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 157, "[Run Summary]", {
+    const btnY3 = btnY2 + btnH + 6;
+    const summaryBtnBg = this.add.rectangle(GAME_WIDTH / 2, btnY3, btnW * 0.8, 26, 0x2a2a4e, 0.9)
+      .setStrokeStyle(1, 0xa855f7).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
+    this.add.text(GAME_WIDTH / 2, btnY3, "Run Summary", {
       fontSize: "11px", color: "#a855f7", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
-    summaryBtn.on("pointerdown", () => {
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+    summaryBtnBg.on("pointerdown", () => {
       this.showRunSummary(true, this.dungeonDef.floors);
     });
 
+    // Gentle gold glow on title
     this.tweens.add({
       targets: titleText,
-      alpha: { from: 1, to: 0.6 },
-      duration: 800, yoyo: true, repeat: -1,
+      alpha: { from: 1, to: 0.7 },
+      duration: 1200, yoyo: true, repeat: -1,
     });
   }
 

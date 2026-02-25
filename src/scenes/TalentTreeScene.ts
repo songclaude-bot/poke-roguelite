@@ -248,8 +248,14 @@ export class TalentTreeScene extends Phaser.Scene {
     const totalInvested = getTotalGoldInvested(this.meta.talentLevels);
     this.pointsText.setText(`Talent Points: ${totalPoints}  |  Invested: ${totalInvested}G`);
 
-    // Flash effect
-    this.cameras.main.flash(200, 251, 191, 36, false);
+    // Subtle gold pulse on the gold text instead of full-screen flash
+    this.tweens.add({
+      targets: this.goldText,
+      scaleX: { from: 1, to: 1.2 },
+      scaleY: { from: 1, to: 1.2 },
+      duration: 150,
+      yoyo: true,
+    });
   }
 
   private addBackButton() {

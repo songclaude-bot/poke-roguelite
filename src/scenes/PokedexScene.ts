@@ -5,6 +5,7 @@ import { SPECIES, PokemonSpecies, LEVELUP_SKILLS } from "../core/pokemon-data";
 import { PokemonType } from "../core/type-chart";
 import { SKILL_DB } from "../core/skill";
 import { getEvolutionChain, hasEvolutionChain, EvolutionNode } from "../core/evolution-chain";
+import { SPRITE_DEX } from "../core/sprite-map";
 
 /** Color map for Pokemon types */
 const TYPE_COLORS: Record<string, string> = {
@@ -44,9 +45,13 @@ export class PokedexScene extends Phaser.Scene {
     const seenSet = new Set(meta.pokemonSeen ?? []);
     const usedSet = new Set(meta.pokemonUsed ?? []);
 
-    // Build sorted species list (alphabetical by name)
+    // Build sorted species list (by Pokedex number)
     const allSpecies: PokemonSpecies[] = Object.values(SPECIES);
-    allSpecies.sort((a, b) => a.name.localeCompare(b.name));
+    allSpecies.sort((a, b) => {
+      const dexA = parseInt(SPRITE_DEX[a.id] ?? "9999", 10);
+      const dexB = parseInt(SPRITE_DEX[b.id] ?? "9999", 10);
+      return dexA - dexB;
+    });
 
     const totalCount = allSpecies.length;
     const seenCount = allSpecies.filter(sp => seenSet.has(sp.id)).length;
@@ -214,8 +219,8 @@ export class PokedexScene extends Phaser.Scene {
 
       if (isSeen) {
         // Seen Pokemon - show full info
-        const dexIdx = allSpecies.indexOf(sp) + 1;
-        const dexStr = String(dexIdx).padStart(4, "0");
+        const dexNum = SPRITE_DEX[sp.id] ?? "????";
+        const dexStr = dexNum;
         row.idxText.setText(dexStr).setColor("#555570").setY(centerY - 4);
 
         row.nameText.setText(sp.name).setColor("#e0e0e0").setY(centerY - 6);
