@@ -1262,7 +1262,7 @@ export class HubScene extends Phaser.Scene {
           .setFillStyle(isCurrent ? 0x3a3a1a : isUnlocked ? 0x1a1a2e : 0x111118, 0.95)
           .setStrokeStyle(1, isCurrent ? 0xfbbf24 : isUnlocked ? 0x334155 : 0x1a1a22);
         cell.nameT.setVisible(true)
-          .setText(isUnlocked ? s.name : `${s.unlock}`)
+          .setText(isUnlocked ? s.name : `[${s.unlock}]`)
           .setColor(isCurrent ? "#fbbf24" : isUnlocked ? "#d0d0e0" : "#333344")
           .setFontStyle(isCurrent ? "bold" : "normal");
 
