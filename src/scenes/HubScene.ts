@@ -13,6 +13,8 @@ import { getStorageItemCount, addToStorage } from "../core/crafting";
 import { SPECIES_ABILITIES, ABILITIES } from "../core/ability";
 import { getAbilityLevel } from "../core/ability-upgrade";
 import { STARTER_LIST } from "../core/starter-data";
+import { SPRITE_DEX } from "../core/sprite-map";
+import { SPECIES } from "../core/pokemon-data";
 import {
   getNGPlusLevel, canActivateNGPlus, activateNGPlus,
   getCurrentBonuses, getNextNGPlusRequirement,
@@ -295,66 +297,71 @@ export class HubScene extends Phaser.Scene {
       }
     }
 
-    // ── Bottom fixed buttons (high depth to stay on top) ──
+    // ── Bottom fixed area ──
     const currentStarter = this.meta.starter ?? "mudkip";
     const starterName = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
 
-    const fixedY = GAME_HEIGHT - 321;
-    const btnSpacing = 27;
-    // Solid background behind fixed buttons — covers from scroll end to bottom
-    const fixedBgTop = fixedY - 30;
+    const fixedY = GAME_HEIGHT - 262;
+    // Solid background behind fixed area
+    const fixedBgTop = fixedY - 14;
     const fixedBgH = GAME_HEIGHT - fixedBgTop;
     this.add.rectangle(GAME_WIDTH / 2, fixedBgTop + fixedBgH / 2, GAME_WIDTH, fixedBgH, 0x1a2744).setDepth(50);
 
+    // ── Starter button (prominent, with sprite placeholder) ──
     const starterBtnResult = this.createFixedButton(GAME_WIDTH / 2, fixedY, btnW, 28,
       `Starter: ${starterName}`, "Tap to change", "#f472b6",
       () => this.showStarterSelect()
     );
     this.starterLabel = starterBtnResult.titleText;
     this.starterDesc = starterBtnResult.descText;
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing, btnW, 28,
-      "Upgrade Shop", `Gold: ${this.meta.gold}`, "#fbbf24",
-      () => this.scene.start("UpgradeScene")
-    );
+
+    // ── Preparation grid (2 columns × 3 rows) ──
+    const gridTop = fixedY + 22;
+    const gridColW = 156;
+    const gridRowH = 25;
+    const gridGap = 4;
+    const gridLeft = GAME_WIDTH / 2 - gridColW - gridGap / 2;
+    const gridRight = GAME_WIDTH / 2 + gridGap / 2;
+
     const equippedHeldItem = this.meta.equippedHeldItem ? getHeldItem(this.meta.equippedHeldItem) : undefined;
-    const heldItemDesc = equippedHeldItem ? equippedHeldItem.name : "None equipped";
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 2, btnW, 28,
-      "Held Items", heldItemDesc, "#f59e0b",
-      () => this.scene.start("HeldItemScene")
-    );
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 3, btnW, 28,
-      "Move Tutor", "Teach new skills!", "#a855f7",
-      () => this.scene.start("MoveTutorScene")
-    );
     const starterAbility = SPECIES_ABILITIES[currentStarter] ?? SPECIES_ABILITIES["mudkip"];
     const abilityDef = ABILITIES[starterAbility];
     const abilityLv = getAbilityLevel(this.meta.abilityLevels, starterAbility);
-    const abilityDesc = abilityDef ? `${abilityDef.name} Lv.${abilityLv}` : "Enhance ability";
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 4, btnW, 28,
-      "Ability Dojo", abilityDesc, "#667eea",
-      () => this.scene.start("AbilityUpgradeScene")
-    );
     const storedItemCount = getStorageItemCount(this.meta.storage);
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 5, btnW, 28,
-      "Item Forge", `Stored: ${storedItemCount} items`, "#ff8c42",
-      () => this.scene.start("CraftingScene")
-    );
     const talentPoints = getTotalTalentPoints(this.meta.talentLevels ?? {});
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 6, btnW, 28,
-      "Talents", talentPoints > 0 ? `${talentPoints} points invested` : "Permanent bonuses", "#fbbf24",
-      () => this.scene.start("TalentTreeScene")
-    );
-    const seenCount = (this.meta.pokemonSeen ?? []).length;
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 7, btnW, 28,
-      "Pokedex", `Seen: ${seenCount} Pokemon`, "#e879f9",
-      () => this.scene.start("PokedexScene")
-    );
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 8, btnW, 28,
-      "Records", `Clears: ${this.meta.totalClears}  Best: B${this.meta.bestFloor}F`, "#60a5fa",
-      () => this.scene.start("AchievementScene")
-    );
 
-    // ── Quests Button ──
+    const prepItems: { label: string; color: string; scene: string }[] = [
+      { label: "Shop", color: "#fbbf24", scene: "UpgradeScene" },
+      { label: equippedHeldItem ? `Item: ${equippedHeldItem.name.slice(0, 8)}` : "Held Item", color: "#f59e0b", scene: "HeldItemScene" },
+      { label: "Move Tutor", color: "#a855f7", scene: "MoveTutorScene" },
+      { label: abilityDef ? `${abilityDef.name.slice(0, 8)} Lv${abilityLv}` : "Ability", color: "#667eea", scene: "AbilityUpgradeScene" },
+      { label: `Forge (${storedItemCount})`, color: "#ff8c42", scene: "CraftingScene" },
+      { label: talentPoints > 0 ? `Talents (${talentPoints})` : "Talents", color: "#fbbf24", scene: "TalentTreeScene" },
+    ];
+
+    for (let i = 0; i < prepItems.length; i++) {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const px = (col === 0 ? gridLeft : gridRight) + gridColW / 2;
+      const py = gridTop + row * (gridRowH + gridGap) + gridRowH / 2;
+      const item = prepItems[i];
+
+      const bg = this.add.rectangle(px, py, gridColW, gridRowH, 0x1a1a2e, 0.9)
+        .setStrokeStyle(1, 0x334155).setDepth(51)
+        .setInteractive({ useHandCursor: true });
+      bg.on("pointerover", () => bg.setFillStyle(0x2a2a4e, 1));
+      bg.on("pointerout", () => bg.setFillStyle(0x1a1a2e, 0.9));
+      bg.on("pointerdown", () => this.scene.start(item.scene));
+
+      this.add.text(px, py, item.label, {
+        fontSize: "10px", color: item.color, fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(52);
+    }
+
+    // ── Info row (Pokedex, Records, Quests — compact bottom row) ──
+    const infoY = gridTop + 3 * (gridRowH + gridGap) + 4;
+    const seenCount = (this.meta.pokemonSeen ?? []).length;
+
     // Refresh daily quests if date changed
     const today = getTodayDateString();
     if (this.meta.questLastDate !== today) {
@@ -368,29 +375,43 @@ export class HubScene extends Phaser.Scene {
 
     const allQuests = [...(this.meta.activeQuests ?? []), ...(this.meta.challengeQuests ?? [])];
     const claimableCount = allQuests.filter(q => q.completed && !q.claimed).length;
-    const questDesc = claimableCount > 0 ? `${claimableCount} ready to claim!` : "Daily & challenge missions";
-    const questBtnResult = this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 9, btnW, 28,
-      "Quests", questDesc, "#10b981",
-      () => this.scene.start("QuestBoardScene")
-    );
 
-    // Notification badge for claimable quests
-    if (claimableCount > 0) {
-      const badgeX = GAME_WIDTH / 2 + btnW / 2 - 16;
-      const badgeY = fixedY + btnSpacing * 9 - 8;
-      const badge = this.add.circle(badgeX, badgeY, 7, 0xef4444).setDepth(53);
-      const badgeText = this.add.text(badgeX, badgeY, String(claimableCount), {
-        fontSize: "8px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
-      }).setOrigin(0.5).setDepth(54);
-      // Pulse animation
-      this.tweens.add({
-        targets: badge,
-        scaleX: { from: 1, to: 1.3 },
-        scaleY: { from: 1, to: 1.3 },
-        duration: 600,
-        yoyo: true,
-        repeat: -1,
-      });
+    const infoItems: { label: string; color: string; scene: string; badge?: number }[] = [
+      { label: `Pokedex (${seenCount})`, color: "#e879f9", scene: "PokedexScene" },
+      { label: "Records", color: "#60a5fa", scene: "AchievementScene" },
+      { label: "Quests", color: "#10b981", scene: "QuestBoardScene", badge: claimableCount },
+    ];
+
+    const infoColW = Math.floor((btnW - 8) / 3);
+    for (let i = 0; i < infoItems.length; i++) {
+      const px = GAME_WIDTH / 2 - btnW / 2 + 4 + i * (infoColW + 4) + infoColW / 2;
+      const item = infoItems[i];
+
+      const bg = this.add.rectangle(px, infoY, infoColW, 22, 0x1a1a2e, 0.9)
+        .setStrokeStyle(1, 0x334155).setDepth(51)
+        .setInteractive({ useHandCursor: true });
+      bg.on("pointerover", () => bg.setFillStyle(0x2a2a4e, 1));
+      bg.on("pointerout", () => bg.setFillStyle(0x1a1a2e, 0.9));
+      bg.on("pointerdown", () => this.scene.start(item.scene));
+
+      this.add.text(px, infoY, item.label, {
+        fontSize: "9px", color: item.color, fontFamily: "monospace",
+      }).setOrigin(0.5).setDepth(52);
+
+      // Notification badge
+      if (item.badge && item.badge > 0) {
+        const badgeX = px + infoColW / 2 - 6;
+        const badgeY2 = infoY - 8;
+        const badge = this.add.circle(badgeX, badgeY2, 6, 0xef4444).setDepth(53);
+        this.add.text(badgeX, badgeY2, String(item.badge), {
+          fontSize: "7px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
+        }).setOrigin(0.5).setDepth(54);
+        this.tweens.add({
+          targets: badge,
+          scaleX: { from: 1, to: 1.3 }, scaleY: { from: 1, to: 1.3 },
+          duration: 600, yoyo: true, repeat: -1,
+        });
+      }
     }
 
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 8, "v4.4.0", {
@@ -1057,34 +1078,133 @@ export class HubScene extends Phaser.Scene {
 
     // Dark overlay
     const overlay = this.add.rectangle(
-      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.85
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.9
     ).setDepth(200).setInteractive();
     uiItems.push(overlay);
 
     // Title
-    const title = this.add.text(GAME_WIDTH / 2, 20, "Choose Starter", {
-      fontSize: "14px", color: "#f472b6", fontFamily: "monospace", fontStyle: "bold",
+    const title = this.add.text(GAME_WIDTH / 2, 16, "Choose Starter", {
+      fontSize: "13px", color: "#f472b6", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5).setDepth(201);
     uiItems.push(title);
 
-    // Close button (top-right, always visible)
-    const closeBtn = this.add.text(GAME_WIDTH - 12, 20, "✕", {
-      fontSize: "18px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
+    // Close button (top-right)
+    const closeBtn = this.add.text(GAME_WIDTH - 16, 16, "✕", {
+      fontSize: "16px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5).setDepth(210).setInteractive({ useHandCursor: true });
     uiItems.push(closeBtn);
 
     const starters = this.getStarterList();
-    const current = this.meta.starter ?? "mudkip";
 
-    // Grid configuration
+    // ── Preview panel (top area, shows selected starter info + sprite) ──
+    const PREVIEW_H = 80;
+    const PREVIEW_TOP = 30;
+    const previewBg = this.add.rectangle(GAME_WIDTH / 2, PREVIEW_TOP + PREVIEW_H / 2, GAME_WIDTH - 16, PREVIEW_H, 0x111122, 0.95)
+      .setStrokeStyle(1, 0x334155).setDepth(201);
+    uiItems.push(previewBg);
+
+    const previewName = this.add.text(GAME_WIDTH / 2 + 10, PREVIEW_TOP + 12, "", {
+      fontSize: "14px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(202);
+    uiItems.push(previewName);
+
+    const previewInfo = this.add.text(GAME_WIDTH / 2 + 10, PREVIEW_TOP + 32, "", {
+      fontSize: "9px", color: "#94a3b8", fontFamily: "monospace",
+    }).setOrigin(0.5).setDepth(202);
+    uiItems.push(previewInfo);
+
+    // Confirm button (hidden until a different starter is selected)
+    const confirmBtn = this.add.text(GAME_WIDTH / 2 + 10, PREVIEW_TOP + 56, "", {
+      fontSize: "11px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+      backgroundColor: "#1a3a2e", padding: { x: 12, y: 4 },
+    }).setOrigin(0.5).setDepth(202).setVisible(false);
+    uiItems.push(confirmBtn);
+
+    // Sprite display area (left side of preview)
+    let previewSprite: Phaser.GameObjects.Sprite | Phaser.GameObjects.Text | null = null;
+    const SPRITE_X = 40;
+    const SPRITE_Y = PREVIEW_TOP + PREVIEW_H / 2;
+
+    let pendingStarter: string | null = null; // starter awaiting confirmation
+
+    const showPreview = (starterId: string) => {
+      const s = starters.find(st => st.id === starterId);
+      if (!s) return;
+      const sp = SPECIES[starterId];
+      const isCurrent = starterId === (this.meta.starter ?? "mudkip");
+
+      previewName.setText(s.name);
+      const typeStr = sp ? sp.types.join("/") : "";
+      const statStr = sp ? `HP:${sp.baseStats.hp} ATK:${sp.baseStats.atk} DEF:${sp.baseStats.def}` : "";
+      previewInfo.setText(`${typeStr}  ${statStr}`);
+
+      if (isCurrent) {
+        confirmBtn.setVisible(false);
+        pendingStarter = null;
+      } else {
+        confirmBtn.setText("  Select  ").setVisible(true).setInteractive({ useHandCursor: true });
+        pendingStarter = starterId;
+      }
+
+      // Show sprite if loaded, else load it
+      if (previewSprite) { previewSprite.destroy(); previewSprite = null; }
+      const textureKey = `${starterId}-idle`;
+      if (this.textures.exists(textureKey)) {
+        previewSprite = this.add.sprite(SPRITE_X, SPRITE_Y, textureKey, 0)
+          .setScale(2).setDepth(203);
+        uiItems.push(previewSprite);
+      } else {
+        // Try to load the sprite dynamically
+        const dexNum = SPRITE_DEX[starterId];
+        if (dexNum && sp) {
+          this.load.spritesheet(textureKey, `sprites/${dexNum}/Idle-Anim.png`, {
+            frameWidth: sp.idleFrameWidth, frameHeight: sp.idleFrameHeight,
+          });
+          this.load.once("complete", () => {
+            if (!starterSelectActive) return;
+            if (previewSprite) previewSprite.destroy();
+            if (this.textures.exists(textureKey)) {
+              previewSprite = this.add.sprite(SPRITE_X, SPRITE_Y, textureKey, 0)
+                .setScale(2).setDepth(203);
+              uiItems.push(previewSprite);
+            }
+          });
+          this.load.start();
+        }
+        // Show placeholder while loading
+        previewSprite = this.add.text(SPRITE_X, SPRITE_Y, "?", {
+          fontSize: "28px", color: "#555570", fontFamily: "monospace",
+        }).setOrigin(0.5).setDepth(203);
+        uiItems.push(previewSprite);
+      }
+    };
+
+    // Show current starter initially
+    showPreview(this.meta.starter ?? "mudkip");
+
+    // Confirm handler
+    confirmBtn.on("pointerdown", () => {
+      if (!pendingStarter) return;
+      this.meta.starter = pendingStarter;
+      saveMeta(this.meta);
+      const name = pendingStarter.charAt(0).toUpperCase() + pendingStarter.slice(1);
+      if (this.starterLabel) this.starterLabel.setText(`Starter: ${name}`);
+      confirmBtn.setVisible(false);
+      pendingStarter = null;
+      buildGrid(); // refresh grid to update highlight
+      gridContainer.y = scrollOffset;
+      showPreview(this.meta.starter!);
+    });
+
+    // ── Grid configuration ──
     const COLS = 4;
     const CELL_W = 82;
-    const CELL_H = 34;
+    const CELL_H = 30;
     const GAP_X = 4;
-    const GAP_Y = 4;
+    const GAP_Y = 3;
     const GRID_LEFT = (GAME_WIDTH - COLS * (CELL_W + GAP_X) + GAP_X) / 2;
-    const VISIBLE_TOP = 40;
-    const VISIBLE_BOTTOM = GAME_HEIGHT - 40;
+    const VISIBLE_TOP = PREVIEW_TOP + PREVIEW_H + 6;
+    const VISIBLE_BOTTOM = GAME_HEIGHT - 10;
     const VISIBLE_H = VISIBLE_BOTTOM - VISIBLE_TOP;
     const ROWS = Math.ceil(starters.length / COLS);
     const TOTAL_H = ROWS * (CELL_H + GAP_Y);
@@ -1100,22 +1220,18 @@ export class HubScene extends Phaser.Scene {
     const gridContainer = this.add.container(0, 0).setDepth(202).setMask(mask);
     uiItems.push(gridContainer);
 
-    // Create all grid cells
-    const cells: { bg: Phaser.GameObjects.Rectangle; nameT: Phaser.GameObjects.Text; starterIdx: number }[] = [];
-
     const buildGrid = () => {
       gridContainer.removeAll(true);
-      cells.length = 0;
 
       for (let i = 0; i < starters.length; i++) {
         const s = starters[i];
         const col = i % COLS;
         const row = Math.floor(i / COLS);
         const cx = GRID_LEFT + col * (CELL_W + GAP_X) + CELL_W / 2;
-        const cy = VISIBLE_TOP + 4 + row * (CELL_H + GAP_Y) + CELL_H / 2;
+        const cy = VISIBLE_TOP + 2 + row * (CELL_H + GAP_Y) + CELL_H / 2;
 
         const isUnlocked = this.meta.totalClears >= s.unlock;
-        const isCurrent = s.id === current;
+        const isCurrent = s.id === (this.meta.starter ?? "mudkip");
 
         const bgColor = isCurrent ? 0x3a3a1a : isUnlocked ? 0x1a1a2e : 0x111118;
         const strokeColor = isCurrent ? 0xfbbf24 : isUnlocked ? 0x334155 : 0x1a1a22;
@@ -1125,27 +1241,20 @@ export class HubScene extends Phaser.Scene {
           .setStrokeStyle(1, strokeColor);
         gridContainer.add(bg);
 
-        const label = isUnlocked ? s.name : "???";
+        const label = isUnlocked ? s.name : `🔒${s.unlock}`;
         const nameT = this.add.text(cx, cy, label, {
           fontSize: "9px", color: textColor, fontFamily: "monospace",
           fontStyle: isCurrent ? "bold" : "normal",
         }).setOrigin(0.5);
         gridContainer.add(nameT);
 
-        if (isUnlocked && !isCurrent) {
+        if (isUnlocked) {
           bg.setInteractive({ useHandCursor: true });
           bg.on("pointerup", (ptr: Phaser.Input.Pointer) => {
             if (ptr.getDistance() > 10) return; // scroll, not tap
-            this.meta.starter = s.id;
-            saveMeta(this.meta);
-            const name = s.name.charAt(0).toUpperCase() + s.name.slice(1);
-            if (this.starterLabel) this.starterLabel.setText(`Starter: ${name}`);
-            buildGrid();
-            gridContainer.y = scrollOffset;
+            showPreview(s.id);
           });
         }
-
-        cells.push({ bg, nameT, starterIdx: i });
       }
     };
 
@@ -1155,7 +1264,7 @@ export class HubScene extends Phaser.Scene {
     let scrollOffset = 0;
 
     // Auto-scroll to current starter
-    const currentIdx = starters.findIndex(s => s.id === current);
+    const currentIdx = starters.findIndex(s => s.id === (this.meta.starter ?? "mudkip"));
     if (currentIdx >= 0) {
       const currentRow = Math.floor(currentIdx / COLS);
       const targetY = currentRow * (CELL_H + GAP_Y);
@@ -1165,7 +1274,7 @@ export class HubScene extends Phaser.Scene {
 
     // Scroll indicator
     const indicator = this.add.rectangle(
-      GAME_WIDTH - 4, VISIBLE_TOP, 3,
+      GAME_WIDTH - 3, VISIBLE_TOP, 3,
       Math.max(20, (VISIBLE_H / TOTAL_H) * VISIBLE_H),
       0x667eea, 0.5
     ).setOrigin(0.5, 0).setDepth(203).setVisible(MAX_SCROLL > 0);
