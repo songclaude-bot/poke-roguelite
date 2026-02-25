@@ -7,6 +7,7 @@ export enum ItemCategory {
   Seed = "seed",
   Orb = "orb",
   TM = "tm",
+  Gem = "gem",
 }
 
 export enum ItemTarget {
@@ -25,6 +26,8 @@ export interface ItemDef {
   stackable: boolean;
   /** For TM items — the skill ID this TM teaches */
   tmSkillId?: string;
+  /** For Gem items — the gem ID in TYPE_GEMS */
+  gemId?: string;
 }
 
 export interface ItemStack {
@@ -367,6 +370,79 @@ export const ITEM_DB: Record<string, ItemDef> = {
     stackable: false,
     tmSkillId: "earthPower",
   },
+  // ── Type Gems ──
+  fireGem: {
+    id: "fireGem", name: "Fire Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Fire-type moves by 50% for the current floor.", stackable: true, gemId: "fireGem",
+  },
+  waterGem: {
+    id: "waterGem", name: "Water Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Water-type moves by 50% for the current floor.", stackable: true, gemId: "waterGem",
+  },
+  grassGem: {
+    id: "grassGem", name: "Grass Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Grass-type moves by 50% for the current floor.", stackable: true, gemId: "grassGem",
+  },
+  electricGem: {
+    id: "electricGem", name: "Electric Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Electric-type moves by 50% for the current floor.", stackable: true, gemId: "electricGem",
+  },
+  iceGem: {
+    id: "iceGem", name: "Ice Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Ice-type moves by 50% for the current floor.", stackable: true, gemId: "iceGem",
+  },
+  fightingGem: {
+    id: "fightingGem", name: "Fighting Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Fighting-type moves by 50% for the current floor.", stackable: true, gemId: "fightingGem",
+  },
+  poisonGem: {
+    id: "poisonGem", name: "Poison Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Poison-type moves by 50% for the current floor.", stackable: true, gemId: "poisonGem",
+  },
+  groundGem: {
+    id: "groundGem", name: "Ground Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Ground-type moves by 50% for the current floor.", stackable: true, gemId: "groundGem",
+  },
+  flyingGem: {
+    id: "flyingGem", name: "Flying Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Flying-type moves by 50% for the current floor.", stackable: true, gemId: "flyingGem",
+  },
+  psychicGem: {
+    id: "psychicGem", name: "Psychic Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Psychic-type moves by 50% for the current floor.", stackable: true, gemId: "psychicGem",
+  },
+  bugGem: {
+    id: "bugGem", name: "Bug Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Bug-type moves by 50% for the current floor.", stackable: true, gemId: "bugGem",
+  },
+  rockGem: {
+    id: "rockGem", name: "Rock Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Rock-type moves by 50% for the current floor.", stackable: true, gemId: "rockGem",
+  },
+  ghostGem: {
+    id: "ghostGem", name: "Ghost Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Ghost-type moves by 50% for the current floor.", stackable: true, gemId: "ghostGem",
+  },
+  dragonGem: {
+    id: "dragonGem", name: "Dragon Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Dragon-type moves by 50% for the current floor.", stackable: true, gemId: "dragonGem",
+  },
+  darkGem: {
+    id: "darkGem", name: "Dark Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Dark-type moves by 50% for the current floor.", stackable: true, gemId: "darkGem",
+  },
+  steelGem: {
+    id: "steelGem", name: "Steel Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Steel-type moves by 50% for the current floor.", stackable: true, gemId: "steelGem",
+  },
+  fairyGem: {
+    id: "fairyGem", name: "Fairy Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Fairy-type moves by 50% for the current floor.", stackable: true, gemId: "fairyGem",
+  },
+  normalGem: {
+    id: "normalGem", name: "Normal Gem", category: ItemCategory.Gem, target: ItemTarget.Self,
+    description: "Boosts Normal-type moves by 50% for the current floor.", stackable: true, gemId: "normalGem",
+  },
 };
 
 /** Items that can spawn on dungeon floors, with relative weights */
@@ -403,6 +479,25 @@ export const FLOOR_ITEM_TABLE: { itemId: string; weight: number }[] = [
   { itemId: "gravelrock", weight: 8 },
   { itemId: "xAttack", weight: 5 },
   { itemId: "xDefend", weight: 5 },
+  // Type Gems (6 common types, low weight — rare consumables)
+  { itemId: "fireGem", weight: 2 },
+  { itemId: "waterGem", weight: 2 },
+  { itemId: "grassGem", weight: 2 },
+  { itemId: "electricGem", weight: 2 },
+  { itemId: "iceGem", weight: 2 },
+  { itemId: "fightingGem", weight: 2 },
+  { itemId: "poisonGem", weight: 1 },
+  { itemId: "groundGem", weight: 1 },
+  { itemId: "flyingGem", weight: 1 },
+  { itemId: "psychicGem", weight: 1 },
+  { itemId: "bugGem", weight: 1 },
+  { itemId: "rockGem", weight: 1 },
+  { itemId: "ghostGem", weight: 1 },
+  { itemId: "dragonGem", weight: 1 },
+  { itemId: "darkGem", weight: 1 },
+  { itemId: "steelGem", weight: 1 },
+  { itemId: "fairyGem", weight: 1 },
+  { itemId: "normalGem", weight: 1 },
 ];
 
 /** Pick a random item from the floor table */

@@ -24,7 +24,8 @@ import { Skill, SkillRange, SkillEffect, SKILL_DB, createSkill } from "../core/s
 import { getSkillTargetTiles } from "../core/skill-targeting";
 import { getEvolution } from "../core/evolution";
 import { distributeAllyExp, AllyLevelUpResult } from "../core/ally-evolution";
-import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY, ITEM_DB } from "../core/item";
+import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY, ITEM_DB, ItemCategory } from "../core/item";
+import { getTypeGem, TypeGem } from "../core/type-gems";
 import { SPECIES, PokemonSpecies, createSpeciesSkills, getLearnableSkill } from "../core/pokemon-data";
 import { DungeonDef, BossDef, getDungeon, getDungeonFloorEnemies, CHALLENGE_MODES } from "../core/dungeon-data";
 import { expFromEnemy, processLevelUp } from "../core/leveling";
@@ -130,6 +131,10 @@ import {
   ShrineType, Shrine, ShrineChoice, ShrineEffect,
   generateShrine, shouldSpawnShrine,
 } from "../core/dungeon-shrines";
+import {
+  RescueOption, MAX_RESCUES_PER_RUN,
+  getRescueOptions,
+} from "../core/rescue-system";
 
 interface AllyData {
   speciesId: string;
@@ -255,6 +260,8 @@ export class DungeonScene extends Phaser.Scene {
   // Game state
   private gameOver = false;
   private enemiesDefeated = 0;
+  // Rescue system — second chance on faint
+  private rescueCount = 0;
   // Quest tracking
   private questItemsCollected = 0;
   private questItemsUsed = false;
@@ -504,6 +511,10 @@ export class DungeonScene extends Phaser.Scene {
   private shrineGraphic: Phaser.GameObjects.Graphics | null = null;
   private shrineMarker: Phaser.GameObjects.Text | null = null;
 
+  // Type Gem state (per-floor: active type boosts, cleared on each new floor)
+  private activeTypeGems: Map<string, number> = new Map(); // PokemonType -> boostPercent
+  private typeGemHudIcons: Phaser.GameObjects.Text[] = [];
+
   constructor() {
     super({ key: "DungeonScene" });
   }
@@ -690,6 +701,9 @@ export class DungeonScene extends Phaser.Scene {
     this.shrineOpen = false;
     this.shrineGraphic = null;
     this.shrineMarker = null;
+    // Reset type gem boosts (per-floor)
+    this.activeTypeGems = new Map();
+    this.typeGemHudIcons = [];
     // Reset combo state on new floor
     this.recentSkillIds = [];
     this.comboDoubleDamage = false;
@@ -1734,8 +1748,8 @@ export class DungeonScene extends Phaser.Scene {
       if (ix === playerStart.x && iy === playerStart.y) continue;
 
       const item = rollFloorItem();
-      const icon = item.category === "berry" ? "●" : item.category === "seed" ? "◆" : "★";
-      const color = item.category === "berry" ? "#ff6b9d" : item.category === "seed" ? "#4ade80" : "#60a5fa";
+      const icon = item.category === "berry" ? "●" : item.category === "seed" ? "◆" : item.category === "gem" ? "◇" : "★";
+      const color = item.category === "berry" ? "#ff6b9d" : item.category === "seed" ? "#4ade80" : item.category === "gem" ? "#ddaaff" : "#60a5fa";
       const sprite = this.add.text(
         ix * TILE_DISPLAY + TILE_DISPLAY / 2,
         iy * TILE_DISPLAY + TILE_DISPLAY / 2,
@@ -1888,8 +1902,8 @@ export class DungeonScene extends Phaser.Scene {
             if (ix === stairsPos.x && iy === stairsPos.y) continue;
 
             const item = rollFloorItem();
-            const icon = item.category === "berry" ? "●" : item.category === "seed" ? "◆" : "★";
-            const color = item.category === "berry" ? "#ff6b9d" : item.category === "seed" ? "#4ade80" : "#60a5fa";
+            const icon = item.category === "berry" ? "●" : item.category === "seed" ? "◆" : item.category === "gem" ? "◇" : "★";
+            const color = item.category === "berry" ? "#ff6b9d" : item.category === "seed" ? "#4ade80" : item.category === "gem" ? "#ddaaff" : "#60a5fa";
             const sprite = this.add.text(
               ix * TILE_DISPLAY + TILE_DISPLAY / 2,
               iy * TILE_DISPLAY + TILE_DISPLAY / 2,
@@ -2331,7 +2345,7 @@ export class DungeonScene extends Phaser.Scene {
         if (terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
 
         const item = rollFloorItem();
-        const icon = item.category === "berry" ? "\u25CF" : item.category === "seed" ? "\u25C6" : "\u2605";
+        const icon = item.category === "berry" ? "\u25CF" : item.category === "seed" ? "\u25C6" : item.category === "gem" ? "\u25C7" : "\u2605";
         const color = "#fde68a"; // golden tint for treasure items
         const sprite = this.add.text(
           ix * TILE_DISPLAY + TILE_DISPLAY / 2,
@@ -2535,6 +2549,7 @@ export class DungeonScene extends Phaser.Scene {
     this.updateHUD();
     this.updateRelicHUD();
     this.updateBlessingHUD();
+    this.updateTypeGemHUD();
 
     // Grant a random blessing/curse every 5 floors (starting floor 5)
     if (this.currentFloor > 1 && this.currentFloor % 5 === 0 && this.activeBlessings.length < 5) {
@@ -4213,7 +4228,7 @@ export class DungeonScene extends Phaser.Scene {
         hud.quickSlotBtn.textContent = "✕";
         hud.quickSlotBtn.style.color = "#555570";
       } else {
-        const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : "★";
+        const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : stack.item.category === "gem" ? "◇" : "★";
         const countStr = stack.count > 1 ? `${stack.count}` : "";
         hud.quickSlotBtn.textContent = `${icon}${countStr}`;
         hud.quickSlotBtn.style.color = "#4ade80";
@@ -4366,7 +4381,7 @@ export class DungeonScene extends Phaser.Scene {
     } else {
       this.inventory.forEach((stack, i) => {
         const y = 60 + i * 32;
-        const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : "★";
+        const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : stack.item.category === "gem" ? "◇" : "★";
         const countStr = stack.count > 1 ? ` x${stack.count}` : "";
         // Show sell price next to item name when in shop room
         const sellStr = inShopForSell ? ` (Sell: ${getItemSellPrice(stack.item.id, this.currentFloor)}G)` : "";
@@ -4458,7 +4473,7 @@ export class DungeonScene extends Phaser.Scene {
       this.quickSlotBtn.setColor("#555570");
       return;
     }
-    const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : "★";
+    const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : stack.item.category === "gem" ? "◇" : "★";
     const countStr = stack.count > 1 ? `${stack.count}` : "";
     this.quickSlotBtn.setText(`${icon}${countStr}`);
     this.quickSlotBtn.setColor("#4ade80");
@@ -4896,6 +4911,17 @@ export class DungeonScene extends Phaser.Scene {
         break;
       }
       default: {
+        // Type Gem handling
+        if (item.category === ItemCategory.Gem && item.gemId) {
+          const gem = getTypeGem(item.gemId);
+          if (gem) {
+            this.activeTypeGems.set(gem.type, gem.boostPercent);
+            sfxBuff();
+            this.showLog(`Used ${gem.name}! ${gem.type}-type moves boosted by ${gem.boostPercent}% this floor!`);
+            this.updateTypeGemHUD();
+            break;
+          }
+        }
         // TM handling
         if (item.tmSkillId) {
           this.useTM(index, item);
@@ -6755,8 +6781,8 @@ export class DungeonScene extends Phaser.Scene {
       if (this.dungeon.terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
 
       const item = rollFloorItem();
-      const icon = item.category === "berry" ? "●" : item.category === "seed" ? "◆" : "★";
-      const color = item.category === "berry" ? "#ff6b9d" : item.category === "seed" ? "#4ade80" : "#60a5fa";
+      const icon = item.category === "berry" ? "●" : item.category === "seed" ? "◆" : item.category === "gem" ? "◇" : "★";
+      const color = item.category === "berry" ? "#ff6b9d" : item.category === "seed" ? "#4ade80" : item.category === "gem" ? "#ddaaff" : "#60a5fa";
       const sprite = this.add.text(
         ix * TILE_DISPLAY + TILE_DISPLAY / 2,
         iy * TILE_DISPLAY + TILE_DISPLAY / 2,
@@ -8796,6 +8822,181 @@ export class DungeonScene extends Phaser.Scene {
 
   private showGameOver() {
     this.stopAutoExplore();
+
+    // Check if rescue is available before committing to game over
+    const meta = loadMeta();
+    const rescueGold = meta.gold + this.gold; // meta (saved) gold + run gold
+    const options = getRescueOptions(this.currentFloor, this.dungeonDef.difficulty, rescueGold);
+    if (this.rescueCount < MAX_RESCUES_PER_RUN && options.length > 0) {
+      // Pause the game but don't finalize game over yet
+      stopBgm();
+      this.showRescuePrompt(options, rescueGold);
+      return;
+    }
+
+    // No rescue available — proceed to final game over
+    this.showGameOverScreen();
+  }
+
+  /**
+   * Rescue prompt overlay — shown when the player faints but can afford a rescue.
+   * Displays rescue options as buttons and a "Give up" fallback.
+   */
+  private showRescuePrompt(options: RescueOption[], availableGold: number) {
+    const rescueUI: Phaser.GameObjects.GameObject[] = [];
+
+    // Dark overlay
+    const bg = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2,
+      GAME_WIDTH, GAME_HEIGHT,
+      0x000000, 0.8
+    ).setScrollFactor(0).setDepth(200).setInteractive();
+    rescueUI.push(bg);
+
+    // Title
+    const title = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 90, "You've been knocked out!", {
+      fontSize: "16px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    rescueUI.push(title);
+
+    // Subtitle with remaining rescues
+    const remaining = MAX_RESCUES_PER_RUN - this.rescueCount;
+    const subtitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 68, `Rescue available! (${remaining} left this run)`, {
+      fontSize: "10px", color: "#fbbf24", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    rescueUI.push(subtitle);
+
+    // Gold display
+    const goldInfo = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 52, `Your Gold: ${availableGold}G`, {
+      fontSize: "10px", color: "#fde68a", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    rescueUI.push(goldInfo);
+
+    // Rescue option buttons
+    let yOffset = GAME_HEIGHT / 2 - 28;
+    for (const option of options) {
+      // Option button background
+      const btnBg = this.add.rectangle(
+        GAME_WIDTH / 2, yOffset + 12, 280, 44,
+        0x1e293b, 0.9
+      ).setScrollFactor(0).setDepth(201).setInteractive();
+      rescueUI.push(btnBg);
+
+      // Option label
+      const labelColor = option.hpPercent >= 100 ? "#34d399" : "#60a5fa";
+      const labelText = this.add.text(GAME_WIDTH / 2, yOffset + 4, option.label, {
+        fontSize: "13px", color: labelColor, fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+      rescueUI.push(labelText);
+
+      // Option description
+      const descText = this.add.text(GAME_WIDTH / 2, yOffset + 20, option.description, {
+        fontSize: "9px", color: "#94a3b8", fontFamily: "monospace",
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+      rescueUI.push(descText);
+
+      // Border highlight on hover
+      btnBg.on("pointerover", () => btnBg.setStrokeStyle(1, 0x60a5fa));
+      btnBg.on("pointerout", () => btnBg.setStrokeStyle(0));
+
+      // Handle rescue selection
+      const selectedOption = option;
+      btnBg.on("pointerdown", () => {
+        for (const el of rescueUI) el.destroy();
+        this.executeRescue(selectedOption);
+      });
+
+      yOffset += 52;
+    }
+
+    // "Give up" button
+    const giveUpY = yOffset + 16;
+    const giveUpText = this.add.text(GAME_WIDTH / 2, giveUpY, "[Give Up]", {
+      fontSize: "14px", color: "#6b7280", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
+    rescueUI.push(giveUpText);
+
+    giveUpText.on("pointerover", () => giveUpText.setColor("#ef4444"));
+    giveUpText.on("pointerout", () => giveUpText.setColor("#6b7280"));
+    giveUpText.on("pointerdown", () => {
+      for (const el of rescueUI) el.destroy();
+      this.showGameOverScreen();
+    });
+  }
+
+  /**
+   * Execute a rescue: deduct gold, restore HP, optionally remove items, clear enemies, resume play.
+   */
+  private executeRescue(option: RescueOption) {
+    const meta = loadMeta();
+    let costRemaining = option.goldCost;
+
+    // First deduct from run gold, then from meta gold
+    if (this.gold >= costRemaining) {
+      this.gold -= costRemaining;
+      costRemaining = 0;
+    } else {
+      costRemaining -= this.gold;
+      this.gold = 0;
+      meta.gold = Math.max(0, meta.gold - costRemaining);
+      saveMeta(meta);
+    }
+
+    // Increment rescue count
+    this.rescueCount++;
+
+    // Restore HP
+    this.player.stats.hp = Math.floor(this.player.stats.maxHp * option.hpPercent / 100);
+    this.player.alive = true;
+    if (this.player.sprite) {
+      this.player.sprite.setAlpha(1);
+    }
+
+    // If basic rescue, remove half the inventory items randomly
+    if (!option.keepItems && this.inventory.length > 0) {
+      const removeCount = Math.floor(this.inventory.length / 2);
+      for (let i = 0; i < removeCount; i++) {
+        const idx = Math.floor(Math.random() * this.inventory.length);
+        this.inventory.splice(idx, 1);
+      }
+    }
+
+    // Clear all enemies on the current floor
+    for (const enemy of this.enemies) {
+      if (enemy.sprite) enemy.sprite.destroy();
+    }
+    this.enemies = [];
+
+    // Ensure gameOver stays false (was not set since we intercepted before showGameOverScreen)
+    this.gameOver = false;
+
+    // Visual feedback: rescue flash
+    this.cameras.main.flash(600, 100, 200, 255);
+    if (this.player.sprite) {
+      this.player.sprite.setTint(0x64b5f6);
+      this.time.delayedCall(800, () => {
+        if (this.player.sprite) this.player.sprite.clearTint();
+      });
+    }
+
+    // Show rescue success message
+    this.showLog(`Rescue successful! Restored to ${option.hpPercent}% HP. (${MAX_RESCUES_PER_RUN - this.rescueCount} rescues left)`);
+
+    // Run log entry
+    this.runLog.add(RunLogEvent.PlayerDied, `Rescued on B${this.currentFloor}F (${option.label})`, this.currentFloor, this.turnManager.turn);
+
+    // Resume BGM
+    startBgm(this.dungeonDef.id);
+
+    // Update HUD to reflect HP/inventory changes
+    this.updateHUD();
+  }
+
+  /**
+   * Final game over screen — shown when rescue is declined or unavailable.
+   * Contains all the original game over logic (gold salvage, scoring, stats, buttons).
+   */
+  private showGameOverScreen() {
     this.gameOver = true;
     stopBgm();
     sfxGameOver();
@@ -9645,7 +9846,10 @@ export class DungeonScene extends Phaser.Scene {
       const relicTypeAdvMult = (attacker === this.player && effectiveness >= 2.0 && (this.relicEffects.typeAdvantageBonus ?? 0) > 0) ? (1 + this.relicEffects.typeAdvantageBonus) : 1.0;
       // Apply difficulty playerDamageMult when defender is the player
       const diffDmgMult = defender === this.player ? this.difficultyMods.playerDamageMult : 1.0;
-      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * scaledWMult * synergyBonus * critMult * relicTypeAdvMult * diffDmgMult));
+      // Type Gem boost: +50% if player has active gem matching attack type
+      const basicGemBoost = (attacker === this.player && this.activeTypeGems.has(attacker.attackType))
+        ? 1 + (this.activeTypeGems.get(attacker.attackType)! / 100) : 1.0;
+      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * scaledWMult * synergyBonus * critMult * relicTypeAdvMult * diffDmgMult * basicGemBoost));
       defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
 
       // Fire-type attacks thaw frozen targets
@@ -9673,6 +9877,7 @@ export class DungeonScene extends Phaser.Scene {
       if (abilityMult > 1) logMsg += " (Torrent!)";
       if (scaledWMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
       if (synergyBonus > 1.0) logMsg += " (Weather Synergy!)";
+      if (basicGemBoost > 1.0) logMsg += ` (${attacker.attackType} Gem!)`;
       this.showLog(logMsg);
 
       // Run log: damage dealt/taken (basic attack)
@@ -9835,7 +10040,10 @@ export class DungeonScene extends Phaser.Scene {
           const skillRelicTypeAdvMult = (user === this.player && effectiveness >= 2.0 && (this.relicEffects.typeAdvantageBonus ?? 0) > 0) ? (1 + this.relicEffects.typeAdvantageBonus) : 1.0;
           // Apply difficulty playerDamageMult when target is the player
           const skillDiffDmgMult = target === this.player ? this.difficultyMods.playerDamageMult : 1.0;
-          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * skillScaledWMult * skillSynergyBonus * skillCritMult * comboMult * skillRelicTypeAdvMult * skillDiffDmgMult));
+          // Type Gem boost: +50% if player has active gem matching skill type
+          const typeGemBoost = (user === this.player && this.activeTypeGems.has(skill.type))
+            ? 1 + (this.activeTypeGems.get(skill.type)! / 100) : 1.0;
+          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * skillScaledWMult * skillSynergyBonus * skillCritMult * comboMult * skillRelicTypeAdvMult * skillDiffDmgMult * typeGemBoost));
           target.stats.hp = Math.max(0, target.stats.hp - dmg);
 
           // Fire-type skills thaw frozen targets
@@ -9858,6 +10066,7 @@ export class DungeonScene extends Phaser.Scene {
           if (effText) logMsg += ` ${effText}`;
           if (skillScaledWMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
           if (skillSynergyBonus > 1.0) logMsg += " (Weather Synergy!)";
+          if (typeGemBoost > 1.0) logMsg += ` (${skill.type} Gem!)`;
           this.showLog(logMsg);
 
           // Run log: damage dealt/taken (skill attack)
@@ -12522,6 +12731,35 @@ export class DungeonScene extends Phaser.Scene {
       }).setScrollFactor(0).setDepth(100).setInteractive();
       ic.on("pointerdown", () => this.showBlessingInfoPopup(ab));
       this.blessingHudIcons.push(ic);
+    }
+  }
+
+  private updateTypeGemHUD() {
+    for (const ic of this.typeGemHudIcons) { if (ic && ic.scene) ic.destroy(); }
+    this.typeGemHudIcons = [];
+    if (this.activeTypeGems.size === 0) return;
+    // Position: row below relics/blessings
+    const startX = 8 + (this.activeRelics.length + this.activeBlessings.length) * 18;
+    let idx = 0;
+    for (const [type, boost] of this.activeTypeGems) {
+      const gemLabel = type.substring(0, 3).toUpperCase();
+      const ic = this.add.text(startX + idx * 28, 64, `${gemLabel}+${boost}%`, {
+        fontSize: "7px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
+        backgroundColor: "#0a0a0fcc", padding: { x: 2, y: 1 },
+      }).setScrollFactor(0).setDepth(100).setInteractive();
+      ic.on("pointerdown", () => {
+        const popup = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2,
+          `${type} Gem Active\n+${boost}% ${type}-type damage\n(this floor only)`, {
+          fontSize: "11px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
+          backgroundColor: "#0a0a0fee", padding: { x: 12, y: 8 },
+          wordWrap: { width: 250 }, align: "center",
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(500);
+        popup.setInteractive();
+        popup.on("pointerdown", () => popup.destroy());
+        this.time.delayedCall(3000, () => { if (popup.scene) popup.destroy(); });
+      });
+      this.typeGemHudIcons.push(ic);
+      idx++;
     }
   }
 
