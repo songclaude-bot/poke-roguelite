@@ -5192,6 +5192,18 @@ export const SKILL_DB: Record<string, Omit<Skill, "currentPp">> = {
     accuracy: 90,
     description: "Performs the final movement of a divine aria that blasts all nearby foes with sound waves.",
   },
+
+  // ── Phase 278: Legendary Encounter Special Moves ──
+  psychicBlast: {
+    id: "psychicBlast",
+    name: "Psychic Blast",
+    type: PokemonType.Psychic,
+    power: 25,
+    pp: 5,
+    range: SkillRange.Room,
+    accuracy: 90,
+    description: "Unleashes a devastating psychic shockwave across the room.",
+  },
 };
 
 /** Get default skills for a pokemon by sprite key */

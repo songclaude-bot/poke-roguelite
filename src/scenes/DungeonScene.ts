@@ -86,6 +86,11 @@ import {
   generatePuzzleTiles, getPuzzleTileCount,
   SWITCH_COLORS, SWITCH_LABELS,
 } from "../core/puzzle-rooms";
+import {
+  LegendaryEncounter,
+  shouldEncounterLegendary,
+  rollLegendaryEncounter,
+} from "../core/legendary-encounters";
 
 interface AllyData {
   speciesId: string;
@@ -343,6 +348,16 @@ export class DungeonScene extends Phaser.Scene {
   private challengeTurnLimit = 0; // speedrun: max turns allowed
   private challengeBadgeText: Phaser.GameObjects.Text | null = null;
 
+  // Legendary encounter state
+  private legendaryEncountered = false; // max 1 per run
+  private legendaryEntity: Entity | null = null;
+  private legendaryEncounter: LegendaryEncounter | null = null;
+  private legendaryHpBar: Phaser.GameObjects.Graphics | null = null;
+  private legendaryHpBg: Phaser.GameObjects.Graphics | null = null;
+  private legendaryNameText: Phaser.GameObjects.Text | null = null;
+  private legendaryParticleTimer: Phaser.Time.TimerEvent | null = null;
+  private legendaryParticleGraphics: Phaser.GameObjects.Graphics | null = null;
+
   // Dungeon modifier state
   private activeModifiers: DungeonModifier[] = [];
   private modifierEffects: ModifierEffects = getModifierEffects([]);
@@ -395,7 +410,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private persistentAllies: AllyData[] | null = null;
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number; scoreChain?: ScoreChain }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number; scoreChain?: ScoreChain; legendaryEncountered?: boolean }) {
     // Load D-Pad side preference
     try {
       const side = localStorage.getItem("poke-roguelite-dpadSide");
@@ -503,6 +518,15 @@ export class DungeonScene extends Phaser.Scene {
     this.bossHpBar = null;
     this.bossHpBg = null;
     this.bossNameText = null;
+    // Reset legendary encounter state (persist flag across floors)
+    this.legendaryEncountered = data?.legendaryEncountered ?? false;
+    this.legendaryEntity = null;
+    this.legendaryEncounter = null;
+    this.legendaryHpBar = null;
+    this.legendaryHpBg = null;
+    this.legendaryNameText = null;
+    this.legendaryParticleTimer = null;
+    this.legendaryParticleGraphics = null;
     // Reset gauntlet state
     this.gauntletActive = false;
     this.gauntletConfig = null;
@@ -1387,6 +1411,80 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Legendary Encounter check (rare mini-boss) ──
+    if (!this.bossEntity && !this.isBossRush && shouldEncounterLegendary(this.currentFloor, this.dungeonDef.floors, loadMeta(), this.legendaryEncountered)) {
+      const encounter = rollLegendaryEncounter(this.currentFloor, this.dungeonDef.difficulty);
+      const legendSp = SPECIES[encounter.speciesId];
+      if (legendSp) {
+        this.legendaryEncountered = true;
+        this.legendaryEncounter = encounter;
+
+        // Place legendary in the largest room (excluding player's room)
+        const legendaryRoom = rooms.slice(1).reduce((best, r) =>
+          (r.w * r.h > best.w * best.h) ? r : best, rooms[1]);
+        const lx = legendaryRoom.x + Math.floor(legendaryRoom.w / 2);
+        const ly = legendaryRoom.y + Math.floor(legendaryRoom.h / 2);
+
+        const baseStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, legendSp, this.ngPlusLevel);
+        const legendaryStats = {
+          hp: Math.floor(baseStats.hp * encounter.hpMultiplier * this.difficultyMods.enemyHpMult),
+          maxHp: Math.floor(baseStats.hp * encounter.hpMultiplier * this.difficultyMods.enemyHpMult),
+          atk: Math.floor(baseStats.atk * encounter.atkMultiplier * this.difficultyMods.enemyAtkMult),
+          def: Math.floor(baseStats.def * encounter.defMultiplier),
+          level: encounter.level,
+        };
+
+        // Give the legendary its special move alongside its normal skills
+        const legendarySkills = createSpeciesSkills(legendSp);
+        const specialMoveTemplate = SKILL_DB[encounter.specialMove];
+        if (specialMoveTemplate && !legendarySkills.some(s => s.id === encounter.specialMove)) {
+          // Replace the weakest skill with the special move
+          if (legendarySkills.length >= 4) {
+            const weakest = legendarySkills.reduce((min, s, i) =>
+              s.power < legendarySkills[min].power ? i : min, 0);
+            legendarySkills[weakest] = createSkill(specialMoveTemplate);
+          } else {
+            legendarySkills.push(createSkill(specialMoveTemplate));
+          }
+        }
+
+        const legendary: Entity = {
+          tileX: lx, tileY: ly,
+          facing: Direction.Down,
+          stats: legendaryStats,
+          alive: true,
+          spriteKey: legendSp.spriteKey,
+          name: encounter.name,
+          types: legendSp.types,
+          attackType: legendSp.attackType,
+          skills: legendarySkills,
+          statusEffects: [],
+          speciesId: legendSp.spriteKey,
+          isBoss: true, // treated as boss for AI targeting and exp
+        };
+
+        // Create sprite with 1.5x scale for imposing presence
+        const legendTex = `${legendSp.spriteKey}-idle`;
+        if (this.textures.exists(legendTex)) {
+          legendary.sprite = this.add.sprite(
+            this.tileToPixelX(lx), this.tileToPixelY(ly), legendTex
+          );
+          legendary.sprite.setScale(TILE_SCALE * 1.5).setDepth(11);
+          const legendAnim = `${legendSp.spriteKey}-idle-${Direction.Down}`;
+          if (this.anims.exists(legendAnim)) legendary.sprite.play(legendAnim);
+        }
+
+        // Golden tint flash for legendary entrance
+        if (legendary.sprite) legendary.sprite.setTint(0xffd700);
+        this.time.delayedCall(1200, () => { if (legendary.sprite) legendary.sprite.clearTint(); });
+
+        this.legendaryEntity = legendary;
+        this.enemies.push(legendary);
+        this.allEntities.push(legendary);
+        this.seenSpecies.add(legendSp.id); // Pokedex tracking
+      }
+    }
+
     // ── Boss Gauntlet check ──
     if (!this.bossEntity && shouldTriggerGauntlet(this.currentFloor, this.dungeonDef.id, this.dungeonDef.floors)) {
       this.gauntletConfig = generateGauntlet(this.currentFloor, this.dungeonDef.id, this.dungeonDef.difficulty);
@@ -2021,11 +2119,70 @@ export class DungeonScene extends Phaser.Scene {
       }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(102);
     }
 
+    // ── Legendary HP Bar (golden, only when legendary encounter present) ──
+    if (this.legendaryEntity && !this.bossEntity) {
+      const barW = 200;
+      const barX = (GAME_WIDTH - barW) / 2;
+      const barY = 56;
+
+      this.legendaryHpBg = this.add.graphics().setScrollFactor(0).setDepth(100);
+      this.legendaryHpBg.fillStyle(0x1a1a2e, 0.95);
+      this.legendaryHpBg.fillRoundedRect(barX - 4, barY - 4, barW + 8, 24, 4);
+      this.legendaryHpBg.lineStyle(2, 0xffd700); // golden border
+      this.legendaryHpBg.strokeRoundedRect(barX - 4, barY - 4, barW + 8, 24, 4);
+
+      this.legendaryHpBar = this.add.graphics().setScrollFactor(0).setDepth(101);
+
+      this.legendaryNameText = this.add.text(GAME_WIDTH / 2, barY - 2, `★ ${this.legendaryEntity.name} ★`, {
+        fontSize: "10px", color: "#ffd700", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(102);
+
+      // Ambient gold particle sparkles around the legendary
+      this.legendaryParticleGraphics = this.add.graphics().setDepth(12);
+      this.legendaryParticleTimer = this.time.addEvent({
+        delay: 200,
+        loop: true,
+        callback: () => {
+          if (!this.legendaryEntity || !this.legendaryEntity.alive || !this.legendaryEntity.sprite || !this.legendaryParticleGraphics) return;
+          this.legendaryParticleGraphics.clear();
+          const sx = this.legendaryEntity.sprite.x;
+          const sy = this.legendaryEntity.sprite.y;
+          for (let i = 0; i < 4; i++) {
+            const px = sx + (Math.random() - 0.5) * 24;
+            const py = sy + (Math.random() - 0.5) * 24;
+            const alpha = 0.4 + Math.random() * 0.6;
+            this.legendaryParticleGraphics.fillStyle(0xffd700, alpha);
+            this.legendaryParticleGraphics.fillCircle(px, py, 1 + Math.random());
+          }
+        },
+      });
+    }
+
     this.updateHUD();
 
     // Boss floor entrance message
     if (this.bossEntity) {
       this.showLog(`⚠ BOSS FLOOR! ${this.bossEntity.name} awaits!`);
+    } else if (this.legendaryEntity && this.legendaryEncounter) {
+      // Legendary encounter dramatic entrance
+      this.cameras.main.fadeOut(500, 0, 0, 0);
+      this.time.delayedCall(500, () => {
+        this.cameras.main.fadeIn(500, 0, 0, 0);
+      });
+      switchToBossTheme();
+      this.time.delayedCall(600, () => {
+        this.showLog("A powerful presence approaches...");
+      });
+      this.time.delayedCall(1500, () => {
+        if (this.legendaryEncounter) {
+          this.showLog(this.legendaryEncounter.flavorText);
+        }
+      });
+      this.time.delayedCall(2500, () => {
+        if (this.legendaryEntity) {
+          this.showLog(`★ ${this.legendaryEntity.name} appeared! ★`);
+        }
+      });
     } else if (this.gauntletActive) {
       // Gauntlet announcement (deferred to give scene time to render)
       this.showLog(`${this.dungeonDef.name} B${this.currentFloor}F`);
@@ -2891,6 +3048,34 @@ export class DungeonScene extends Phaser.Scene {
         if (this.bossHpBg) this.bossHpBg.setVisible(false);
         this.bossHpBar.setVisible(false);
         if (this.bossNameText) this.bossNameText.setVisible(false);
+      }
+    }
+
+    // Legendary HP bar update (golden bar)
+    if (this.legendaryEntity && this.legendaryHpBar) {
+      this.legendaryHpBar.clear();
+      if (this.legendaryEntity.alive) {
+        const legRatio = this.legendaryEntity.stats.hp / this.legendaryEntity.stats.maxHp;
+        const barW = 200;
+        const barX = (GAME_WIDTH - barW) / 2;
+        const barY = 56;
+        // Golden HP bar color scheme
+        const legBarColor = legRatio > 0.5 ? 0xffd700 : legRatio > 0.25 ? 0xffaa00 : 0xff6600;
+        const legBarWidth = Math.max(0, Math.floor(barW * legRatio));
+        this.legendaryHpBar.fillStyle(legBarColor, 1);
+        this.legendaryHpBar.fillRoundedRect(barX, barY, legBarWidth, 12, 3);
+
+        if (this.legendaryNameText) {
+          this.legendaryNameText.setText(`★ ${this.legendaryEntity.name} — ${this.legendaryEntity.stats.hp}/${this.legendaryEntity.stats.maxHp} ★`);
+        }
+      } else {
+        // Legendary defeated — hide bar
+        if (this.legendaryHpBg) this.legendaryHpBg.setVisible(false);
+        this.legendaryHpBar.setVisible(false);
+        if (this.legendaryNameText) this.legendaryNameText.setVisible(false);
+        // Stop particle effects
+        if (this.legendaryParticleTimer) { this.legendaryParticleTimer.destroy(); this.legendaryParticleTimer = null; }
+        if (this.legendaryParticleGraphics) { this.legendaryParticleGraphics.destroy(); this.legendaryParticleGraphics = null; }
       }
     }
 
@@ -5258,7 +5443,7 @@ export class DungeonScene extends Phaser.Scene {
   private checkStairs() {
     const { stairsPos } = this.dungeon;
     if (this.player.tileX === stairsPos.x && this.player.tileY === stairsPos.y) {
-      // Block stairs if boss is alive
+      // Block stairs if boss is alive (but allow flee from legendary encounters)
       if (this.bossEntity && this.bossEntity.alive) {
         this.showLog("The stairs are sealed! Defeat the boss first!");
         return;
@@ -5267,6 +5452,20 @@ export class DungeonScene extends Phaser.Scene {
       if (this.gauntletStairsLocked) {
         this.showLog("The stairs are sealed! Clear the gauntlet first!");
         return;
+      }
+      // Legendary encounter: player can flee (use stairs) with no reward
+      if (this.legendaryEntity && this.legendaryEntity.alive) {
+        this.showLog("The legendary Pokemon disappeared...");
+        // Clean up legendary entity visuals
+        if (this.legendaryEntity.sprite) this.legendaryEntity.sprite.destroy();
+        this.legendaryEntity.alive = false;
+        this.legendaryEntity = null;
+        this.legendaryEncounter = null;
+        if (this.legendaryHpBg) { this.legendaryHpBg.setVisible(false); }
+        if (this.legendaryHpBar) { this.legendaryHpBar.setVisible(false); }
+        if (this.legendaryNameText) { this.legendaryNameText.setVisible(false); }
+        if (this.legendaryParticleTimer) { this.legendaryParticleTimer.destroy(); this.legendaryParticleTimer = null; }
+        if (this.legendaryParticleGraphics) { this.legendaryParticleGraphics.destroy(); this.legendaryParticleGraphics = null; }
       }
       this.advanceFloor();
     }
@@ -7239,6 +7438,7 @@ export class DungeonScene extends Phaser.Scene {
         modifiers: modifierIds,
         runElapsedTime: this.runElapsedSeconds,
         scoreChain: this.scoreChain,
+        legendaryEncountered: this.legendaryEncountered,
       });
     });
   }
@@ -8684,7 +8884,71 @@ export class DungeonScene extends Phaser.Scene {
       const expGain = Math.floor((isBossKill ? baseExp * 5 : baseExp) * this.modifierEffects.expMult * heldExpMult * this.difficultyMods.expMult * ngExpMult);
       this.totalExp += expGain;
 
-      if (isBossKill) {
+      // Check if this is a legendary encounter defeat
+      const isLegendaryKill = this.legendaryEntity === entity && this.legendaryEncounter !== null;
+
+      if (isLegendaryKill && this.legendaryEncounter) {
+        // Legendary defeat: golden celebration + rewards
+        sfxBossDefeat();
+        this.cameras.main.shake(600, 0.02);
+        this.cameras.main.flash(500, 255, 215, 0); // golden flash
+        this.showLog(`★ You defeated ${entity.name}! ★`);
+
+        // Award legendary gold reward
+        const legendaryGold = this.legendaryEncounter.reward.gold;
+        this.gold += legendaryGold;
+        this.time.delayedCall(800, () => {
+          this.showLog(`Received ${legendaryGold}G!`);
+        });
+
+        // Award legendary bonus EXP
+        const legendaryBonusExp = this.legendaryEncounter.reward.exp;
+        this.totalExp += legendaryBonusExp;
+        this.time.delayedCall(1200, () => {
+          this.showLog(`Bonus EXP: +${legendaryBonusExp}!`);
+        });
+
+        // Skill reward: add to player's skill set
+        if (this.legendaryEncounter.reward.skillId) {
+          const rewardSkillId = this.legendaryEncounter.reward.skillId;
+          const rewardTemplate = SKILL_DB[rewardSkillId];
+          if (rewardTemplate && !this.player.skills.some(s => s.id === rewardSkillId)) {
+            this.time.delayedCall(1800, () => {
+              if (this.player.skills.length < 4) {
+                this.player.skills.push(createSkill(rewardTemplate));
+              } else {
+                // Replace weakest skill
+                const weakest = this.player.skills.reduce((min, s, i) =>
+                  s.power < this.player.skills[min].power ? i : min, 0);
+                this.player.skills[weakest] = createSkill(rewardTemplate);
+              }
+              this.showLog(`Learned ${rewardTemplate.name}!`);
+              this.createSkillButtons();
+            });
+          }
+        }
+
+        // Item reward (stored in meta storage)
+        if (this.legendaryEncounter.reward.uniqueItem) {
+          const rewardItemId = this.legendaryEncounter.reward.uniqueItem;
+          const itemDef = ITEM_DB[rewardItemId];
+          if (itemDef) {
+            this.time.delayedCall(2200, () => {
+              this.showLog(`Obtained ${itemDef.name}!`);
+              const existing = this.inventory.find(s => s.item.id === rewardItemId && itemDef.stackable);
+              if (existing) existing.count++;
+              else if (this.inventory.length < MAX_INVENTORY) this.inventory.push({ item: itemDef, count: 1 });
+            });
+          }
+        }
+
+        // Clean up legendary state
+        this.legendaryEntity = null;
+        this.legendaryEncounter = null;
+        // Stop particle effects
+        if (this.legendaryParticleTimer) { this.legendaryParticleTimer.destroy(); this.legendaryParticleTimer = null; }
+        if (this.legendaryParticleGraphics) { this.legendaryParticleGraphics.destroy(); this.legendaryParticleGraphics = null; }
+      } else if (isBossKill) {
         // Boss defeat: big screen shake + special message
         sfxBossDefeat();
         this.cameras.main.shake(500, 0.015);
@@ -9188,6 +9452,12 @@ export class DungeonScene extends Phaser.Scene {
     if (this.bossHpBg) { this.bossHpBg.destroy(); this.bossHpBg = null; }
     if (this.bossHpBar) { this.bossHpBar.destroy(); this.bossHpBar = null; }
     if (this.bossNameText) { this.bossNameText.destroy(); this.bossNameText = null; }
+    // Clean up legendary HP bar and particles
+    if (this.legendaryHpBg) { this.legendaryHpBg.destroy(); this.legendaryHpBg = null; }
+    if (this.legendaryHpBar) { this.legendaryHpBar.destroy(); this.legendaryHpBar = null; }
+    if (this.legendaryNameText) { this.legendaryNameText.destroy(); this.legendaryNameText = null; }
+    if (this.legendaryParticleTimer) { this.legendaryParticleTimer.destroy(); this.legendaryParticleTimer = null; }
+    if (this.legendaryParticleGraphics) { this.legendaryParticleGraphics.destroy(); this.legendaryParticleGraphics = null; }
   }
 
   /** Recruit a defeated enemy as ally */
