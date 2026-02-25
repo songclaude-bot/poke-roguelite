@@ -24,6 +24,7 @@ import {
   generateDailyQuests, getChallengeQuests, hasClaimableQuests,
   getTodayDateString, updateQuestProgress, RunQuestData,
 } from "../core/quests";
+import { NPC_LIST, getNpcDialogue, NPC } from "../core/npc-dialogue";
 
 /**
  * HubScene — the town between dungeon runs.
@@ -194,10 +195,13 @@ export class HubScene extends Phaser.Scene {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace",
     }).setOrigin(0.5);
 
+    // ── NPC Avatars ──
+    this.createNpcStrip();
+
     // ── Dungeon Selection ──
     const unlocked = getUnlockedDungeons(this.meta.totalClears);
     const hasSave = hasDungeonSave();
-    let y = 105;
+    let y = 135;
     const btnW = 320;
 
     // Continue saved run (if exists)
@@ -1207,5 +1211,208 @@ export class HubScene extends Phaser.Scene {
 
   private getStarterList(): { id: string; name: string; unlock: number }[] {
     return STARTER_LIST;
+  }
+
+  // ── NPC System ──
+
+  /**
+   * Creates a horizontal strip of NPC avatars below the records text.
+   * Each NPC is a small colored circle with an initial letter and a label.
+   * Tapping opens a dialogue overlay with typewriter text.
+   */
+  private createNpcStrip(): void {
+    const npcs = NPC_LIST;
+    const count = npcs.length;
+    const avatarR = 14;
+    const spacing = (GAME_WIDTH - 40) / count;
+    const startX = 20 + spacing / 2;
+    const rowY = 105;
+
+    for (let i = 0; i < count; i++) {
+      const npc = npcs[i];
+      const cx = startX + i * spacing;
+
+      // Colored circle avatar
+      const color = parseInt(npc.color.replace("#", ""), 16);
+      const circle = this.add.circle(cx, rowY, avatarR, color, 0.85)
+        .setStrokeStyle(1.5, 0xffffff, 0.3);
+
+      // Initial letter inside circle
+      const initial = npc.name.charAt(0).toUpperCase();
+      const initialText = this.add.text(cx, rowY - 1, initial, {
+        fontSize: "12px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5);
+
+      // Species name label below
+      const label = this.add.text(cx, rowY + avatarR + 4, npc.name, {
+        fontSize: "6px", color: "#94a3b8", fontFamily: "monospace",
+      }).setOrigin(0.5);
+
+      // Idle bob animation
+      this.tweens.add({
+        targets: [circle, initialText],
+        y: `-=2`,
+        duration: 1200 + i * 200,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+      });
+
+      // Make tappable
+      circle.setInteractive({ useHandCursor: true });
+      circle.on("pointerover", () => circle.setAlpha(1));
+      circle.on("pointerout", () => circle.setAlpha(0.85));
+      circle.on("pointerdown", () => this.showNpcDialogue(npc));
+    }
+  }
+
+  /**
+   * Shows a dialogue overlay for the given NPC.
+   * Features typewriter text effect, Next/Close buttons.
+   */
+  private showNpcDialogue(npc: NPC): void {
+    const lines = getNpcDialogue(npc, this.meta);
+    let lineIndex = 0;
+    let typewriterTimer: Phaser.Time.TimerEvent | null = null;
+    let isTyping = false;
+    let currentFullText = "";
+    const uiItems: Phaser.GameObjects.GameObject[] = [];
+
+    // Dark overlay
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7
+    ).setDepth(400).setInteractive();
+    uiItems.push(overlay);
+
+    // Dialogue panel at bottom
+    const panelH = 160;
+    const panelY = GAME_HEIGHT - panelH / 2 - 20;
+    const panel = this.add.rectangle(
+      GAME_WIDTH / 2, panelY, GAME_WIDTH - 24, panelH, 0x1a1a2e, 0.95
+    ).setStrokeStyle(2, parseInt(npc.color.replace("#", ""), 16))
+      .setDepth(401);
+    uiItems.push(panel);
+
+    // NPC portrait area: colored circle with initial
+    const portraitX = 40;
+    const portraitY = panelY - panelH / 2 + 30;
+    const portraitColor = parseInt(npc.color.replace("#", ""), 16);
+    const portrait = this.add.circle(portraitX, portraitY, 18, portraitColor, 0.9)
+      .setStrokeStyle(2, 0xffffff, 0.4).setDepth(402);
+    uiItems.push(portrait);
+
+    const portraitInitial = this.add.text(portraitX, portraitY - 1, npc.name.charAt(0), {
+      fontSize: "16px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(403);
+    uiItems.push(portraitInitial);
+
+    // NPC name + role
+    const nameText = this.add.text(portraitX + 28, portraitY - 10, npc.name, {
+      fontSize: "12px", color: npc.color, fontFamily: "monospace", fontStyle: "bold",
+    }).setDepth(402);
+    uiItems.push(nameText);
+
+    const roleText = this.add.text(portraitX + 28, portraitY + 4, npc.role, {
+      fontSize: "8px", color: "#94a3b8", fontFamily: "monospace",
+    }).setDepth(402);
+    uiItems.push(roleText);
+
+    // Dialogue text area
+    const textX = 28;
+    const textY = portraitY + 30;
+    const textMaxW = GAME_WIDTH - 60;
+    const dialogueText = this.add.text(textX, textY, "", {
+      fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace",
+      wordWrap: { width: textMaxW },
+      lineSpacing: 4,
+    }).setDepth(402);
+    uiItems.push(dialogueText);
+
+    // Next / Close button
+    const btnLabel = this.add.text(GAME_WIDTH - 50, panelY + panelH / 2 - 20, "", {
+      fontSize: "11px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(403).setInteractive({ useHandCursor: true });
+    uiItems.push(btnLabel);
+
+    // Line indicator (e.g., "1/3")
+    const lineIndicator = this.add.text(GAME_WIDTH / 2, panelY + panelH / 2 - 20, "", {
+      fontSize: "8px", color: "#555570", fontFamily: "monospace",
+    }).setOrigin(0.5).setDepth(402);
+    uiItems.push(lineIndicator);
+
+    const cleanup = () => {
+      if (typewriterTimer) typewriterTimer.destroy();
+      uiItems.forEach((o) => o.destroy());
+    };
+
+    const updateButtonLabel = () => {
+      if (lineIndex < lines.length - 1) {
+        btnLabel.setText("[Next]");
+      } else {
+        btnLabel.setText("[Close]");
+      }
+      lineIndicator.setText(`${lineIndex + 1}/${lines.length}`);
+    };
+
+    const showFullText = () => {
+      if (typewriterTimer) {
+        typewriterTimer.destroy();
+        typewriterTimer = null;
+      }
+      isTyping = false;
+      dialogueText.setText(currentFullText);
+    };
+
+    const startTypewriter = (text: string) => {
+      currentFullText = text;
+      isTyping = true;
+      dialogueText.setText("");
+      let charIndex = 0;
+
+      if (typewriterTimer) {
+        typewriterTimer.destroy();
+      }
+
+      typewriterTimer = this.time.addEvent({
+        delay: 30,
+        repeat: text.length - 1,
+        callback: () => {
+          charIndex++;
+          dialogueText.setText(text.substring(0, charIndex));
+          if (charIndex >= text.length) {
+            isTyping = false;
+          }
+        },
+      });
+    };
+
+    const advance = () => {
+      if (isTyping) {
+        // Skip to full text
+        showFullText();
+        return;
+      }
+      lineIndex++;
+      if (lineIndex >= lines.length) {
+        cleanup();
+        return;
+      }
+      updateButtonLabel();
+      startTypewriter(lines[lineIndex]);
+    };
+
+    // Button click
+    btnLabel.on("pointerdown", advance);
+
+    // Tap on overlay to advance too
+    overlay.on("pointerdown", advance);
+
+    // Tap on panel to advance
+    panel.setInteractive();
+    panel.on("pointerdown", advance);
+
+    // Start first line
+    updateButtonLabel();
+    startTypewriter(lines[0]);
   }
 }
