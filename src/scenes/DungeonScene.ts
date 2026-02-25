@@ -101,6 +101,11 @@ import {
   generateDailyQuests, getChallengeQuests, updateQuestProgress,
   getTodayDateString, RunQuestData,
 } from "../core/quests";
+import {
+  SecretRoomType, SecretRoom, SecretReward,
+  shouldSpawnSecretRoom, generateSecretRoom,
+} from "../core/secret-rooms";
+import { getAggregatedTalentEffects } from "../core/talent-tree";
 
 interface AllyData {
   speciesId: string;
@@ -395,6 +400,9 @@ export class DungeonScene extends Phaser.Scene {
   private enchantment: Enchantment | null = null;
   private phoenixUsed = false;  // Phoenix enchantment: one revive per run
 
+  // Talent tree aggregated effects (loaded from meta at init)
+  private talentEffects: Record<string, number> = {};
+
   // Auto-Explore state
   private autoExploring = false;
   private autoExploreTimer: Phaser.Time.TimerEvent | null = null;
@@ -428,6 +436,19 @@ export class DungeonScene extends Phaser.Scene {
   private mutationHudTexts: Phaser.GameObjects.Text[] = [];
   private typeShiftType: PokemonType | null = null;         // for TypeShift mutation
   private mirrorApplied = false;                            // track if MirrorWorld already applied
+
+  // Secret Room state
+  private secretRoomData: SecretRoom | null = null;
+  private secretWallPos: { x: number; y: number } | null = null;  // the fake wall tile
+  private secretRoomTiles: { x: number; y: number }[] = [];       // 3x3 ground tiles of the room
+  private secretEffectTile: { x: number; y: number } | null = null; // center tile with effect
+  private secretRoomDiscovered = false;
+  private secretRoomUsed = false;                                    // reward already claimed
+  private secretRoomGraphics: Phaser.GameObjects.Graphics[] = [];
+  private secretWallShimmerTimer: Phaser.Time.TimerEvent | null = null;
+  private secretWallShimmerGfx: Phaser.GameObjects.Graphics | null = null;
+  private secretRoomUI: Phaser.GameObjects.GameObject[] = [];       // WarpHub UI overlay
+  private secretWarpOpen = false;                                    // WarpHub overlay is open
 
   constructor() {
     super({ key: "DungeonScene" });
@@ -483,6 +504,9 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // Load talent tree bonuses
+    this.talentEffects = getAggregatedTalentEffects(meta.talentLevels ?? {});
+
     this.dungeonDef = getDungeon(data?.dungeonId ?? "beachCave");
     const isNewRun = (data?.floor ?? 1) === 1 && !data?.hp;
     this.currentFloor = data?.floor ?? 1;
@@ -522,9 +546,13 @@ export class DungeonScene extends Phaser.Scene {
     const ngDefMult = 1 + this.ngPlusBonuses.allStatsPercent / 100;
     // Overlord enchantment: +5% to all stats (stacks multiplicatively with NG+)
     const overlordMult = this.enchantment?.id === "overlord" ? 1.05 : 1.0;
-    const baseHp = Math.floor((50 + hpBonus + heldHpBonus + enchHpBonus) * ngHpMult * overlordMult);
-    const baseAtk = Math.floor((12 + atkBonus + heldAtkBonus + enchAtkBonus) * ngAtkMult * overlordMult);
-    const baseDef = Math.floor((6 + defBonus + heldDefBonus + enchDefBonus) * ngDefMult * overlordMult);
+    // Talent tree stat multipliers
+    const talentHpMult = 1 + (this.talentEffects.hpPercent ?? 0) / 100;
+    const talentAtkMult = 1 + (this.talentEffects.atkPercent ?? 0) / 100;
+    const talentDefMult = 1 + (this.talentEffects.defPercent ?? 0) / 100;
+    const baseHp = Math.floor((50 + hpBonus + heldHpBonus + enchHpBonus) * ngHpMult * overlordMult * talentHpMult);
+    const baseAtk = Math.floor((12 + atkBonus + heldAtkBonus + enchAtkBonus) * ngAtkMult * overlordMult * talentAtkMult);
+    const baseDef = Math.floor((6 + defBonus + heldDefBonus + enchDefBonus) * ngDefMult * overlordMult * talentDefMult);
 
     this.persistentHp = data?.hp ?? baseHp;
     this.persistentMaxHp = data?.maxHp ?? baseHp;
@@ -647,6 +675,18 @@ export class DungeonScene extends Phaser.Scene {
     this.puzzleHudBg = null;
     this.puzzleUI = [];
     this.puzzleShowingSequence = false;
+    // Reset secret room state
+    this.secretRoomData = null;
+    this.secretWallPos = null;
+    this.secretRoomTiles = [];
+    this.secretEffectTile = null;
+    this.secretRoomDiscovered = false;
+    this.secretRoomUsed = false;
+    this.secretRoomGraphics = [];
+    this.secretWallShimmerTimer = null;
+    this.secretWallShimmerGfx = null;
+    this.secretRoomUI = [];
+    this.secretWarpOpen = false;
     this.autoExploring = false;
     this.autoExploreTimer = null;
     this.autoExploreText = null;
@@ -1578,7 +1618,8 @@ export class DungeonScene extends Phaser.Scene {
     // Lucky enchantment: +5% item find chance
     const enchItemMult = this.enchantment?.id === "lucky" ? 1.05 : 1.0;
     const mutItemMult = hasMutation(this.floorMutations, MutationType.ItemRain) ? getMutationEffect(MutationType.ItemRain, "itemMult") : 1;
-    const itemCount = Math.max(1, Math.floor(this.dungeonDef.itemsPerFloor * this.difficultyMods.itemDropMult * ngItemDropMult * enchItemMult * mutItemMult));
+    const talentItemMult = 1 + (this.talentEffects.itemSpawnPercent ?? 0) / 100;
+    const itemCount = Math.max(1, Math.floor(this.dungeonDef.itemsPerFloor * this.difficultyMods.itemDropMult * ngItemDropMult * enchItemMult * mutItemMult * talentItemMult));
     for (let i = 0; i < itemCount; i++) {
       const room = rooms[Math.floor(Math.random() * rooms.length)];
       const ix = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
@@ -1897,12 +1938,41 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Secret Room (5% chance on floor 3+, not last floor, not boss floor) ──
+    if (!isBossFloor && shouldSpawnSecretRoom(this.currentFloor, this.dungeonDef.floors)) {
+      // Find a wall tile adjacent to a corridor (not inside a room) that can host a secret entrance
+      const secretEntrance = this.findSecretWallPosition(terrain, rooms, width, height, playerStart, stairsPos);
+      if (secretEntrance) {
+        this.secretWallPos = secretEntrance.wall;
+        this.secretRoomData = generateSecretRoom(this.currentFloor, this.dungeonDef.difficulty);
+
+        // Carve out a 3x3 secret room behind the wall
+        const roomTiles = this.carveSecretRoom(
+          secretEntrance.wall, secretEntrance.insideDir,
+          terrain, width, height
+        );
+        if (roomTiles.length > 0) {
+          this.secretRoomTiles = roomTiles;
+          // Center tile of the 3x3 is the effect tile
+          this.secretEffectTile = roomTiles[Math.floor(roomTiles.length / 2)];
+
+          // Start shimmer hint on the secret wall
+          this.startSecretWallShimmer();
+        } else {
+          // Could not carve room — cancel
+          this.secretRoomData = null;
+          this.secretWallPos = null;
+        }
+      }
+    }
+
     // ── Fog of War ──
     this.visited = Array.from({ length: height }, () => new Array(width).fill(false));
     this.currentlyVisible = Array.from({ length: height }, () => new Array(width).fill(false));
-    const sightRadius = hasMutation(this.floorMutations, MutationType.DarkFloor)
+    const talentSightBonus = this.talentEffects.sightRangeBonus ?? 0;
+    const sightRadius = (hasMutation(this.floorMutations, MutationType.DarkFloor)
       ? getMutationEffect(MutationType.DarkFloor, "sightRadius")
-      : 4;
+      : 4) + talentSightBonus;
     this.revealArea(playerStart.x, playerStart.y, sightRadius);
 
     // ── Camera ──
@@ -2794,6 +2864,19 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Secret Room (gold dot, only after discovery) ──
+    if (this.secretRoomDiscovered && this.secretEffectTile) {
+      const srt = this.secretEffectTile;
+      if (this.visited[srt.y]?.[srt.x]) {
+        gfx.fillStyle(0xfbbf24, 1);
+        const srp = expanded ? 1 : 0;
+        gfx.fillRect(
+          mx + srt.x * t - srp, my + srt.y * t - srp,
+          t + srp * 2, t + srp * 2
+        );
+      }
+    }
+
     // ── Stairs (blue dot, only if visited) ──
     const { stairsPos } = this.dungeon;
     if (this.visited[stairsPos.y]?.[stairsPos.x]) {
@@ -2882,10 +2965,11 @@ export class DungeonScene extends Phaser.Scene {
     const expanded = this.minimapExpanded;
     const pad = 4;
 
-    // Reveal area around player each update (DarkFloor mutation reduces radius)
-    const revealRadius = hasMutation(this.floorMutations, MutationType.DarkFloor)
+    // Reveal area around player each update (DarkFloor mutation reduces radius, talent increases)
+    const revealTalentBonus = this.talentEffects.sightRangeBonus ?? 0;
+    const revealRadius = (hasMutation(this.floorMutations, MutationType.DarkFloor)
       ? getMutationEffect(MutationType.DarkFloor, "sightRadius")
-      : 4;
+      : 4) + revealTalentBonus;
     this.revealArea(this.player.tileX, this.player.tileY, revealRadius);
 
     // ── Background (themed) ──
@@ -4297,7 +4381,8 @@ export class DungeonScene extends Phaser.Scene {
         const ngEscGoldMult = 1 + this.ngPlusBonuses.goldPercent / 100;
         const enchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
         const escMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
-        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult * this.difficultyMods.goldMult * ngEscGoldMult * enchGoldMult * escMutGoldMult);
+        const escTalentGoldMult = 1 + (this.talentEffects.goldPercent ?? 0) / 100;
+        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult * this.difficultyMods.goldMult * ngEscGoldMult * enchGoldMult * escMutGoldMult * escTalentGoldMult);
         this.cameras.main.fadeOut(500);
         this.time.delayedCall(600, () => {
           this.scene.start("HubScene", {
@@ -5533,7 +5618,8 @@ export class DungeonScene extends Phaser.Scene {
     if (this.belly > 0) {
       // Difficulty-based drain: higher difficulty = faster hunger, NG+ reduces drain
       const ngBellyMult = 1 - this.ngPlusBonuses.bellyDrainReduction / 100;
-      const drainRate = (0.5 + this.dungeonDef.difficulty * 0.1) * this.difficultyMods.bellyDrainMult * ngBellyMult;
+      const talentBellyMult = 1 - (this.talentEffects.bellyDrainReduction ?? 0) / 100;
+      const drainRate = (0.5 + this.dungeonDef.difficulty * 0.1) * this.difficultyMods.bellyDrainMult * ngBellyMult * talentBellyMult;
       const prevBelly = this.belly;
       this.belly = Math.max(0, this.belly - drainRate);
 
@@ -7834,7 +7920,8 @@ export class DungeonScene extends Phaser.Scene {
     const clearEnchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
     const hasBoss = this.dungeonDef.boss || this.isBossRush;
     const clearMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
-    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * this.difficultyMods.goldMult * clearEnchGoldMult * clearMutGoldMult);
+    const clearTalentGoldMult = 1 + (this.talentEffects.goldPercent ?? 0) / 100;
+    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * this.difficultyMods.goldMult * clearEnchGoldMult * clearMutGoldMult * clearTalentGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -8010,7 +8097,8 @@ export class DungeonScene extends Phaser.Scene {
     const ngGoGoldMult = 1 + this.ngPlusBonuses.goldPercent / 100;
     const goEnchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
     const goMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
-    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult * ngGoGoldMult * goEnchGoldMult * goMutGoldMult);
+    const goTalentGoldMult = 1 + (this.talentEffects.goldPercent ?? 0) / 100;
+    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult * ngGoGoldMult * goEnchGoldMult * goMutGoldMult * goTalentGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -8275,13 +8363,23 @@ export class DungeonScene extends Phaser.Scene {
       } else {
         const canMove = this.canEntityMove(this.player, dir);
         if (!canMove) {
-          this.player.sprite!.play(`${this.player.spriteKey}-idle-${dir}`);
-          return;
+          // Check for secret wall before giving up
+          if (this.tryOpenSecretWall(targetX, targetY)) {
+            // Secret wall was opened — move player into the revealed tile
+            await this.turnManager.executeTurn(
+              () => this.moveEntity(this.player, dir),
+              [...this.getAllyActions(), ...this.getEnemyActions()]
+            );
+          } else {
+            this.player.sprite!.play(`${this.player.spriteKey}-idle-${dir}`);
+            return;
+          }
+        } else {
+          await this.turnManager.executeTurn(
+            () => this.moveEntity(this.player, dir),
+            [...this.getAllyActions(), ...this.getEnemyActions()]
+          );
         }
-        await this.turnManager.executeTurn(
-          () => this.moveEntity(this.player, dir),
-          [...this.getAllyActions(), ...this.getEnemyActions()]
-        );
       }
 
       // PP recovery: 1 PP for a random depleted skill on movement
@@ -8303,6 +8401,7 @@ export class DungeonScene extends Phaser.Scene {
       this.checkMonsterHouse();
       this.checkEventRoom();
       this.checkPuzzleRoom();
+      this.checkSecretRoom();
     }
 
     // Belly drain per turn (movement or attack)
@@ -9292,7 +9391,8 @@ export class DungeonScene extends Phaser.Scene {
       const baseExp = expFromEnemy(entity.stats.level, this.currentFloor);
       const heldExpMult = 1 + (this.heldItemEffect.expBonus ?? 0) / 100;
       const ngExpMult = 1 + this.ngPlusBonuses.expPercent / 100;
-      const expGain = Math.floor((isBossKill ? baseExp * 5 : baseExp) * this.modifierEffects.expMult * heldExpMult * this.difficultyMods.expMult * ngExpMult);
+      const talentExpMult = 1 + (this.talentEffects.expPercent ?? 0) / 100;
+      const expGain = Math.floor((isBossKill ? baseExp * 5 : baseExp) * this.modifierEffects.expMult * heldExpMult * this.difficultyMods.expMult * ngExpMult * talentExpMult);
       this.totalExp += expGain;
 
       // Check if this is a legendary encounter defeat
@@ -10418,5 +10518,716 @@ export class DungeonScene extends Phaser.Scene {
       this.autoExploreText.destroy();
       this.autoExploreText = null;
     }
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Secret Room System ─────────────────────────────────
+  // ══════════════════════════════════════════════════════════
+
+  /**
+   * Find a suitable wall tile adjacent to a corridor that can host a secret entrance.
+   * The wall must have enough space behind it (3x3 area that is currently all walls).
+   * Returns the wall position and the direction into the wall (for carving the room).
+   */
+  private findSecretWallPosition(
+    terrain: TerrainType[][],
+    rooms: { x: number; y: number; w: number; h: number }[],
+    mapW: number, mapH: number,
+    playerStart: { x: number; y: number },
+    stairsPos: { x: number; y: number },
+  ): { wall: { x: number; y: number }; insideDir: { dx: number; dy: number } } | null {
+    // Build a set of room interior tiles (to avoid placing inside existing rooms)
+    const roomTileSet = new Set<string>();
+    for (const r of rooms) {
+      for (let ry = r.y; ry < r.y + r.h; ry++) {
+        for (let rx = r.x; rx < r.x + r.w; rx++) {
+          roomTileSet.add(`${rx},${ry}`);
+        }
+      }
+    }
+
+    // Candidate walls: wall tiles adjacent to at least one ground tile (corridor or room edge)
+    const candidates: { wall: { x: number; y: number }; insideDir: { dx: number; dy: number } }[] = [];
+    const dirs = [
+      { dx: 0, dy: -1 }, // north
+      { dx: 0, dy: 1 },  // south
+      { dx: -1, dy: 0 }, // west
+      { dx: 1, dy: 0 },  // east
+    ];
+
+    for (let y = 2; y < mapH - 5; y++) {
+      for (let x = 2; x < mapW - 5; x++) {
+        if (terrain[y][x] !== TerrainType.WALL) continue;
+        // Skip if too close to player start or stairs
+        const distPlayer = Math.abs(x - playerStart.x) + Math.abs(y - playerStart.y);
+        const distStairs = Math.abs(x - stairsPos.x) + Math.abs(y - stairsPos.y);
+        if (distPlayer < 4 || distStairs < 4) continue;
+
+        for (const d of dirs) {
+          const adjX = x + d.dx;
+          const adjY = y + d.dy;
+          if (adjX < 0 || adjX >= mapW || adjY < 0 || adjY >= mapH) continue;
+          if (terrain[adjY][adjX] !== TerrainType.GROUND) continue;
+
+          // The "inside" direction is opposite to the corridor side
+          const insideDx = -d.dx;
+          const insideDy = -d.dy;
+
+          // Check if a 3x3 area behind this wall (in insideDir) is all walls
+          const behindX = x + insideDx;
+          const behindY = y + insideDy;
+          let valid = true;
+
+          // Check a 3x3 region centered on behindX,behindY
+          for (let dy2 = -1; dy2 <= 1; dy2++) {
+            for (let dx2 = -1; dx2 <= 1; dx2++) {
+              const cx = behindX + dx2;
+              const cy = behindY + dy2;
+              if (cx < 1 || cx >= mapW - 1 || cy < 1 || cy >= mapH - 1) { valid = false; break; }
+              if (terrain[cy][cx] !== TerrainType.WALL) { valid = false; break; }
+              if (roomTileSet.has(`${cx},${cy}`)) { valid = false; break; }
+            }
+            if (!valid) break;
+          }
+
+          // Also check a 1-tile buffer around the 3x3 to avoid bleeding into corridors
+          if (valid) {
+            for (let dy2 = -2; dy2 <= 2; dy2++) {
+              for (let dx2 = -2; dx2 <= 2; dx2++) {
+                // Skip the inner 3x3, only check the border ring
+                if (Math.abs(dy2) <= 1 && Math.abs(dx2) <= 1) continue;
+                const cx = behindX + dx2;
+                const cy = behindY + dy2;
+                if (cx < 0 || cx >= mapW || cy < 0 || cy >= mapH) { valid = false; break; }
+                // Buffer tiles should be walls (to prevent merging with other rooms)
+                if (terrain[cy][cx] !== TerrainType.WALL) { valid = false; break; }
+              }
+              if (!valid) break;
+            }
+          }
+
+          if (valid) {
+            candidates.push({ wall: { x, y }, insideDir: { dx: insideDx, dy: insideDy } });
+          }
+        }
+      }
+    }
+
+    if (candidates.length === 0) return null;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  /**
+   * Carve a 3x3 secret room behind the secret wall tile.
+   * Returns the list of ground tiles created (excluding the wall tile itself).
+   */
+  private carveSecretRoom(
+    wallPos: { x: number; y: number },
+    insideDir: { dx: number; dy: number },
+    terrain: TerrainType[][],
+    mapW: number, mapH: number,
+  ): { x: number; y: number }[] {
+    const tiles: { x: number; y: number }[] = [];
+    const behindX = wallPos.x + insideDir.dx;
+    const behindY = wallPos.y + insideDir.dy;
+
+    // Carve a 3x3 room centered on (behindX, behindY)
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const tx = behindX + dx;
+        const ty = behindY + dy;
+        if (tx < 1 || tx >= mapW - 1 || ty < 1 || ty >= mapH - 1) continue;
+        terrain[ty][tx] = TerrainType.GROUND;
+        tiles.push({ x: tx, y: ty });
+      }
+    }
+
+    return tiles;
+  }
+
+  /**
+   * Start a subtle shimmer animation on the secret wall tile (hint for players).
+   * Every 3 seconds, the wall flickers briefly.
+   */
+  private startSecretWallShimmer() {
+    if (!this.secretWallPos) return;
+
+    this.secretWallShimmerGfx = this.add.graphics().setDepth(3);
+
+    this.secretWallShimmerTimer = this.time.addEvent({
+      delay: 3000,
+      loop: true,
+      callback: () => {
+        if (!this.secretWallPos || this.secretRoomDiscovered) {
+          if (this.secretWallShimmerTimer) {
+            this.secretWallShimmerTimer.destroy();
+            this.secretWallShimmerTimer = null;
+          }
+          if (this.secretWallShimmerGfx) {
+            this.secretWallShimmerGfx.destroy();
+            this.secretWallShimmerGfx = null;
+          }
+          return;
+        }
+
+        // Only shimmer if tile is currently visible or visited
+        const wx = this.secretWallPos.x;
+        const wy = this.secretWallPos.y;
+        if (!this.currentlyVisible[wy]?.[wx] && !this.visited[wy]?.[wx]) return;
+
+        // Brief alpha twitch
+        const gfx = this.secretWallShimmerGfx!;
+        gfx.clear();
+        gfx.fillStyle(0xfbbf24, 0.3);
+        gfx.fillRect(
+          wx * TILE_DISPLAY + 2, wy * TILE_DISPLAY + 2,
+          TILE_DISPLAY - 4, TILE_DISPLAY - 4,
+        );
+
+        // Fade out after 200ms
+        this.time.delayedCall(200, () => {
+          if (gfx && gfx.scene) gfx.clear();
+        });
+      },
+    });
+  }
+
+  /**
+   * Check if the player is walking into a secret wall tile and open it.
+   * Returns true if the wall was opened (so player can move there).
+   */
+  private tryOpenSecretWall(targetX: number, targetY: number): boolean {
+    if (!this.secretWallPos || this.secretRoomDiscovered) return false;
+    if (targetX !== this.secretWallPos.x || targetY !== this.secretWallPos.y) return false;
+
+    // Open the secret wall — change it to ground
+    this.dungeon.terrain[targetY][targetX] = TerrainType.GROUND;
+    this.secretRoomDiscovered = true;
+
+    // Stop shimmer
+    if (this.secretWallShimmerTimer) {
+      this.secretWallShimmerTimer.destroy();
+      this.secretWallShimmerTimer = null;
+    }
+    if (this.secretWallShimmerGfx) {
+      this.secretWallShimmerGfx.destroy();
+      this.secretWallShimmerGfx = null;
+    }
+
+    // Visual: update the theme overlay for newly carved tiles
+    if (this.themeOverlay) {
+      // Draw ground overlay on the wall tile + secret room tiles
+      const allNewTiles = [{ x: targetX, y: targetY }, ...this.secretRoomTiles];
+      for (const tile of allNewTiles) {
+        this.themeOverlay.fillStyle(this.currentTheme.floorColor, 0.18);
+        this.themeOverlay.fillRect(
+          tile.x * TILE_DISPLAY, tile.y * TILE_DISPLAY,
+          TILE_DISPLAY, TILE_DISPLAY,
+        );
+      }
+    }
+
+    // Camera shake for dramatic reveal
+    this.cameras.main.shake(200, 0.005);
+
+    // Sound effect
+    sfxPickup();
+
+    // Show announcement
+    this.showSecretRoomAnnouncement();
+
+    // Draw room effect tile graphics
+    this.drawSecretRoomEffectTile();
+
+    // Mark secret room data as discovered
+    if (this.secretRoomData) {
+      this.secretRoomData.discovered = true;
+    }
+
+    return true;
+  }
+
+  /**
+   * Show a prominent "You found a Secret Room!" announcement with gold sparkle.
+   */
+  private showSecretRoomAnnouncement() {
+    if (!this.secretRoomData) return;
+
+    const typeLabel = this.secretRoomData.name;
+    this.showLog(`You found a Secret Room! (${typeLabel})`);
+
+    // Create a centered gold announcement text
+    const announce = this.add.text(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40,
+      `Secret Room Found!\n${typeLabel}`,
+      {
+        fontSize: "14px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+        stroke: "#000000", strokeThickness: 3, align: "center",
+        backgroundColor: "#1a1a2ecc", padding: { x: 12, y: 8 },
+      }
+    ).setOrigin(0.5).setScrollFactor(0).setDepth(150);
+
+    // Sparkle particles around announcement
+    const sparkleGfx = this.add.graphics().setScrollFactor(0).setDepth(149);
+    for (let i = 0; i < 8; i++) {
+      const sx = GAME_WIDTH / 2 + (Math.random() - 0.5) * 120;
+      const sy = GAME_HEIGHT / 2 - 40 + (Math.random() - 0.5) * 60;
+      sparkleGfx.fillStyle(0xfbbf24, 0.8);
+      sparkleGfx.fillCircle(sx, sy, 2 + Math.random() * 2);
+    }
+
+    // Fade out after 2 seconds
+    this.tweens.add({
+      targets: announce,
+      alpha: 0,
+      duration: 500,
+      delay: 1800,
+      onComplete: () => {
+        announce.destroy();
+        sparkleGfx.destroy();
+      },
+    });
+
+    this.tweens.add({
+      targets: sparkleGfx,
+      alpha: 0,
+      duration: 500,
+      delay: 1800,
+    });
+  }
+
+  /**
+   * Draw the effect tile graphic in the center of the secret room based on type.
+   */
+  private drawSecretRoomEffectTile() {
+    if (!this.secretEffectTile || !this.secretRoomData) return;
+
+    const tx = this.secretEffectTile.x;
+    const ty = this.secretEffectTile.y;
+    const px = tx * TILE_DISPLAY;
+    const py = ty * TILE_DISPLAY;
+
+    const gfx = this.add.graphics().setDepth(4);
+
+    switch (this.secretRoomData.type) {
+      case SecretRoomType.TreasureVault: {
+        // Gold carpet + item sprites placed as floor items
+        gfx.fillStyle(0xfbbf24, 0.15);
+        for (const tile of this.secretRoomTiles) {
+          gfx.fillRect(tile.x * TILE_DISPLAY, tile.y * TILE_DISPLAY, TILE_DISPLAY, TILE_DISPLAY);
+        }
+        // Place items on the secret room tiles
+        if (this.secretRoomData.reward.items) {
+          const items = this.secretRoomData.reward.items;
+          const placementTiles = this.secretRoomTiles.filter(
+            t => !(t.x === this.secretEffectTile!.x && t.y === this.secretEffectTile!.y)
+          );
+          for (let i = 0; i < items.length && i < placementTiles.length; i++) {
+            const itemId = items[i];
+            const itemDef = ITEM_DB[itemId];
+            if (!itemDef) continue;
+            const pt = placementTiles[i];
+            const sprite = this.add.text(
+              pt.x * TILE_DISPLAY + TILE_DISPLAY / 2,
+              pt.y * TILE_DISPLAY + TILE_DISPLAY / 2,
+              "\u2605", { fontSize: "14px", color: "#fde047" }
+            ).setOrigin(0.5).setDepth(6);
+            this.floorItems.push({ x: pt.x, y: pt.y, item: itemDef, sprite });
+          }
+        }
+        // Gold text at center
+        if (this.secretRoomData.reward.gold) {
+          const goldText = this.add.text(
+            px + TILE_DISPLAY / 2, py + TILE_DISPLAY / 2,
+            `${this.secretRoomData.reward.gold}G`,
+            { fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+              stroke: "#000000", strokeThickness: 2 }
+          ).setOrigin(0.5).setDepth(7);
+          this.secretRoomGraphics.push(goldText as unknown as Phaser.GameObjects.Graphics);
+        }
+        break;
+      }
+
+      case SecretRoomType.HealingSpring: {
+        // Blue glowing center tile
+        gfx.fillStyle(0x60a5fa, 0.35);
+        gfx.fillRect(px + 4, py + 4, TILE_DISPLAY - 8, TILE_DISPLAY - 8);
+        // Pulsing blue glow
+        this.tweens.add({
+          targets: gfx,
+          alpha: { from: 1, to: 0.5 },
+          duration: 1200,
+          yoyo: true,
+          repeat: -1,
+          ease: "Sine.easeInOut",
+        });
+        // Label
+        const healLabel = this.add.text(
+          px + TILE_DISPLAY / 2, py - 6,
+          "Spring", { fontSize: "7px", color: "#60a5fa", fontFamily: "monospace",
+            stroke: "#000000", strokeThickness: 2 }
+        ).setOrigin(0.5).setDepth(7);
+        this.secretRoomGraphics.push(healLabel as unknown as Phaser.GameObjects.Graphics);
+        break;
+      }
+
+      case SecretRoomType.SkillShrine: {
+        // Purple glowing tile
+        gfx.fillStyle(0xa855f7, 0.35);
+        gfx.fillRect(px + 4, py + 4, TILE_DISPLAY - 8, TILE_DISPLAY - 8);
+        this.tweens.add({
+          targets: gfx,
+          alpha: { from: 1, to: 0.5 },
+          duration: 1200,
+          yoyo: true,
+          repeat: -1,
+          ease: "Sine.easeInOut",
+        });
+        const shrineLabel = this.add.text(
+          px + TILE_DISPLAY / 2, py - 6,
+          "Shrine", { fontSize: "7px", color: "#a855f7", fontFamily: "monospace",
+            stroke: "#000000", strokeThickness: 2 }
+        ).setOrigin(0.5).setDepth(7);
+        this.secretRoomGraphics.push(shrineLabel as unknown as Phaser.GameObjects.Graphics);
+        break;
+      }
+
+      case SecretRoomType.TrainingRoom: {
+        // Orange tile
+        gfx.fillStyle(0xf59e0b, 0.35);
+        gfx.fillRect(px + 4, py + 4, TILE_DISPLAY - 8, TILE_DISPLAY - 8);
+        this.tweens.add({
+          targets: gfx,
+          alpha: { from: 1, to: 0.5 },
+          duration: 1200,
+          yoyo: true,
+          repeat: -1,
+          ease: "Sine.easeInOut",
+        });
+        const trainLabel = this.add.text(
+          px + TILE_DISPLAY / 2, py - 6,
+          "Training", { fontSize: "7px", color: "#f59e0b", fontFamily: "monospace",
+            stroke: "#000000", strokeThickness: 2 }
+        ).setOrigin(0.5).setDepth(7);
+        this.secretRoomGraphics.push(trainLabel as unknown as Phaser.GameObjects.Graphics);
+        break;
+      }
+
+      case SecretRoomType.WarpHub: {
+        // Swirling portal (teal/cyan)
+        gfx.fillStyle(0x22d3ee, 0.4);
+        gfx.fillCircle(px + TILE_DISPLAY / 2, py + TILE_DISPLAY / 2, TILE_DISPLAY / 3);
+        gfx.lineStyle(2, 0x22d3ee, 0.6);
+        gfx.strokeCircle(px + TILE_DISPLAY / 2, py + TILE_DISPLAY / 2, TILE_DISPLAY / 3 + 4);
+        this.tweens.add({
+          targets: gfx,
+          angle: { from: 0, to: 360 },
+          duration: 3000,
+          repeat: -1,
+          ease: "Linear",
+        });
+        const warpLabel = this.add.text(
+          px + TILE_DISPLAY / 2, py - 6,
+          "Warp", { fontSize: "7px", color: "#22d3ee", fontFamily: "monospace",
+            stroke: "#000000", strokeThickness: 2 }
+        ).setOrigin(0.5).setDepth(7);
+        this.secretRoomGraphics.push(warpLabel as unknown as Phaser.GameObjects.Graphics);
+        break;
+      }
+    }
+
+    this.secretRoomGraphics.push(gfx);
+  }
+
+  /**
+   * Check if the player is standing on the secret room effect tile and apply the reward.
+   */
+  private checkSecretRoom() {
+    if (!this.secretRoomData || !this.secretRoomDiscovered || this.secretRoomUsed) return;
+    if (!this.secretEffectTile) return;
+    if (this.secretWarpOpen) return; // warp overlay already open
+
+    const px = this.player.tileX;
+    const py = this.player.tileY;
+    const ex = this.secretEffectTile.x;
+    const ey = this.secretEffectTile.y;
+
+    // For TreasureVault, collect gold when stepping on center tile
+    if (this.secretRoomData.type === SecretRoomType.TreasureVault) {
+      if (px === ex && py === ey) {
+        this.applySecretRewardTreasure();
+      }
+      return;
+    }
+
+    // For other types, stepping on the effect tile triggers the reward
+    if (px !== ex || py !== ey) return;
+
+    switch (this.secretRoomData.type) {
+      case SecretRoomType.HealingSpring:
+        this.applySecretRewardHealing();
+        break;
+      case SecretRoomType.SkillShrine:
+        this.applySecretRewardSkill();
+        break;
+      case SecretRoomType.TrainingRoom:
+        this.applySecretRewardTraining();
+        break;
+      case SecretRoomType.WarpHub:
+        this.showWarpHubOverlay();
+        break;
+    }
+  }
+
+  /** TreasureVault: collect gold from center tile */
+  private applySecretRewardTreasure() {
+    if (!this.secretRoomData?.reward.gold) return;
+    this.secretRoomUsed = true;
+    const goldAmount = this.secretRoomData.reward.gold;
+    this.gold += goldAmount;
+    sfxPickup();
+    this.showLog(`Collected ${goldAmount} Gold from the Treasure Vault!`);
+
+    // Flash gold text popup
+    if (this.player.sprite) {
+      this.showDamagePopup(
+        this.player.sprite.x, this.player.sprite.y - 10,
+        0, 1, `+${goldAmount}G`
+      );
+    }
+    this.updateHUD();
+  }
+
+  /** HealingSpring: full HP/PP restore + AtkUp+DefUp buff for 10 turns */
+  private applySecretRewardHealing() {
+    this.secretRoomUsed = true;
+    sfxHeal();
+
+    // Full HP restore
+    this.player.stats.hp = this.player.stats.maxHp;
+
+    // Full PP restore for all skills
+    for (const sk of this.player.skills) {
+      sk.currentPp = sk.pp;
+    }
+
+    // Temporary AtkUp + DefUp buff
+    const buffTurns = this.secretRoomData?.reward.buffTurns ?? 10;
+    if (!this.player.statusEffects.some(s => s.type === SkillEffect.AtkUp)) {
+      this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: buffTurns });
+    }
+    if (!this.player.statusEffects.some(s => s.type === SkillEffect.DefUp)) {
+      this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: buffTurns });
+    }
+
+    this.showLog("The Healing Spring fully restores your HP and PP!");
+    this.showLog("ATK and DEF boosted for 10 turns!");
+
+    // Heal allies too
+    for (const ally of this.allies) {
+      if (ally.alive) {
+        ally.stats.hp = ally.stats.maxHp;
+        for (const sk of ally.skills) {
+          sk.currentPp = sk.pp;
+        }
+      }
+    }
+
+    this.updateHUD();
+  }
+
+  /** SkillShrine: learn a random rare skill (replace weakest skill if 4 skills already) */
+  private applySecretRewardSkill() {
+    this.secretRoomUsed = true;
+    const skillId = this.secretRoomData?.reward.skillId;
+    if (!skillId || !SKILL_DB[skillId]) {
+      this.showLog("The shrine is empty...");
+      return;
+    }
+
+    sfxSkill();
+    const template = SKILL_DB[skillId];
+    const newSkill = createSkill(template);
+
+    if (this.player.skills.length < 4) {
+      // Has room — just add
+      this.player.skills.push(newSkill);
+      this.showLog(`Learned ${newSkill.name} from the Skill Shrine!`);
+    } else {
+      // Replace the lowest-power skill
+      let weakestIdx = 0;
+      let weakestPower = Infinity;
+      for (let i = 0; i < this.player.skills.length; i++) {
+        if (this.player.skills[i].power < weakestPower) {
+          weakestPower = this.player.skills[i].power;
+          weakestIdx = i;
+        }
+      }
+      const replaced = this.player.skills[weakestIdx];
+      this.player.skills[weakestIdx] = newSkill;
+      this.showLog(`Learned ${newSkill.name}! (Replaced ${replaced.name})`);
+    }
+
+    this.updateHUD();
+  }
+
+  /** TrainingRoom: grant 2 level-ups worth of EXP */
+  private applySecretRewardTraining() {
+    this.secretRoomUsed = true;
+    const expGain = this.secretRoomData?.reward.exp ?? 100;
+    sfxLevelUp();
+
+    this.totalExp += expGain;
+    this.showLog(`Gained ${expGain} EXP from the Training Room!`);
+
+    // Process level ups
+    const { results } = processLevelUp(this.player.stats, 0, this.totalExp);
+    for (const r of results) {
+      this.showLog(`Level Up! Lv${r.newLevel}! HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
+    }
+
+    if (this.player.sprite) {
+      this.showDamagePopup(
+        this.player.sprite.x, this.player.sprite.y - 10,
+        0, 1, `+${expGain} EXP`
+      );
+    }
+
+    this.updateHUD();
+  }
+
+  /**
+   * Show WarpHub floor selection overlay.
+   * Allows the player to choose any floor from 1 to currentFloor - 1.
+   */
+  private showWarpHubOverlay() {
+    if (this.secretWarpOpen || this.currentFloor <= 1) {
+      this.showLog("The portal flickers but has nowhere to send you...");
+      this.secretRoomUsed = true;
+      return;
+    }
+
+    this.secretWarpOpen = true;
+    this.stopAutoExplore();
+
+    // Dim overlay
+    const overlay = this.add.rectangle(
+      GAME_WIDTH / 2, GAME_HEIGHT / 2,
+      GAME_WIDTH, GAME_HEIGHT,
+      0x000000, 0.75
+    ).setScrollFactor(0).setDepth(200).setInteractive();
+    this.secretRoomUI.push(overlay);
+
+    // Title
+    const title = this.add.text(GAME_WIDTH / 2, 60, "Warp Hub", {
+      fontSize: "16px", color: "#22d3ee", fontFamily: "monospace", fontStyle: "bold",
+      stroke: "#000000", strokeThickness: 2,
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    this.secretRoomUI.push(title);
+
+    const subtitle = this.add.text(GAME_WIDTH / 2, 85, "Choose a floor to warp to:", {
+      fontSize: "10px", color: "#aab0c8", fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    this.secretRoomUI.push(subtitle);
+
+    // Floor buttons (scrollable list of floors 1 to currentFloor - 1)
+    const maxFloor = this.currentFloor - 1;
+    const buttonsPerRow = 4;
+    const btnW = 60;
+    const btnH = 28;
+    const gap = 6;
+    const startY = 110;
+
+    for (let f = 1; f <= maxFloor; f++) {
+      const row = Math.floor((f - 1) / buttonsPerRow);
+      const col = (f - 1) % buttonsPerRow;
+      const bx = GAME_WIDTH / 2 - ((Math.min(maxFloor, buttonsPerRow) * (btnW + gap) - gap) / 2) + col * (btnW + gap) + btnW / 2;
+      const by = startY + row * (btnH + gap);
+
+      // Only show if it fits on screen
+      if (by > GAME_HEIGHT - 100) continue;
+
+      const btn = this.add.text(bx, by, `B${f}F`, {
+        fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace", fontStyle: "bold",
+        backgroundColor: "#334466", padding: { x: 8, y: 4 },
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
+
+      btn.on("pointerover", () => btn.setColor("#22d3ee"));
+      btn.on("pointerout", () => btn.setColor("#e0e0e0"));
+      btn.on("pointerdown", () => {
+        this.executeWarp(f);
+      });
+
+      this.secretRoomUI.push(btn);
+    }
+
+    // Cancel button
+    const cancelBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 60, "Cancel", {
+      fontSize: "12px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
+      backgroundColor: "#1a1a2ecc", padding: { x: 16, y: 6 },
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
+
+    cancelBtn.on("pointerover", () => cancelBtn.setColor("#ff7777"));
+    cancelBtn.on("pointerout", () => cancelBtn.setColor("#ef4444"));
+    cancelBtn.on("pointerdown", () => {
+      this.closeWarpHubOverlay();
+    });
+
+    this.secretRoomUI.push(cancelBtn);
+  }
+
+  /**
+   * Execute the warp to a chosen floor.
+   */
+  private executeWarp(targetFloor: number) {
+    this.closeWarpHubOverlay();
+    this.secretRoomUsed = true;
+
+    sfxStairs();
+    this.showLog(`Warped to B${targetFloor}F!`);
+
+    this.gameOver = true;
+
+    // Pass modifier IDs through floor transitions
+    const modifierIds = this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined;
+
+    this.cameras.main.fadeOut(500, 0, 0, 0);
+    this.time.delayedCall(600, () => {
+      this.scene.restart({
+        floor: targetFloor,
+        hp: this.player.stats.hp,
+        maxHp: this.player.stats.maxHp,
+        skills: this.player.skills,
+        inventory: this.inventory,
+        level: this.player.stats.level,
+        atk: this.player.stats.atk,
+        def: this.player.stats.def,
+        exp: this.totalExp,
+        dungeonId: this.dungeonDef.id,
+        allies: this.serializeAllies(),
+        belly: this.belly,
+        starter: this.starterId,
+        challengeMode: this.challengeMode ?? undefined,
+        modifiers: modifierIds,
+        runElapsedTime: this.runElapsedSeconds,
+        scoreChain: this.scoreChain,
+        legendaryEncountered: this.legendaryEncountered,
+        questItemsCollected: this.questItemsCollected,
+        questItemsUsed: this.questItemsUsed,
+      });
+    });
+  }
+
+  /**
+   * Close the WarpHub overlay.
+   */
+  private closeWarpHubOverlay() {
+    this.secretWarpOpen = false;
+    for (const obj of this.secretRoomUI) {
+      if (obj && (obj as Phaser.GameObjects.GameObject).scene) {
+        obj.destroy();
+      }
+    }
+    this.secretRoomUI = [];
   }
 }

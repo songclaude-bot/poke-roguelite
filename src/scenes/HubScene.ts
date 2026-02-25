@@ -25,6 +25,7 @@ import {
   getTodayDateString, updateQuestProgress, RunQuestData,
 } from "../core/quests";
 import { NPC_LIST, getNpcDialogue, NPC } from "../core/npc-dialogue";
+import { getTotalTalentPoints } from "../core/talent-tree";
 
 /**
  * HubScene — the town between dungeon runs.
@@ -298,7 +299,7 @@ export class HubScene extends Phaser.Scene {
     const currentStarter = this.meta.starter ?? "mudkip";
     const starterName = currentStarter.charAt(0).toUpperCase() + currentStarter.slice(1);
 
-    const fixedY = GAME_HEIGHT - 294;
+    const fixedY = GAME_HEIGHT - 321;
     const btnSpacing = 27;
     // Solid background behind fixed buttons — covers from scroll end to bottom
     const fixedBgTop = fixedY - 30;
@@ -338,12 +339,17 @@ export class HubScene extends Phaser.Scene {
       "Item Forge", `Stored: ${storedItemCount} items`, "#ff8c42",
       () => this.scene.start("CraftingScene")
     );
-    const seenCount = (this.meta.pokemonSeen ?? []).length;
+    const talentPoints = getTotalTalentPoints(this.meta.talentLevels ?? {});
     this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 6, btnW, 28,
+      "Talents", talentPoints > 0 ? `${talentPoints} points invested` : "Permanent bonuses", "#fbbf24",
+      () => this.scene.start("TalentTreeScene")
+    );
+    const seenCount = (this.meta.pokemonSeen ?? []).length;
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 7, btnW, 28,
       "Pokedex", `Seen: ${seenCount} Pokemon`, "#e879f9",
       () => this.scene.start("PokedexScene")
     );
-    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 7, btnW, 28,
+    this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 8, btnW, 28,
       "Records", `Clears: ${this.meta.totalClears}  Best: B${this.meta.bestFloor}F`, "#60a5fa",
       () => this.scene.start("AchievementScene")
     );
@@ -363,7 +369,7 @@ export class HubScene extends Phaser.Scene {
     const allQuests = [...(this.meta.activeQuests ?? []), ...(this.meta.challengeQuests ?? [])];
     const claimableCount = allQuests.filter(q => q.completed && !q.claimed).length;
     const questDesc = claimableCount > 0 ? `${claimableCount} ready to claim!` : "Daily & challenge missions";
-    const questBtnResult = this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 8, btnW, 28,
+    const questBtnResult = this.createFixedButton(GAME_WIDTH / 2, fixedY + btnSpacing * 9, btnW, 28,
       "Quests", questDesc, "#10b981",
       () => this.scene.start("QuestBoardScene")
     );
@@ -371,7 +377,7 @@ export class HubScene extends Phaser.Scene {
     // Notification badge for claimable quests
     if (claimableCount > 0) {
       const badgeX = GAME_WIDTH / 2 + btnW / 2 - 16;
-      const badgeY = fixedY + btnSpacing * 8 - 8;
+      const badgeY = fixedY + btnSpacing * 9 - 8;
       const badge = this.add.circle(badgeX, badgeY, 7, 0xef4444).setDepth(53);
       const badgeText = this.add.text(badgeX, badgeY, String(claimableCount), {
         fontSize: "8px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",

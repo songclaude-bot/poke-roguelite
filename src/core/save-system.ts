@@ -87,6 +87,8 @@ export interface MetaSaveData {
   activeQuests?: Quest[];       // current daily quests
   questLastDate?: string;       // date string (YYYY-MM-DD) of when daily quests were generated
   challengeQuests?: Quest[];    // persistent challenge quests
+  // Talent Tree levels (talentId → level)
+  talentLevels?: Record<string, number>;
 }
 
 const SAVE_VERSION = 1;
@@ -172,6 +174,7 @@ export function loadMeta(): MetaSaveData {
     if (data.activeQuests === undefined) data.activeQuests = [];
     if (data.questLastDate === undefined) data.questLastDate = undefined;
     if (data.challengeQuests === undefined) data.challengeQuests = [];
+    if (data.talentLevels === undefined) data.talentLevels = {};
     return data;
   } catch {
     return defaultMeta();
