@@ -16,6 +16,21 @@ export interface PlayerStats {
   endlessBestFloor: number;
   challengeClears: number;
   uniqueStartersUsed: number;
+  // New feature stats
+  totalShrinesUsed: number;
+  maxActiveBlessings: number;
+  dungeonsClearedWithCurses: number;
+  forgeLevel: number;
+  uniqueTypeGemsUsed: number;
+  totalRescues: number;
+  totalEliteDefeated: number;
+  totalShadowDefeated: number;
+  totalAncientDefeated: number;
+  bestChainTier: string;
+  totalPuzzlesSolved: number;
+  maxRelicsHeld: number;
+  totalAllyEvolutions: number;
+  bestTurnClear: number;
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
@@ -53,4 +68,38 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Variety
   { id: "fiveStarters", name: "Collector", description: "Use 5 different starters", condition: s => s.uniqueStartersUsed >= 5, icon: "#" },
   { id: "twentyStarters", name: "Pokemon Trainer", description: "Use 20 different starters", condition: s => s.uniqueStartersUsed >= 20, icon: "##" },
+
+  // Shrines & Blessings
+  { id: "shrineSeeker", name: "Shrine Seeker", description: "Use 10 shrines across all runs", condition: s => s.totalShrinesUsed >= 10, icon: "^" },
+  { id: "blessedSoul", name: "Blessed Soul", description: "Have 3 active blessings at once", condition: s => s.maxActiveBlessings >= 3, icon: "^^" },
+  { id: "curseBreaker", name: "Curse Breaker", description: "Complete a dungeon with 2+ active curses", condition: s => s.dungeonsClearedWithCurses >= 1, icon: "^!" },
+
+  // Forge
+  { id: "masterForger", name: "Master Forger", description: "Reach forge level 5", condition: s => s.forgeLevel >= 5, icon: "%" },
+
+  // Type Gems
+  { id: "gemCollector", name: "Gem Collector", description: "Use 10 different type gems", condition: s => s.uniqueTypeGemsUsed >= 10, icon: "<>" },
+
+  // Rescue
+  { id: "rescueRanger", name: "Rescue Ranger", description: "Get rescued 5 times total", condition: s => s.totalRescues >= 5, icon: "+" },
+
+  // Enemy Variants
+  { id: "variantHunter", name: "Variant Hunter", description: "Defeat 10 Elite enemies", condition: s => s.totalEliteDefeated >= 10, icon: "E" },
+  { id: "shadowSlayer", name: "Shadow Slayer", description: "Defeat 5 Shadow enemies", condition: s => s.totalShadowDefeated >= 5, icon: "S" },
+  { id: "ancientConqueror", name: "Ancient Conqueror", description: "Defeat an Ancient enemy", condition: s => s.totalAncientDefeated >= 1, icon: "A" },
+
+  // Chain
+  { id: "chainMaster", name: "Chain Master", description: "Reach SSS chain tier", condition: s => s.bestChainTier === "SSS", icon: "&&" },
+
+  // Puzzle
+  { id: "puzzleMaster", name: "Puzzle Master", description: "Solve 20 puzzles total", condition: s => s.totalPuzzlesSolved >= 20, icon: "?" },
+
+  // Relics
+  { id: "fullHouse", name: "Full House", description: "Have 3 relics at once", condition: s => s.maxRelicsHeld >= 3, icon: "R" },
+
+  // Ally Evolution
+  { id: "evolutionExpert", name: "Evolution Expert", description: "Evolve an ally in a dungeon", condition: s => s.totalAllyEvolutions >= 1, icon: ">" },
+
+  // Speed
+  { id: "speedDemon", name: "Speed Demon", description: "Clear a dungeon in under 50 turns", condition: s => s.bestTurnClear > 0 && s.bestTurnClear < 50, icon: "!" },
 ];

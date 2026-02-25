@@ -53,6 +53,21 @@ export class AchievementScene extends Phaser.Scene {
       endlessBestFloor: this.meta.endlessBestFloor ?? 0,
       challengeClears: this.meta.challengeClears ?? 0,
       uniqueStartersUsed: (this.meta.startersUsed ?? []).length,
+      // New feature stats
+      totalShrinesUsed: this.meta.totalShrinesUsed ?? 0,
+      maxActiveBlessings: this.meta.maxActiveBlessings ?? 0,
+      dungeonsClearedWithCurses: this.meta.dungeonsClearedWithCurses ?? 0,
+      forgeLevel: this.meta.forgeLevel ?? 0,
+      uniqueTypeGemsUsed: (this.meta.uniqueTypeGemsUsed ?? []).length,
+      totalRescues: this.meta.totalRescues ?? 0,
+      totalEliteDefeated: this.meta.totalEliteDefeated ?? 0,
+      totalShadowDefeated: this.meta.totalShadowDefeated ?? 0,
+      totalAncientDefeated: this.meta.totalAncientDefeated ?? 0,
+      bestChainTier: this.meta.bestChainTier ?? "",
+      totalPuzzlesSolved: this.meta.totalPuzzlesSolved ?? 0,
+      maxRelicsHeld: this.meta.maxRelicsHeld ?? 0,
+      totalAllyEvolutions: this.meta.totalAllyEvolutions ?? 0,
+      bestTurnClear: this.meta.bestTurnClear ?? 0,
     };
 
     // Background

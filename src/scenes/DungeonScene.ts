@@ -75,6 +75,9 @@ import {
   getBgmVolume, getSfxVolume, setBgmVolume, setSfxVolume,
 } from "../core/sound-manager";
 import { DungeonEvent, EventChoice, rollDungeonEvent } from "../core/dungeon-events";
+import {
+  FloorEvent, FloorEventType, rollFloorEvent, invertEffectiveness, floorEventColorHex,
+} from "../core/floor-events";
 import { FloorTheme, getDepthAdjustedTheme, darkenColor } from "../core/floor-themes";
 import { addToStorage } from "../core/crafting";
 import {
@@ -312,6 +315,10 @@ export class DungeonScene extends Phaser.Scene {
   private eventUI: Phaser.GameObjects.GameObject[] = [];
   private currentEvent: DungeonEvent | null = null;
   private eventMarker: Phaser.GameObjects.Text | null = null;
+
+  // Floor Event (floor-wide global effect)
+  private floorEvent: FloorEvent | null = null;
+  private floorEventBadge: Phaser.GameObjects.Text | null = null;
 
   // Puzzle Room
   private puzzleRoom: { x: number; y: number; w: number; h: number } | null = null;
@@ -2409,6 +2416,75 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // ── Floor Event (floor-wide global effect) ──
+    this.floorEvent = rollFloorEvent(this.currentFloor, this.dungeonDef.difficulty);
+    if (this.floorEvent) {
+      const fe = this.floorEvent;
+      const feColorHex = floorEventColorHex(fe);
+
+      // HUD badge (below mutation badges)
+      const mutBadgeCount = this.mutationHudTexts?.length ?? 0;
+      const feBadgeY = 64 + mutBadgeCount * 14;
+      this.floorEventBadge = this.add.text(8, feBadgeY, `${fe.icon} ${fe.name}`, {
+        fontSize: "8px", color: feColorHex, fontFamily: "monospace", fontStyle: "bold",
+        backgroundColor: "#00000088", padding: { x: 3, y: 1 },
+      }).setScrollFactor(0).setDepth(103).setInteractive();
+      this.floorEventBadge.on("pointerdown", () => {
+        this.showLog(`${fe.name}: ${fe.description}`);
+      });
+
+      // Auto-dismiss banner at screen center (delayed to avoid overlapping mutation banner)
+      const bannerDelay = this.floorMutations.length > 0 ? 2800 : 200;
+      this.time.delayedCall(bannerDelay, () => {
+        const feBannerBg = this.add.rectangle(
+          GAME_WIDTH / 2, 40, GAME_WIDTH * 0.85, 40,
+          0x000000, 0.88
+        ).setScrollFactor(0).setDepth(300);
+        const feBannerTitle = this.add.text(GAME_WIDTH / 2, 32, `${fe.icon} ${fe.name}`, {
+          fontSize: "12px", color: feColorHex, fontFamily: "monospace", fontStyle: "bold",
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+        const feBannerDesc = this.add.text(GAME_WIDTH / 2, 46, fe.description, {
+          fontSize: "8px", color: "#e2e8f0", fontFamily: "monospace",
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+        this.time.delayedCall(2500, () => {
+          feBannerBg.destroy();
+          feBannerTitle.destroy();
+          feBannerDesc.destroy();
+        });
+      });
+
+      this.showLog(`Floor Event: ${fe.name} — ${fe.description}`);
+
+      // Apply FamineFloor: destroy all floor items that were just spawned
+      if (fe.type === FloorEventType.FamineFloor) {
+        for (const fi of this.floorItems) {
+          if (fi.sprite) fi.sprite.destroy();
+        }
+        this.floorItems = [];
+      }
+
+      // Apply TreasureFloor: spawn extra items (doubling)
+      if (fe.type === FloorEventType.TreasureFloor) {
+        const extraCount = Math.max(1, Math.floor(this.dungeonDef.itemsPerFloor));
+        for (let i = 0; i < extraCount; i++) {
+          const room = rooms[Math.floor(Math.random() * rooms.length)];
+          const ix = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
+          const iy = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
+          if (terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
+          if (ix === stairsPos.x && iy === stairsPos.y) continue;
+          const item = rollFloorItem();
+          const icon = item.category === "berry" ? "\u25CF" : item.category === "seed" ? "\u25C6" : item.category === "gem" ? "\u25C7" : "\u2605";
+          const color = "#fde68a"; // golden tint for treasure items
+          const sprite = this.add.text(
+            ix * TILE_DISPLAY + TILE_DISPLAY / 2,
+            iy * TILE_DISPLAY + TILE_DISPLAY / 2,
+            icon, { fontSize: "16px", color, fontFamily: "monospace" }
+          ).setOrigin(0.5).setDepth(6);
+          this.floorItems.push({ x: ix, y: iy, item, sprite });
+        }
+      }
+    }
+
     // ── Minimap ──
     this.minimapBg = this.add.graphics().setScrollFactor(0).setDepth(100);
     this.minimapBorder = this.add.graphics().setScrollFactor(0).setDepth(100);
@@ -3153,11 +3229,15 @@ export class DungeonScene extends Phaser.Scene {
     const pad = 4;
 
     // Reveal area around player each update (DarkFloor mutation reduces radius, talent increases)
+    // FoggyFloor event: override sight to 2
     const revealTalentBonus = this.talentEffects.sightRangeBonus ?? 0;
     const blessingSightReduction = getBlessingEffect(this.activeBlessings, "sightReduction");
-    const revealRadius = Math.max(1, ((hasMutation(this.floorMutations, MutationType.DarkFloor)
-      ? getMutationEffect(MutationType.DarkFloor, "sightRadius")
-      : 4) + revealTalentBonus) - blessingSightReduction);
+    const baseSight = this.floorEvent?.type === FloorEventType.FoggyFloor
+      ? 2
+      : (hasMutation(this.floorMutations, MutationType.DarkFloor)
+        ? getMutationEffect(MutationType.DarkFloor, "sightRadius")
+        : 4);
+    const revealRadius = Math.max(1, (baseSight + revealTalentBonus) - blessingSightReduction);
     this.revealArea(this.player.tileX, this.player.tileY, revealRadius);
 
     // ── Background (themed) ──
@@ -5926,7 +6006,9 @@ export class DungeonScene extends Phaser.Scene {
       const ngBellyMult = 1 - this.ngPlusBonuses.bellyDrainReduction / 100;
       const talentBellyMult = 1 - (this.talentEffects.bellyDrainReduction ?? 0) / 100;
       const blessingBellyMult = 1 + getBlessingEffect(this.activeBlessings, "bellyDrainMult");
-      const drainRate = (0.5 + this.dungeonDef.difficulty * 0.1) * this.difficultyMods.bellyDrainMult * ngBellyMult * talentBellyMult * blessingBellyMult;
+      // FamineFloor: belly drains 2x faster
+      const famineFloorMult = this.floorEvent?.type === FloorEventType.FamineFloor ? 2.0 : 1.0;
+      const drainRate = (0.5 + this.dungeonDef.difficulty * 0.1) * this.difficultyMods.bellyDrainMult * ngBellyMult * talentBellyMult * blessingBellyMult * famineFloorMult;
       const prevBelly = this.belly;
       this.belly = Math.max(0, this.belly - drainRate);
 
@@ -9809,7 +9891,11 @@ export class DungeonScene extends Phaser.Scene {
         return;
       }
 
-      const effectiveness = getEffectiveness(attacker.attackType, defender.types);
+      let effectiveness = getEffectiveness(attacker.attackType, defender.types);
+      // InverseFloor: reverse type effectiveness
+      if (this.floorEvent?.type === FloorEventType.InverseFloor) {
+        effectiveness = invertEffectiveness(effectiveness);
+      }
       const effText = effectivenessText(effectiveness);
 
       let atk = getEffectiveAtk(attacker);
@@ -9938,6 +10024,11 @@ export class DungeonScene extends Phaser.Scene {
         this.checkDeath(attacker);
       }
 
+      // WindyFloor: knockback defender 1 tile away from attacker
+      if (this.floorEvent?.type === FloorEventType.WindyFloor && defender.alive && defender.sprite) {
+        this.applyWindyKnockback(attacker, defender);
+      }
+
       this.updateHUD();
       this.checkDeath(defender);
       this.time.delayedCall(250, resolve);
@@ -10014,7 +10105,11 @@ export class DungeonScene extends Phaser.Scene {
             continue;
           }
 
-          const effectiveness = getEffectiveness(skill.type, target.types);
+          let effectiveness = getEffectiveness(skill.type, target.types);
+          // InverseFloor: reverse type effectiveness
+          if (this.floorEvent?.type === FloorEventType.InverseFloor) {
+            effectiveness = invertEffectiveness(effectiveness);
+          }
           const effText = effectivenessText(effectiveness);
           let skillAtk = getEffectiveAtk(user);
           let skillDef = getEffectiveDef(target);
@@ -10649,6 +10744,12 @@ export class DungeonScene extends Phaser.Scene {
     } else {
       // Enemy defeated — track for gold
       this.enemiesDefeated++;
+      // TreasureFloor: bonus gold per enemy defeated
+      if (this.floorEvent?.type === FloorEventType.TreasureFloor) {
+        const treasureGold = Math.floor(5 + this.currentFloor * 3);
+        this.gold += treasureGold;
+        this.showLog(`Treasure bonus! +${treasureGold}G`);
+      }
       // Run log: enemy defeated
       this.runLog.add(RunLogEvent.EnemyDefeated, entity.name, this.currentFloor, this.turnManager.turn);
 
@@ -10896,6 +10997,18 @@ export class DungeonScene extends Phaser.Scene {
               this.updateHUD();
             });
           }
+        }
+      }
+
+      // ── LuckyFloor: every enemy drops an item ──
+      if (this.floorEvent?.type === FloorEventType.LuckyFloor && this.challengeMode !== "noItems") {
+        if (this.inventory.length < MAX_INVENTORY) {
+          const luckyDrop = rollFloorItem();
+          const luckyExisting = this.inventory.find(s => s.item.id === luckyDrop.id && luckyDrop.stackable);
+          if (luckyExisting) luckyExisting.count++;
+          else this.inventory.push({ item: luckyDrop, count: 1 });
+          this.showLog(`Lucky! ${entity.name} dropped a ${luckyDrop.name}!`);
+          sfxItemPickup();
         }
       }
 
@@ -11466,8 +11579,78 @@ export class DungeonScene extends Phaser.Scene {
               }
             }
           }
+
+          // ── WarpFloor: 10% chance enemy teleports to a random ground tile ──
+          if (this.floorEvent?.type === FloorEventType.WarpFloor && enemy.alive && Math.random() < 0.10) {
+            this.warpEntityRandom(enemy);
+          }
         };
       });
+  }
+
+  // ── Floor Event Helpers ──
+
+  /** WindyFloor: push defender 1 tile away from attacker (if ground tile is free). */
+  private applyWindyKnockback(attacker: Entity, defender: Entity) {
+    const dx = defender.tileX - attacker.tileX;
+    const dy = defender.tileY - attacker.tileY;
+    // Normalize to -1/0/1
+    const pushX = dx === 0 ? 0 : (dx > 0 ? 1 : -1);
+    const pushY = dy === 0 ? 0 : (dy > 0 ? 1 : -1);
+    if (pushX === 0 && pushY === 0) return;
+
+    const nx = defender.tileX + pushX;
+    const ny = defender.tileY + pushY;
+    // Bounds + terrain check
+    if (nx < 0 || ny < 0 || nx >= this.dungeon.width || ny >= this.dungeon.height) return;
+    if (this.dungeon.terrain[ny][nx] !== TerrainType.GROUND) return;
+    // Check if another entity occupies that tile
+    if (this.allEntities.some(e => e.alive && e.tileX === nx && e.tileY === ny && e !== defender)) return;
+
+    defender.tileX = nx;
+    defender.tileY = ny;
+    if (defender.sprite) {
+      this.tweens.add({
+        targets: defender.sprite,
+        x: nx * TILE_DISPLAY + TILE_DISPLAY / 2,
+        y: ny * TILE_DISPLAY + TILE_DISPLAY / 2,
+        duration: 100,
+        ease: "Quad.easeOut",
+      });
+    }
+  }
+
+  /** WarpFloor: teleport an entity to a random walkable ground tile. */
+  private warpEntityRandom(entity: Entity) {
+    const { width, height, terrain } = this.dungeon;
+    // Collect candidate tiles
+    const candidates: { x: number; y: number }[] = [];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (terrain[y][x] !== TerrainType.GROUND) continue;
+        if (this.allEntities.some(e => e.alive && e.tileX === x && e.tileY === y)) continue;
+        candidates.push({ x, y });
+      }
+    }
+    if (candidates.length === 0) return;
+    const dest = candidates[Math.floor(Math.random() * candidates.length)];
+
+    // Flash before warp
+    if (entity.sprite) {
+      entity.sprite.setTint(0xc084fc);
+      this.time.delayedCall(150, () => {
+        if (entity.sprite) entity.sprite.clearTint();
+      });
+    }
+
+    entity.tileX = dest.x;
+    entity.tileY = dest.y;
+    if (entity.sprite) {
+      entity.sprite.setPosition(
+        dest.x * TILE_DISPLAY + TILE_DISPLAY / 2,
+        dest.y * TILE_DISPLAY + TILE_DISPLAY / 2
+      );
+    }
   }
 
   // ── Ally AI ──

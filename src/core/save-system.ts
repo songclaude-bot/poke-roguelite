@@ -91,6 +91,21 @@ export interface MetaSaveData {
   talentLevels?: Record<string, number>;
   // Forge upgrade level for held items (0-5)
   forgeLevel?: number;
+  // Achievement tracking: new feature stats
+  totalShrinesUsed?: number;       // total shrines interacted with across all runs
+  maxActiveBlessings?: number;     // max blessings held simultaneously in a single run
+  dungeonsClearedWithCurses?: number; // number of dungeon clears while having 2+ curses
+  totalTypeGemsUsed?: number;      // total type gems consumed across all runs
+  uniqueTypeGemsUsed?: string[];   // unique type gem IDs used
+  totalRescues?: number;           // total rescue uses across all runs
+  totalEliteDefeated?: number;     // total Elite variant enemies defeated
+  totalShadowDefeated?: number;    // total Shadow variant enemies defeated
+  totalAncientDefeated?: number;   // total Ancient variant enemies defeated
+  bestChainTier?: string;          // best chain tier reached (C/B/A/S/SS/SSS)
+  totalPuzzlesSolved?: number;     // total puzzles solved across all runs
+  maxRelicsHeld?: number;          // max relics held at once in a single run
+  totalAllyEvolutions?: number;    // total ally evolutions triggered in dungeons
+  bestTurnClear?: number;          // fewest turns to clear a dungeon
 }
 
 const SAVE_VERSION = 1;
@@ -178,6 +193,21 @@ export function loadMeta(): MetaSaveData {
     if (data.challengeQuests === undefined) data.challengeQuests = [];
     if (data.talentLevels === undefined) data.talentLevels = {};
     if (data.forgeLevel === undefined) data.forgeLevel = 0;
+    // New achievement tracking fields
+    if (data.totalShrinesUsed === undefined) data.totalShrinesUsed = 0;
+    if (data.maxActiveBlessings === undefined) data.maxActiveBlessings = 0;
+    if (data.dungeonsClearedWithCurses === undefined) data.dungeonsClearedWithCurses = 0;
+    if (data.totalTypeGemsUsed === undefined) data.totalTypeGemsUsed = 0;
+    if (data.uniqueTypeGemsUsed === undefined) data.uniqueTypeGemsUsed = [];
+    if (data.totalRescues === undefined) data.totalRescues = 0;
+    if (data.totalEliteDefeated === undefined) data.totalEliteDefeated = 0;
+    if (data.totalShadowDefeated === undefined) data.totalShadowDefeated = 0;
+    if (data.totalAncientDefeated === undefined) data.totalAncientDefeated = 0;
+    if (data.bestChainTier === undefined) data.bestChainTier = "";
+    if (data.totalPuzzlesSolved === undefined) data.totalPuzzlesSolved = 0;
+    if (data.maxRelicsHeld === undefined) data.maxRelicsHeld = 0;
+    if (data.totalAllyEvolutions === undefined) data.totalAllyEvolutions = 0;
+    if (data.bestTurnClear === undefined) data.bestTurnClear = 0;
     return data;
   } catch {
     return defaultMeta();
