@@ -6,6 +6,7 @@ import {
   TILE_SCALE,
   TILE_DISPLAY,
 } from "../config";
+import { createDomHud, layoutHudButtons, DomHudElements } from "../ui/dom-hud";
 import { generateDungeon, DungeonData, TerrainType } from "../core/dungeon-generator";
 import { getTileIndex } from "../core/autotiler";
 import { Direction, DIR_DX, DIR_DY, angleToDirection } from "../core/direction";
@@ -91,6 +92,11 @@ import {
   shouldEncounterLegendary,
   rollLegendaryEncounter,
 } from "../core/legendary-encounters";
+import {
+  DungeonMutation, MutationType,
+  rollMutations, hasMutation, getMutationEffect, getMutationDef,
+  mutationColorHex,
+} from "../core/dungeon-mutations";
 
 interface AllyData {
   speciesId: string;
@@ -338,6 +344,12 @@ export class DungeonScene extends Phaser.Scene {
   // Quick-slot: last used item
   private lastUsedItemId: string | null = null;
   private quickSlotBtn: Phaser.GameObjects.Text | null = null;
+  private pickupBtnPhaser: Phaser.GameObjects.Text | null = null;
+  private teamBtnPhaser: Phaser.GameObjects.Text | null = null;
+
+  // DOM-based HUD overlay (always crisp text)
+  private domHud: DomHudElements | null = null;
+  private domHudElement: Phaser.GameObjects.DOMElement | null = null;
 
   // Challenge mode state
   private challengeMode: string | null = null;
@@ -403,6 +415,12 @@ export class DungeonScene extends Phaser.Scene {
   private runElapsedSeconds = 0;          // total seconds elapsed across floors
   private timerText!: Phaser.GameObjects.Text;
   private timerEvent: Phaser.Time.TimerEvent | null = null;
+
+  // Dungeon Mutation state (per-floor)
+  private floorMutations: DungeonMutation[] = [];
+  private mutationHudTexts: Phaser.GameObjects.Text[] = [];
+  private typeShiftType: PokemonType | null = null;         // for TypeShift mutation
+  private mirrorApplied = false;                            // track if MirrorWorld already applied
 
   constructor() {
     super({ key: "DungeonScene" });
@@ -984,6 +1002,18 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Floor Theme ──
     this.currentTheme = getDepthAdjustedTheme(this.dungeonDef.id, this.currentFloor);
+
+    // ── Roll Floor Mutations early (before spawning) ──
+    this.floorMutations = rollMutations(this.currentFloor, this.dungeonDef.id);
+    this.typeShiftType = null;
+    this.mirrorApplied = false;
+    this.mutationHudTexts = [];
+
+    if (hasMutation(this.floorMutations, MutationType.TypeShift)) {
+      const allTypes = Object.values(PokemonType);
+      this.typeShiftType = allTypes[Math.floor(Math.random() * allTypes.length)];
+    }
+
     const rooms = this.dungeon.rooms;
 
     // Build a set of room tiles for corridor vs room distinction
@@ -1182,7 +1212,9 @@ export class DungeonScene extends Phaser.Scene {
 
       for (let i = 1; i < rooms.length; i++) {
         const room = rooms[i];
-        const enemyCount = this.modifierEffects.doubleEnemies ? enemiesPerRoom(this.currentFloor) * 2 : enemiesPerRoom(this.currentFloor);
+        const baseEnemyCount = this.modifierEffects.doubleEnemies ? enemiesPerRoom(this.currentFloor) * 2 : enemiesPerRoom(this.currentFloor);
+        const mutEnemyMult = hasMutation(this.floorMutations, MutationType.EnemySwarm) ? getMutationEffect(MutationType.EnemySwarm, "enemyCountMult") : 1;
+        const enemyCount = Math.max(1, Math.ceil(baseEnemyCount * mutEnemyMult));
         for (let e = 0; e < enemyCount; e++) {
           const ex = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
           const ey = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
@@ -1208,6 +1240,25 @@ export class DungeonScene extends Phaser.Scene {
             enemyStats.atk = Math.floor(enemyStats.atk * this.difficultyMods.enemyAtkMult);
           }
 
+          // ── Floor Mutation: GiantEnemies (+30% HP) ──
+          if (hasMutation(this.floorMutations, MutationType.GiantEnemies)) {
+            const hpM = getMutationEffect(MutationType.GiantEnemies, "enemyHpMult");
+            enemyStats.hp = Math.floor(enemyStats.hp * hpM);
+            enemyStats.maxHp = Math.floor(enemyStats.maxHp * hpM);
+          }
+          // ── Floor Mutation: TreasureFloor (+50% ATK & HP) ──
+          if (hasMutation(this.floorMutations, MutationType.TreasureFloor)) {
+            const tHp = getMutationEffect(MutationType.TreasureFloor, "enemyHpMult");
+            const tAtk = getMutationEffect(MutationType.TreasureFloor, "enemyAtkMult");
+            enemyStats.hp = Math.floor(enemyStats.hp * tHp);
+            enemyStats.maxHp = Math.floor(enemyStats.maxHp * tHp);
+            enemyStats.atk = Math.floor(enemyStats.atk * tAtk);
+          }
+
+          // ── Floor Mutation: TypeShift — override types ──
+          const enemyTypes = this.typeShiftType ? [this.typeShiftType] : sp.types;
+          const enemyAttackType = this.typeShiftType ?? sp.attackType;
+
           const enemy: Entity = {
             tileX: ex, tileY: ey,
             facing: Direction.Down,
@@ -1215,8 +1266,8 @@ export class DungeonScene extends Phaser.Scene {
             alive: true,
             spriteKey: sp.spriteKey,
             name: sp.name,
-            types: sp.types,
-            attackType: sp.attackType,
+            types: enemyTypes,
+            attackType: enemyAttackType,
             skills: createSpeciesSkills(sp),
             statusEffects: [],
             speciesId: sp.spriteKey, // for recruitment
@@ -1227,7 +1278,10 @@ export class DungeonScene extends Phaser.Scene {
             enemy.sprite = this.add.sprite(
               this.tileToPixelX(ex), this.tileToPixelY(ey), eTex
             );
-            enemy.sprite.setScale(TILE_SCALE).setDepth(9);
+            const giantScale = hasMutation(this.floorMutations, MutationType.GiantEnemies)
+              ? TILE_SCALE * getMutationEffect(MutationType.GiantEnemies, "enemySpriteScale")
+              : TILE_SCALE;
+            enemy.sprite.setScale(giantScale).setDepth(9);
             const eAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
             if (this.anims.exists(eAnim)) enemy.sprite.play(eAnim);
           }
@@ -1508,7 +1562,8 @@ export class DungeonScene extends Phaser.Scene {
     const ngItemDropMult = 1 + this.ngPlusBonuses.itemDropPercent / 100;
     // Lucky enchantment: +5% item find chance
     const enchItemMult = this.enchantment?.id === "lucky" ? 1.05 : 1.0;
-    const itemCount = Math.max(1, Math.floor(this.dungeonDef.itemsPerFloor * this.difficultyMods.itemDropMult * ngItemDropMult * enchItemMult));
+    const mutItemMult = hasMutation(this.floorMutations, MutationType.ItemRain) ? getMutationEffect(MutationType.ItemRain, "itemMult") : 1;
+    const itemCount = Math.max(1, Math.floor(this.dungeonDef.itemsPerFloor * this.difficultyMods.itemDropMult * ngItemDropMult * enchItemMult * mutItemMult));
     for (let i = 0; i < itemCount; i++) {
       const room = rooms[Math.floor(Math.random() * rooms.length)];
       const ix = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
@@ -1830,7 +1885,10 @@ export class DungeonScene extends Phaser.Scene {
     // ── Fog of War ──
     this.visited = Array.from({ length: height }, () => new Array(width).fill(false));
     this.currentlyVisible = Array.from({ length: height }, () => new Array(width).fill(false));
-    this.revealArea(playerStart.x, playerStart.y, 4);
+    const sightRadius = hasMutation(this.floorMutations, MutationType.DarkFloor)
+      ? getMutationEffect(MutationType.DarkFloor, "sightRadius")
+      : 4;
+    this.revealArea(playerStart.x, playerStart.y, sightRadius);
 
     // ── Camera ──
     const mapPixelW = width * TILE_DISPLAY;
@@ -1900,7 +1958,9 @@ export class DungeonScene extends Phaser.Scene {
         if (this.gameOver) return;
         if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.teamPanelOpen || this.fullMapOpen) return;
         this.runElapsedSeconds++;
-        this.timerText.setText(this.formatTime(this.runElapsedSeconds));
+        const timeStr = this.formatTime(this.runElapsedSeconds);
+        this.timerText.setText(timeStr);
+        if (this.domHud) this.domHud.timerLabel.textContent = timeStr;
       },
     });
 
@@ -2024,6 +2084,89 @@ export class DungeonScene extends Phaser.Scene {
       });
     }
 
+    // ── Floor Mutation: MirrorWorld — swap player and all enemy ATK/DEF ──
+    if (hasMutation(this.floorMutations, MutationType.MirrorWorld) && !this.mirrorApplied) {
+      this.mirrorApplied = true;
+      const pAtk = this.player.stats.atk;
+      this.player.stats.atk = this.player.stats.def;
+      this.player.stats.def = pAtk;
+      for (const enemy of this.enemies) {
+        const eAtk = enemy.stats.atk;
+        enemy.stats.atk = enemy.stats.def;
+        enemy.stats.def = eAtk;
+      }
+    }
+
+    // ── Floor Mutation: TreasureFloor — spawn extra rare items ──
+    if (hasMutation(this.floorMutations, MutationType.TreasureFloor)) {
+      const extraCount = getMutationEffect(MutationType.TreasureFloor, "extraRareItems");
+      for (let i = 0; i < extraCount; i++) {
+        const room = rooms[Math.floor(Math.random() * rooms.length)];
+        const ix = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
+        const iy = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
+        if (terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
+
+        const item = rollFloorItem();
+        const icon = item.category === "berry" ? "\u25CF" : item.category === "seed" ? "\u25C6" : "\u2605";
+        const color = "#fde68a"; // golden tint for treasure items
+        const sprite = this.add.text(
+          ix * TILE_DISPLAY + TILE_DISPLAY / 2,
+          iy * TILE_DISPLAY + TILE_DISPLAY / 2,
+          icon, { fontSize: "16px", color, fontFamily: "monospace" }
+        ).setOrigin(0.5).setDepth(6);
+
+        this.floorItems.push({ x: ix, y: iy, item, sprite });
+      }
+    }
+
+    // ── Mutation HUD Badges (left side, below timer text) ──
+    if (this.floorMutations.length > 0) {
+      const mutBaseY = 64; // below timer text
+      for (let mi = 0; mi < this.floorMutations.length; mi++) {
+        const mut = this.floorMutations[mi];
+        const colorStr = mutationColorHex(mut);
+        const badge = this.add.text(8, mutBaseY + mi * 14, `${mut.icon} ${mut.name}`, {
+          fontSize: "8px", color: colorStr, fontFamily: "monospace", fontStyle: "bold",
+          backgroundColor: "#00000088", padding: { x: 3, y: 1 },
+        }).setScrollFactor(0).setDepth(103).setInteractive();
+
+        badge.on("pointerdown", () => {
+          this.showLog(`${mut.name}: ${mut.description}`);
+        });
+
+        this.mutationHudTexts.push(badge);
+      }
+
+      // Mutation intro banner (auto-dismiss after 2.5s)
+      const bannerBg = this.add.rectangle(
+        GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH * 0.85, 30 + this.floorMutations.length * 22,
+        0x000000, 0.88
+      ).setScrollFactor(0).setDepth(300);
+      const bannerTexts: Phaser.GameObjects.Text[] = [];
+      const bannerTitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 10 - this.floorMutations.length * 8, "Floor Mutation!", {
+        fontSize: "11px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+      bannerTexts.push(bannerTitle);
+      for (let mi = 0; mi < this.floorMutations.length; mi++) {
+        const mut = this.floorMutations[mi];
+        const colorStr = mutationColorHex(mut);
+        const mutText = this.add.text(
+          GAME_WIDTH / 2, GAME_HEIGHT / 2 + 6 + mi * 18 - (this.floorMutations.length - 1) * 4,
+          `${mut.icon} [${mut.name}] ${mut.description}`,
+          { fontSize: "9px", color: colorStr, fontFamily: "monospace", backgroundColor: "#00000066", padding: { x: 4, y: 2 } }
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+        bannerTexts.push(mutText);
+      }
+      this.time.delayedCall(2500, () => {
+        bannerBg.destroy();
+        for (const t of bannerTexts) t.destroy();
+      });
+
+      for (const mut of this.floorMutations) {
+        this.showLog(`Floor Mutation: ${mut.name} — ${mut.description}`);
+      }
+    }
+
     // ── Minimap ──
     this.minimapBg = this.add.graphics().setScrollFactor(0).setDepth(100);
     this.minimapBorder = this.add.graphics().setScrollFactor(0).setDepth(100);
@@ -2074,7 +2217,7 @@ export class DungeonScene extends Phaser.Scene {
     const menuCY = GAME_HEIGHT - 55;
     const iconStyle = { fontSize: "18px", color: "#aab0c8", fontFamily: "monospace", backgroundColor: "#1a1a2ecc", padding: { x: 6, y: 4 } };
 
-    this.add.text(menuCX - 22, menuCY - 5, "⬇", iconStyle)
+    this.pickupBtnPhaser = this.add.text(menuCX - 22, menuCY - 5, "⬇", iconStyle)
       .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
       .on("pointerdown", () => this.pickupItem());
 
@@ -2085,7 +2228,7 @@ export class DungeonScene extends Phaser.Scene {
     this.updateQuickSlotLabel();
 
     // ── Team button (center-bottom, below Pickup/Wait) ──
-    this.add.text(menuCX, menuCY + 22, "Team", {
+    this.teamBtnPhaser = this.add.text(menuCX, menuCY + 22, "Team", {
       fontSize: "10px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
       backgroundColor: "#1a1a2ecc", padding: { x: 8, y: 3 },
     }).setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
@@ -2157,6 +2300,9 @@ export class DungeonScene extends Phaser.Scene {
         },
       });
     }
+
+    // ── DOM HUD overlay: crisp text at any DPI ──
+    this.initDomHud();
 
     this.updateHUD();
 
@@ -2721,8 +2867,11 @@ export class DungeonScene extends Phaser.Scene {
     const expanded = this.minimapExpanded;
     const pad = 4;
 
-    // Reveal area around player each update
-    this.revealArea(this.player.tileX, this.player.tileY, 4);
+    // Reveal area around player each update (DarkFloor mutation reduces radius)
+    const revealRadius = hasMutation(this.floorMutations, MutationType.DarkFloor)
+      ? getMutationEffect(MutationType.DarkFloor, "sightRadius")
+      : 4;
+    this.revealArea(this.player.tileX, this.player.tileY, revealRadius);
 
     // ── Background (themed) ──
     this.minimapBg.clear();
@@ -3095,6 +3244,9 @@ export class DungeonScene extends Phaser.Scene {
 
     this.updateSkillButtons();
     this.updateMinimap();
+
+    // Sync DOM HUD overlay
+    this.syncDomHud();
   }
 
   private openHamburgerMenu() {
@@ -3657,6 +3809,141 @@ export class DungeonScene extends Phaser.Scene {
     this.skillButtons.forEach(btn => btn.destroy());
     this.skillButtons = [];
     this.createSkillButtons();
+    // Re-layout DOM HUD buttons if present
+    if (this.domHud) {
+      layoutHudButtons(this.domHud, this.dpadSide, GAME_WIDTH, GAME_HEIGHT);
+    }
+  }
+
+  /** Initialize DOM-based HUD overlay for always-crisp text rendering */
+  private initDomHud() {
+    const hud = createDomHud();
+    this.domHud = hud;
+
+    // Attach as Phaser DOMElement so it scales with the canvas
+    this.domHudElement = this.add.dom(GAME_WIDTH / 2, GAME_HEIGHT / 2, hud.container);
+    this.domHudElement.setScrollFactor(0);
+    this.domHudElement.setDepth(500); // above everything
+
+    // Layout buttons based on current D-pad side
+    layoutHudButtons(hud, this.dpadSide, GAME_WIDTH, GAME_HEIGHT);
+
+    // Wire up skill button events
+    for (let i = 0; i < 4; i++) {
+      hud.skillBtns[i].addEventListener("pointerdown", (e: Event) => {
+        e.stopPropagation();
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.fullMapOpen) return;
+        const skill = this.player.skills[i];
+        if (!skill || skill.currentPp <= 0) {
+          this.showLog("No PP left!");
+          return;
+        }
+        this.showSkillPreview(i);
+      });
+    }
+
+    // Wire up pickup button
+    hud.pickupBtn.addEventListener("pointerdown", (e: Event) => {
+      e.stopPropagation();
+      this.pickupItem();
+    });
+
+    // Wire up quick-slot button
+    hud.quickSlotBtn.addEventListener("pointerdown", (e: Event) => {
+      e.stopPropagation();
+      this.useQuickSlot();
+    });
+
+    // Wire up team button
+    hud.teamBtn.addEventListener("pointerdown", (e: Event) => {
+      e.stopPropagation();
+      this.openTeamPanel();
+    });
+
+    // Hide original Phaser text elements (keep them updating for logic, just invisible)
+    this.floorText.setAlpha(0);
+    this.hpText.setAlpha(0);
+    this.turnText.setAlpha(0);
+    this.timerText.setAlpha(0);
+    this.bellyText.setAlpha(0);
+    this.logText.setAlpha(0);
+    if (this.chainHudText) this.chainHudText.setAlpha(0);
+
+    // Hide original Phaser skill buttons & action buttons
+    for (const btn of this.skillButtons) btn.setAlpha(0).disableInteractive();
+    if (this.quickSlotBtn) this.quickSlotBtn.setAlpha(0).disableInteractive();
+  }
+
+  /** Sync DOM HUD text from Phaser text values */
+  private syncDomHud() {
+    const hud = this.domHud;
+    if (!hud) return;
+
+    // Floor label
+    hud.floorLabel.textContent = this.floorText.text;
+
+    // HP label
+    hud.hpLabel.textContent = this.hpText.text;
+
+    // Turn / Level info
+    hud.turnLabel.textContent = this.turnText.text;
+
+    // Timer
+    hud.timerLabel.textContent = this.timerText.text;
+
+    // Belly
+    hud.bellyLabel.textContent = this.bellyText.text;
+
+    // Log box
+    const logMsg = this.logMessages.join("\n");
+    if (logMsg) {
+      hud.logBox.textContent = logMsg;
+      hud.logBox.style.display = "block";
+    } else {
+      hud.logBox.style.display = "none";
+    }
+
+    // Chain HUD
+    if (this.chainHudText && this.chainHudText.text && this.scoreChain.currentMultiplier > 1.0) {
+      hud.chainLabel.textContent = this.chainHudText.text;
+      hud.chainLabel.style.color = this.chainHudText.style.color?.toString() ?? "#999999";
+      hud.chainLabel.style.display = "block";
+    } else {
+      hud.chainLabel.style.display = "none";
+    }
+
+    // Skill buttons
+    const skills = this.player.skills;
+    for (let i = 0; i < 4; i++) {
+      const skill = skills[i];
+      const btn = hud.skillBtns[i];
+      if (!skill) {
+        btn.textContent = "---";
+        btn.style.color = "#444460";
+      } else {
+        const haspp = skill.currentPp > 0;
+        btn.textContent = `${skill.name} ${skill.currentPp}/${skill.pp}`;
+        btn.style.color = haspp ? "#c0c8e0" : "#444460";
+        btn.style.borderColor = haspp ? "#333355" : "#222240";
+      }
+    }
+
+    // Quick-slot button sync
+    if (!this.lastUsedItemId) {
+      hud.quickSlotBtn.textContent = "—";
+      hud.quickSlotBtn.style.color = "#555570";
+    } else {
+      const stack = this.inventory.find(s => s.item.id === this.lastUsedItemId);
+      if (!stack) {
+        hud.quickSlotBtn.textContent = "✕";
+        hud.quickSlotBtn.style.color = "#555570";
+      } else {
+        const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : "★";
+        const countStr = stack.count > 1 ? `${stack.count}` : "";
+        hud.quickSlotBtn.textContent = `${icon}${countStr}`;
+        hud.quickSlotBtn.style.color = "#4ade80";
+      }
+    }
   }
 
   private showLog(msg: string) {
@@ -3668,13 +3955,27 @@ export class DungeonScene extends Phaser.Scene {
     const displayText = this.logMessages.join("\n");
     this.logText.setText(displayText);
 
+    // Sync to DOM log box
+    if (this.domHud) {
+      this.domHud.logBox.textContent = displayText;
+      this.domHud.logBox.style.display = "block";
+    }
+
     // Auto-clear oldest messages after delay
     const snapshot = [...this.logMessages];
     this.time.delayedCall(4000, () => {
       // Remove messages that are still in the log from this batch
       if (this.logMessages.length > 0 && this.logMessages[0] === snapshot[0]) {
         this.logMessages.shift();
-        this.logText.setText(this.logMessages.join("\n"));
+        const txt = this.logMessages.join("\n");
+        this.logText.setText(txt);
+        if (this.domHud) {
+          if (txt) {
+            this.domHud.logBox.textContent = txt;
+          } else {
+            this.domHud.logBox.style.display = "none";
+          }
+        }
       }
     });
   }
@@ -3975,7 +4276,8 @@ export class DungeonScene extends Phaser.Scene {
         const heldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
         const ngEscGoldMult = 1 + this.ngPlusBonuses.goldPercent / 100;
         const enchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
-        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult * this.difficultyMods.goldMult * ngEscGoldMult * enchGoldMult);
+        const escMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
+        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult * this.difficultyMods.goldMult * ngEscGoldMult * enchGoldMult * escMutGoldMult);
         this.cameras.main.fadeOut(500);
         this.time.delayedCall(600, () => {
           this.scene.start("HubScene", {
@@ -4530,6 +4832,7 @@ export class DungeonScene extends Phaser.Scene {
       this.chainHudText.setAlpha(0);
       this.chainHudBg.clear();
       this.lastChainTier = "";
+      if (this.domHud) this.domHud.chainLabel.style.display = "none";
       return;
     }
 
@@ -4538,7 +4841,14 @@ export class DungeonScene extends Phaser.Scene {
 
     this.chainHudText.setText(displayStr);
     this.chainHudText.setColor(color);
-    this.chainHudText.setAlpha(1);
+    this.chainHudText.setAlpha(0); // keep hidden, DOM shows it
+
+    // Sync to DOM
+    if (this.domHud) {
+      this.domHud.chainLabel.textContent = displayStr;
+      this.domHud.chainLabel.style.color = color;
+      this.domHud.chainLabel.style.display = "block";
+    }
 
     // Background box
     const bounds = this.chainHudText.getBounds();
@@ -5258,6 +5568,32 @@ export class DungeonScene extends Phaser.Scene {
     }
     this.chainActionThisTurn = false; // reset for next turn
 
+    // ── Floor Mutation: RegenFloor — heal 1 HP every N turns ──
+    if (hasMutation(this.floorMutations, MutationType.RegenFloor) && this.player.alive) {
+      const interval = getMutationEffect(MutationType.RegenFloor, "regenInterval") || 3;
+      const amount = getMutationEffect(MutationType.RegenFloor, "regenAmount") || 1;
+      if (this.floorTurns > 0 && this.floorTurns % interval === 0 && this.player.stats.hp < this.player.stats.maxHp) {
+        this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + amount);
+        if (this.player.sprite) {
+          this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, 0, 1, `+${amount} Regen`);
+        }
+      }
+    }
+
+    // ── Floor Mutation: CursedFloor — lose 1 HP every N turns ──
+    if (hasMutation(this.floorMutations, MutationType.CursedFloor) && this.player.alive) {
+      const interval = getMutationEffect(MutationType.CursedFloor, "curseInterval") || 10;
+      const amount = getMutationEffect(MutationType.CursedFloor, "curseDamage") || 1;
+      if (this.floorTurns > 0 && this.floorTurns % interval === 0) {
+        this.player.stats.hp = Math.max(1, this.player.stats.hp - amount);
+        if (this.player.sprite) {
+          this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, amount, 0.5, "Curse");
+        }
+        this.showLog("The curse saps your strength!");
+        this.checkPlayerDeath();
+      }
+    }
+
     // Check mid-floor weather transition every 10 turns
     if (this.floorTurns % 10 === 0 && this.currentWeather !== WeatherType.None) {
       this.checkWeatherTransition();
@@ -5958,7 +6294,8 @@ export class DungeonScene extends Phaser.Scene {
         // 3-5 item drops + bonus gold (2x gold bonus)
         const itemCount = 3 + Math.floor(Math.random() * 3);
         this.spawnMonsterHouseRewardItems(r, itemCount);
-        const bonusGold = Math.floor((20 + this.currentFloor * 10) * 2);
+        const mutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
+        const bonusGold = Math.floor((20 + this.currentFloor * 10) * 2 * mutGoldMult);
         this.gold += bonusGold;
         const meta = loadMeta();
         meta.gold = this.gold;
@@ -7217,8 +7554,9 @@ export class DungeonScene extends Phaser.Scene {
 
     const reward = getPuzzleReward(this.puzzleData);
 
-    // Grant gold
-    this.gold += reward.gold;
+    // Grant gold (GoldenAge mutation multiplier)
+    const puzzleMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
+    this.gold += Math.floor(reward.gold * puzzleMutGoldMult);
 
     // Grant EXP
     const levelResult = processLevelUp(this.player.stats, reward.exp, this.totalExp);
@@ -7457,7 +7795,8 @@ export class DungeonScene extends Phaser.Scene {
     const clearHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
     const clearEnchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
     const hasBoss = this.dungeonDef.boss || this.isBossRush;
-    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * this.difficultyMods.goldMult * clearEnchGoldMult);
+    const clearMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
+    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * this.difficultyMods.goldMult * clearEnchGoldMult * clearMutGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -7631,7 +7970,8 @@ export class DungeonScene extends Phaser.Scene {
     const goHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
     const ngGoGoldMult = 1 + this.ngPlusBonuses.goldPercent / 100;
     const goEnchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
-    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult * ngGoGoldMult * goEnchGoldMult);
+    const goMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
+    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult * ngGoGoldMult * goEnchGoldMult * goMutGoldMult);
 
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
@@ -8894,8 +9234,9 @@ export class DungeonScene extends Phaser.Scene {
         this.cameras.main.flash(500, 255, 215, 0); // golden flash
         this.showLog(`★ You defeated ${entity.name}! ★`);
 
-        // Award legendary gold reward
-        const legendaryGold = this.legendaryEncounter.reward.gold;
+        // Award legendary gold reward (GoldenAge mutation multiplier)
+        const legMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
+        const legendaryGold = Math.floor(this.legendaryEncounter.reward.gold * legMutGoldMult);
         this.gold += legendaryGold;
         this.time.delayedCall(800, () => {
           this.showLog(`Received ${legendaryGold}G!`);
@@ -9386,9 +9727,10 @@ export class DungeonScene extends Phaser.Scene {
       this.cameras.main.shake(600, 0.02);
       this.cameras.main.flash(500, 255, 215, 0);
 
-      // Award rewards
+      // Award rewards (GoldenAge mutation multiplier)
       const reward = getGauntletReward(this.gauntletConfig, this.gauntletTotalWavesCleared);
-      this.gold += reward.gold;
+      const gauntletMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
+      this.gold += Math.floor(reward.gold * gauntletMutGoldMult);
       this.totalExp += reward.exp;
       this.showLog(`Gauntlet complete! +${reward.gold}G +${reward.exp} EXP`);
 
@@ -9562,6 +9904,22 @@ export class DungeonScene extends Phaser.Scene {
             await this.moveEntity(enemy, moveDir);
             // Check hazard tiles for enemies after movement
             this.checkEntityHazard(enemy, false);
+          }
+
+          // ── Floor Mutation: FastEnemies — 20% chance of a bonus move ──
+          if (hasMutation(this.floorMutations, MutationType.FastEnemies) && enemy.alive && this.player.alive) {
+            const chance = getMutationEffect(MutationType.FastEnemies, "doubleMoveChance");
+            if (Math.random() < chance) {
+              const bonusDir = getEnemyMoveDirection(
+                enemy, this.player,
+                this.dungeon.terrain, this.dungeon.width, this.dungeon.height,
+                this.allEntities
+              );
+              if (bonusDir !== null && this.canEntityMove(enemy, bonusDir)) {
+                await this.moveEntity(enemy, bonusDir);
+                this.checkEntityHazard(enemy, false);
+              }
+            }
           }
         };
       });
