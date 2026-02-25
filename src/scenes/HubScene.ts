@@ -1191,24 +1191,25 @@ export class HubScene extends Phaser.Scene {
       if (this.starterLabel) this.starterLabel.setText(`Starter: ${name}`);
       confirmBtn.setVisible(false);
       pendingStarter = null;
-      buildGrid(); // refresh grid to update highlight
-      gridContainer.y = scrollOffset;
+      renderVisible(); // refresh grid to update highlight
       showPreview(this.meta.starter!);
     });
 
-    // ── Grid configuration ──
+    // ── Grid configuration (object-pooled for performance) ──
     const COLS = 4;
     const CELL_W = 82;
     const CELL_H = 30;
     const GAP_X = 4;
     const GAP_Y = 3;
+    const ROW_H = CELL_H + GAP_Y;
     const GRID_LEFT = (GAME_WIDTH - COLS * (CELL_W + GAP_X) + GAP_X) / 2;
     const VISIBLE_TOP = PREVIEW_TOP + PREVIEW_H + 6;
     const VISIBLE_BOTTOM = GAME_HEIGHT - 10;
     const VISIBLE_H = VISIBLE_BOTTOM - VISIBLE_TOP;
-    const ROWS = Math.ceil(starters.length / COLS);
-    const TOTAL_H = ROWS * (CELL_H + GAP_Y);
+    const TOTAL_ROWS = Math.ceil(starters.length / COLS);
+    const TOTAL_H = TOTAL_ROWS * ROW_H;
     const MAX_SCROLL = Math.max(0, TOTAL_H - VISIBLE_H);
+    const POOL_ROWS = Math.ceil(VISIBLE_H / ROW_H) + 2;
 
     // Mask for scroll area
     const maskShape = this.make.graphics({ x: 0, y: 0 });
@@ -1216,49 +1217,78 @@ export class HubScene extends Phaser.Scene {
     uiItems.push(maskShape as unknown as Phaser.GameObjects.GameObject);
     const mask = maskShape.createGeometryMask();
 
-    // Container for all grid cells
-    const gridContainer = this.add.container(0, 0).setDepth(202).setMask(mask);
-    uiItems.push(gridContainer);
+    // Create object pool: only POOL_ROWS × COLS cells
+    type PoolCell = { bg: Phaser.GameObjects.Rectangle; nameT: Phaser.GameObjects.Text };
+    const pool: PoolCell[][] = []; // pool[poolRow][col]
+    const poolContainer = this.add.container(0, 0).setDepth(202).setMask(mask);
+    uiItems.push(poolContainer);
 
-    const buildGrid = () => {
-      gridContainer.removeAll(true);
+    for (let pr = 0; pr < POOL_ROWS; pr++) {
+      const row: PoolCell[] = [];
+      for (let c = 0; c < COLS; c++) {
+        const bg = this.add.rectangle(0, 0, CELL_W, CELL_H, 0x1a1a2e, 0.95)
+          .setStrokeStyle(1, 0x334155).setInteractive({ useHandCursor: true });
+        const nameT = this.add.text(0, 0, "", {
+          fontSize: "9px", color: "#d0d0e0", fontFamily: "monospace",
+        }).setOrigin(0.5);
+        poolContainer.add([bg, nameT]);
+        row.push({ bg, nameT });
+      }
+      pool.push(row);
+    }
 
-      for (let i = 0; i < starters.length; i++) {
-        const s = starters[i];
-        const col = i % COLS;
-        const row = Math.floor(i / COLS);
-        const cx = GRID_LEFT + col * (CELL_W + GAP_X) + CELL_W / 2;
-        const cy = VISIBLE_TOP + 2 + row * (CELL_H + GAP_Y) + CELL_H / 2;
+    // Bind a pool row to a data row
+    const bindPoolRow = (poolRow: number, dataRow: number, yPos: number) => {
+      const cells = pool[poolRow];
+      for (let c = 0; c < COLS; c++) {
+        const cell = cells[c];
+        const dataIdx = dataRow * COLS + c;
+        const cx = GRID_LEFT + c * (CELL_W + GAP_X) + CELL_W / 2;
+        cell.bg.setPosition(cx, yPos);
+        cell.nameT.setPosition(cx, yPos);
 
+        if (dataIdx >= starters.length) {
+          cell.bg.setVisible(false);
+          cell.nameT.setVisible(false);
+          cell.bg.disableInteractive();
+          continue;
+        }
+
+        const s = starters[dataIdx];
         const isUnlocked = this.meta.totalClears >= s.unlock;
         const isCurrent = s.id === (this.meta.starter ?? "mudkip");
 
-        const bgColor = isCurrent ? 0x3a3a1a : isUnlocked ? 0x1a1a2e : 0x111118;
-        const strokeColor = isCurrent ? 0xfbbf24 : isUnlocked ? 0x334155 : 0x1a1a22;
-        const textColor = isCurrent ? "#fbbf24" : isUnlocked ? "#d0d0e0" : "#333344";
+        cell.bg.setVisible(true)
+          .setFillStyle(isCurrent ? 0x3a3a1a : isUnlocked ? 0x1a1a2e : 0x111118, 0.95)
+          .setStrokeStyle(1, isCurrent ? 0xfbbf24 : isUnlocked ? 0x334155 : 0x1a1a22);
+        cell.nameT.setVisible(true)
+          .setText(isUnlocked ? s.name : `${s.unlock}`)
+          .setColor(isCurrent ? "#fbbf24" : isUnlocked ? "#d0d0e0" : "#333344")
+          .setFontStyle(isCurrent ? "bold" : "normal");
 
-        const bg = this.add.rectangle(cx, cy, CELL_W, CELL_H, bgColor, 0.95)
-          .setStrokeStyle(1, strokeColor);
-        gridContainer.add(bg);
-
-        const label = isUnlocked ? s.name : `🔒${s.unlock}`;
-        const nameT = this.add.text(cx, cy, label, {
-          fontSize: "9px", color: textColor, fontFamily: "monospace",
-          fontStyle: isCurrent ? "bold" : "normal",
-        }).setOrigin(0.5);
-        gridContainer.add(nameT);
-
+        cell.bg.removeAllListeners("pointerup");
         if (isUnlocked) {
-          bg.setInteractive({ useHandCursor: true });
-          bg.on("pointerup", (ptr: Phaser.Input.Pointer) => {
-            if (ptr.getDistance() > 10) return; // scroll, not tap
+          cell.bg.setInteractive({ useHandCursor: true });
+          cell.bg.on("pointerup", (ptr: Phaser.Input.Pointer) => {
+            if (ptr.getDistance() > 10) return;
             showPreview(s.id);
           });
+        } else {
+          cell.bg.disableInteractive();
         }
       }
     };
 
-    buildGrid();
+    // Render visible rows from scroll position
+    const renderVisible = () => {
+      const topOffset = -scrollOffset; // positive px from content top
+      const firstRow = Math.max(0, Math.floor(topOffset / ROW_H));
+      for (let i = 0; i < POOL_ROWS; i++) {
+        const dataRow = firstRow + i;
+        const yPos = VISIBLE_TOP + 2 + dataRow * ROW_H + CELL_H / 2 + scrollOffset;
+        bindPoolRow(i, dataRow, yPos);
+      }
+    };
 
     // Scroll state
     let scrollOffset = 0;
@@ -1267,10 +1297,10 @@ export class HubScene extends Phaser.Scene {
     const currentIdx = starters.findIndex(s => s.id === (this.meta.starter ?? "mudkip"));
     if (currentIdx >= 0) {
       const currentRow = Math.floor(currentIdx / COLS);
-      const targetY = currentRow * (CELL_H + GAP_Y);
+      const targetY = currentRow * ROW_H;
       scrollOffset = -Math.min(MAX_SCROLL, Math.max(0, targetY - VISIBLE_H / 3));
-      gridContainer.y = scrollOffset;
     }
+    renderVisible();
 
     // Scroll indicator
     const indicator = this.add.rectangle(
@@ -1302,7 +1332,7 @@ export class HubScene extends Phaser.Scene {
       const dy = ptr.y - dragStartY;
       dragStartY = ptr.y;
       scrollOffset = Math.max(-MAX_SCROLL, Math.min(0, scrollOffset + dy));
-      gridContainer.y = scrollOffset;
+      renderVisible();
       updateIndicator();
     };
 
