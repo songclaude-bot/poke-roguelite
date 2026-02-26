@@ -19,8 +19,9 @@ const FONT = `'Courier New', Courier, monospace`;
 /** Y constants — derived from GAME_HEIGHT=640 */
 const DPAD_CENTER_Y = GAME_HEIGHT - 70;   // 570
 const DPAD_RADIUS = 50;
-// Pickup/quickslot row sits just above the D-pad circle
-const ACTION_ROW_Y = DPAD_CENTER_Y - DPAD_RADIUS - 18; // 502
+const DPAD_BG_R = DPAD_RADIUS + 5;        // 55 — actual visual circle
+// Pickup/quickslot row: at least 16px above D-pad background top edge
+const ACTION_ROW_Y = DPAD_CENTER_Y - DPAD_BG_R - 16 - 28; // 570-55-16-28 = 471
 
 export interface DomHudElements {
   container: HTMLDivElement;
@@ -255,8 +256,11 @@ export function layoutHudButtons(
 
   // ── Action buttons: above D-pad, aligned with D-pad center ──
   hud.pickupBtn.style.left = `${dpadCX - 32}px`;
+  hud.pickupBtn.style.top = `${ACTION_ROW_Y}px`;
   hud.quickSlotBtn.style.left = `${dpadCX + 4}px`;
+  hud.quickSlotBtn.style.top = `${ACTION_ROW_Y}px`;
   hud.teamBtn.style.left = `${dpadCX + 36}px`;
+  hud.teamBtn.style.top = `${ACTION_ROW_Y}px`;
 }
 
 /**
@@ -277,4 +281,12 @@ export function setDomHudInteractive(hud: DomHudElements, enabled: boolean): voi
   hud.quickSlotBtn.style.opacity = opacity;
   hud.teamBtn.style.pointerEvents = pe;
   hud.teamBtn.style.opacity = opacity;
+}
+
+/** Hide/show DOM skill buttons (used when Phaser OK/Cancel confirmation appears). */
+export function setDomSkillsVisible(hud: DomHudElements, visible: boolean): void {
+  const display = visible ? "block" : "none";
+  for (const btn of hud.skillBtns) {
+    btn.style.display = display;
+  }
 }

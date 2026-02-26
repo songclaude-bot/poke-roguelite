@@ -6,7 +6,7 @@ import {
   TILE_SCALE,
   TILE_DISPLAY,
 } from "../config";
-import { createDomHud, layoutHudButtons, setDomHudInteractive, DomHudElements } from "../ui/dom-hud";
+import { createDomHud, layoutHudButtons, setDomHudInteractive, setDomSkillsVisible, DomHudElements } from "../ui/dom-hud";
 import { generateDungeon, DungeonData, TerrainType } from "../core/dungeon-generator";
 import { getTileIndex } from "../core/autotiler";
 import { Direction, DIR_DX, DIR_DY, angleToDirection } from "../core/direction";
@@ -2930,9 +2930,9 @@ export class DungeonScene extends Phaser.Scene {
 
     this.dpadUI.push(waitBtn, waitTxt);
 
-    // Auto-Explore button (below D-Pad)
-    const autoX = cx;
-    const autoY = cy + r + 22;
+    // Auto-Explore button (above D-Pad, offset to the side)
+    const autoX = isRight ? cx - r - 30 : cx + r + 30;
+    const autoY = cy;
     const autoBtn = this.add.text(autoX, autoY, "Auto", {
       fontSize: "10px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
       backgroundColor: "#1a1a2ecc", padding: { x: 8, y: 3 },
@@ -3007,6 +3007,9 @@ export class DungeonScene extends Phaser.Scene {
     if (!skill) return;
     this.skillPreviewActive = true;
 
+    // Hide DOM skill buttons so they don't overlap OK/Cancel
+    if (this.domHud) setDomSkillsVisible(this.domHud, false);
+
     const dir = this.player.facing;
     const tiles = getSkillTargetTiles(
       skill.range, this.player.tileX, this.player.tileY, dir,
@@ -3073,6 +3076,8 @@ export class DungeonScene extends Phaser.Scene {
     this.skillPreviewUI = [];
     this.skillPreviewActive = false;
     for (const btn of this.skillButtons) btn.setVisible(true);
+    // Restore DOM skill buttons
+    if (this.domHud) setDomSkillsVisible(this.domHud, true);
   }
 
   private updateSkillButtons() {
@@ -4306,8 +4311,8 @@ export class DungeonScene extends Phaser.Scene {
 
       this.cameras.main.fadeOut(500);
       this.cameras.main.once("camerafadeoutcomplete", doTransition);
-      // Safety fallback: if camerafadeoutcomplete never fires
-      this.time.delayedCall(1200, doTransition);
+      // Safety fallback using native setTimeout (Phaser timers may stall with the scene)
+      setTimeout(doTransition, 1200);
     });
   }
 
@@ -9118,8 +9123,8 @@ export class DungeonScene extends Phaser.Scene {
 
     this.cameras.main.fadeOut(500, 0, 0, 0);
     this.cameras.main.once("camerafadeoutcomplete", doRestart);
-    // Safety fallback: if camerafadeoutcomplete never fires, restart after 1.2s
-    this.time.delayedCall(1200, doRestart);
+    // Safety fallback using native setTimeout (Phaser timers may stall with the scene)
+    setTimeout(doRestart, 1200);
   }
 
   private showDungeonClear() {
