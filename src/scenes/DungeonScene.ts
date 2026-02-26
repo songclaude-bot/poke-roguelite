@@ -4234,6 +4234,7 @@ export class DungeonScene extends Phaser.Scene {
   private confirmGiveUp() {
     if (this.gameOver) return;
     sfxMenuOpen();
+    if (this.domHud) setDomHudInteractive(this.domHud, false);
 
     const uiElements: Phaser.GameObjects.GameObject[] = [];
 
@@ -4266,7 +4267,11 @@ export class DungeonScene extends Phaser.Scene {
 
     const cleanup = () => { uiElements.forEach(o => o.destroy()); };
 
-    noBtn.on("pointerdown", () => { sfxMenuClose(); cleanup(); });
+    noBtn.on("pointerdown", () => {
+      sfxMenuClose();
+      cleanup();
+      if (this.domHud) setDomHudInteractive(this.domHud, true);
+    });
 
     yesBtn.on("pointerdown", () => {
       cleanup();
@@ -4274,8 +4279,11 @@ export class DungeonScene extends Phaser.Scene {
       stopBgm();
       clearDungeonSave();
       if (this.domHud) setDomHudInteractive(this.domHud, false);
-      this.cameras.main.fadeOut(500);
-      this.cameras.main.once("camerafadeoutcomplete", () => {
+
+      let transitioned = false;
+      const doTransition = () => {
+        if (transitioned) return;
+        transitioned = true;
         if (this.domHudElement) {
           this.domHudElement.destroy();
           this.domHudElement = null as unknown as Phaser.GameObjects.DOMElement;
@@ -4294,7 +4302,12 @@ export class DungeonScene extends Phaser.Scene {
           inventory: serializeInventory(this.inventory),
           ...this.getQuestTrackingData(),
         });
-      });
+      };
+
+      this.cameras.main.fadeOut(500);
+      this.cameras.main.once("camerafadeoutcomplete", doTransition);
+      // Safety fallback: if camerafadeoutcomplete never fires
+      this.time.delayedCall(1200, doTransition);
     });
   }
 
@@ -9065,8 +9078,11 @@ export class DungeonScene extends Phaser.Scene {
     const modifierIds = this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined;
 
     if (this.domHud) setDomHudInteractive(this.domHud, false);
-    this.cameras.main.fadeOut(500, 0, 0, 0);
-    this.cameras.main.once("camerafadeoutcomplete", () => {
+
+    let restarted = false;
+    const doRestart = () => {
+      if (restarted) return;
+      restarted = true;
       // Clean up DOM HUD before restart
       if (this.domHudElement) {
         this.domHudElement.destroy();
@@ -9098,7 +9114,12 @@ export class DungeonScene extends Phaser.Scene {
         runLogEntries: this.runLog.serialize(),
         blessings: serializeBlessings(this.activeBlessings),
       });
-    });
+    };
+
+    this.cameras.main.fadeOut(500, 0, 0, 0);
+    this.cameras.main.once("camerafadeoutcomplete", doRestart);
+    // Safety fallback: if camerafadeoutcomplete never fires, restart after 1.2s
+    this.time.delayedCall(1200, doRestart);
   }
 
   private showDungeonClear() {
