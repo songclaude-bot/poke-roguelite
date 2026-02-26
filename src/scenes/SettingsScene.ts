@@ -44,10 +44,14 @@ export class SettingsScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Back button
-    const backBtn = this.add.text(16, 24, "[Back]", {
-      fontSize: "12px", color: "#60a5fa", fontFamily: "monospace",
-    }).setOrigin(0, 0.5).setInteractive({ useHandCursor: true });
-    backBtn.on("pointerdown", () => this.scene.start("HubScene"));
+    const backBg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 30, 180, 34, 0x1a1a2e, 0.95)
+      .setStrokeStyle(1, 0x334155).setInteractive({ useHandCursor: true });
+    backBg.on("pointerover", () => backBg.setFillStyle(0x2a2a4e, 1));
+    backBg.on("pointerout", () => backBg.setFillStyle(0x1a1a2e, 0.95));
+    backBg.on("pointerdown", () => this.scene.start("HubScene"));
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 30, "Back to Town", {
+      fontSize: "13px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5);
 
     // ── Difficulty Section ──
     this.add.text(GAME_WIDTH / 2, 60, "-- Difficulty --", {

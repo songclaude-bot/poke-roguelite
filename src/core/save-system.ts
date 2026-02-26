@@ -25,10 +25,13 @@ export interface DungeonSaveData {
   atk: number;
   def: number;
   totalExp: number;
+  belly?: number;
   // Skills (saved as IDs + current PP)
   skills: { id: string; currentPp: number }[];
   // Inventory (saved as IDs + counts)
   inventory: { itemId: string; count: number }[];
+  // Allies (team members)
+  allies?: { speciesId: string; hp: number; maxHp: number; atk: number; def: number; level: number; skills: { id: string; currentPp: number }[] }[];
   // Starter species
   starter?: string;
   // Challenge mode (if any)

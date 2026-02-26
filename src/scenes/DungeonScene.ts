@@ -6,7 +6,7 @@ import {
   TILE_SCALE,
   TILE_DISPLAY,
 } from "../config";
-import { createDomHud, layoutHudButtons, DomHudElements } from "../ui/dom-hud";
+import { createDomHud, layoutHudButtons, setDomHudInteractive, DomHudElements } from "../ui/dom-hud";
 import { generateDungeon, DungeonData, TerrainType } from "../core/dungeon-generator";
 import { getTileIndex } from "../core/autotiler";
 import { Direction, DIR_DX, DIR_DY, angleToDirection } from "../core/direction";
@@ -2307,7 +2307,7 @@ export class DungeonScene extends Phaser.Scene {
     });
 
     this.logText = this.add
-      .text(8, GAME_HEIGHT - 200, "", {
+      .text(8, GAME_HEIGHT - 230, "", {
         fontSize: "10px", color: "#fbbf24", fontFamily: "monospace",
         wordWrap: { width: 340 },
         backgroundColor: "#000000cc",
@@ -2504,11 +2504,11 @@ export class DungeonScene extends Phaser.Scene {
       const bannerBg = this.add.rectangle(
         GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH * 0.85, 30 + this.floorMutations.length * 22,
         0x000000, 0.88
-      ).setScrollFactor(0).setDepth(300);
+      ).setScrollFactor(0).setDepth(600);
       const bannerTexts: Phaser.GameObjects.Text[] = [];
       const bannerTitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 10 - this.floorMutations.length * 8, "Floor Mutation!", {
         fontSize: "11px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(601);
       bannerTexts.push(bannerTitle);
       for (let mi = 0; mi < this.floorMutations.length; mi++) {
         const mut = this.floorMutations[mi];
@@ -2517,7 +2517,7 @@ export class DungeonScene extends Phaser.Scene {
           GAME_WIDTH / 2, GAME_HEIGHT / 2 + 6 + mi * 18 - (this.floorMutations.length - 1) * 4,
           `${mut.icon} [${mut.name}] ${mut.description}`,
           { fontSize: "9px", color: colorStr, fontFamily: "monospace", backgroundColor: "#00000066", padding: { x: 4, y: 2 } }
-        ).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(601);
         bannerTexts.push(mutText);
       }
       this.time.delayedCall(2500, () => {
@@ -2553,13 +2553,13 @@ export class DungeonScene extends Phaser.Scene {
         const feBannerBg = this.add.rectangle(
           GAME_WIDTH / 2, 40, GAME_WIDTH * 0.85, 40,
           0x000000, 0.88
-        ).setScrollFactor(0).setDepth(300);
+        ).setScrollFactor(0).setDepth(600);
         const feBannerTitle = this.add.text(GAME_WIDTH / 2, 32, `${fe.icon} ${fe.name}`, {
           fontSize: "12px", color: feColorHex, fontFamily: "monospace", fontStyle: "bold",
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(601);
         const feBannerDesc = this.add.text(GAME_WIDTH / 2, 46, fe.description, {
           fontSize: "8px", color: "#e2e8f0", fontFamily: "monospace",
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(601);
         this.time.delayedCall(2500, () => {
           feBannerBg.destroy();
           feBannerTitle.destroy();
@@ -2644,34 +2644,34 @@ export class DungeonScene extends Phaser.Scene {
     // ── Skill Buttons (bottom-right, 2x2 grid) ──
     this.createSkillButtons();
 
-    // ── Action buttons (center-bottom): Pickup + Wait only ──
+    // ── Action buttons: Pickup, Quick-slot, Team (above skill bar) ──
     const menuCX = GAME_WIDTH / 2;
-    const menuCY = GAME_HEIGHT - 55;
-    const iconStyle = { fontSize: "18px", color: "#aab0c8", fontFamily: "monospace", backgroundColor: "#1a1a2ecc", padding: { x: 6, y: 4 } };
+    const actionRowY = GAME_HEIGHT - 70 - 50 - 42 - 34; // matches DOM ACTION_ROW_Y
+    const iconStyle = { fontSize: "16px", color: "#aab0c8", fontFamily: "monospace", backgroundColor: "#1a1a2ecc", padding: { x: 6, y: 3 } };
 
-    this.pickupBtnPhaser = this.add.text(menuCX - 22, menuCY - 5, "⬇", iconStyle)
+    this.pickupBtnPhaser = this.add.text(menuCX - 50, actionRowY, "⬇", iconStyle)
       .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
       .on("pointerdown", () => this.pickupItem());
 
     // Quick-slot: use last used item (or show "—" if none)
-    this.quickSlotBtn = this.add.text(menuCX + 22, menuCY - 5, "—", iconStyle)
+    this.quickSlotBtn = this.add.text(menuCX, actionRowY, "—", iconStyle)
       .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
       .on("pointerdown", () => this.useQuickSlot());
     this.updateQuickSlotLabel();
 
-    // ── Team button (center-bottom, below Pickup/Wait) ──
-    this.teamBtnPhaser = this.add.text(menuCX, menuCY + 22, "Team", {
+    // ── Team button ──
+    this.teamBtnPhaser = this.add.text(menuCX + 50, actionRowY, "Team", {
       fontSize: "10px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
       backgroundColor: "#1a1a2ecc", padding: { x: 8, y: 3 },
     }).setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
       .on("pointerdown", () => this.openTeamPanel());
 
-    // ── Hamburger menu button (under minimap, top-right) ──
-    const hamX = this.MINIMAP_X_SMALL + 30;
-    const hamY = this.MINIMAP_Y_SMALL + 70;
+    // ── Hamburger menu button (top-right corner, clear of minimap) ──
+    const hamX = GAME_WIDTH - 20;
+    const hamY = 72;
     this.add.text(hamX, hamY, "☰", {
-      fontSize: "20px", color: "#aab0c8", fontFamily: "monospace",
-      backgroundColor: "#1a1a2ecc", padding: { x: 6, y: 2 },
+      fontSize: "18px", color: "#aab0c8", fontFamily: "monospace",
+      backgroundColor: "#1a1a2ecc", padding: { x: 5, y: 2 },
     }).setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
       .on("pointerdown", () => this.openHamburgerMenu());
 
@@ -3632,6 +3632,7 @@ export class DungeonScene extends Phaser.Scene {
   private openFullMap() {
     if (this.fullMapOpen) return;
     this.fullMapOpen = true;
+    if (this.domHud) setDomHudInteractive(this.domHud, false);
 
     // Turns are paused via fullMapOpen guard checks on all input handlers
 
@@ -3727,6 +3728,7 @@ export class DungeonScene extends Phaser.Scene {
   private closeFullMap() {
     if (!this.fullMapOpen) return;
     this.fullMapOpen = false;
+    if (this.domHud) setDomHudInteractive(this.domHud, true);
 
     // Turns resume automatically since fullMapOpen guard is cleared
 
@@ -3893,6 +3895,7 @@ export class DungeonScene extends Phaser.Scene {
 
     sfxMenuOpen();
     this.menuOpen = true;
+    if (this.domHud) setDomHudInteractive(this.domHud, false);
 
     // Semi-transparent backdrop
     const backdrop = this.add.rectangle(
@@ -3942,6 +3945,7 @@ export class DungeonScene extends Phaser.Scene {
   private closeMenu() {
     sfxMenuClose();
     this.menuOpen = false;
+    if (this.domHud) setDomHudInteractive(this.domHud, true);
     this.menuUI.forEach(obj => obj.destroy());
     this.menuUI = [];
   }
@@ -3965,6 +3969,7 @@ export class DungeonScene extends Phaser.Scene {
 
     sfxMenuOpen();
     this.teamPanelOpen = true;
+    if (this.domHud) setDomHudInteractive(this.domHud, false);
     this.teamPanelScroll = 0;
     this.buildTeamPanelUI();
   }
@@ -3972,6 +3977,7 @@ export class DungeonScene extends Phaser.Scene {
   private closeTeamPanel() {
     sfxMenuClose();
     this.teamPanelOpen = false;
+    if (this.domHud) setDomHudInteractive(this.domHud, true);
     this.teamPanelUI.forEach(obj => obj.destroy());
     this.teamPanelUI = [];
   }
@@ -4267,8 +4273,14 @@ export class DungeonScene extends Phaser.Scene {
       this.gameOver = true;
       stopBgm();
       clearDungeonSave();
+      if (this.domHud) setDomHudInteractive(this.domHud, false);
       this.cameras.main.fadeOut(500);
-      this.time.delayedCall(600, () => {
+      this.cameras.main.once("camerafadeoutcomplete", () => {
+        if (this.domHudElement) {
+          this.domHudElement.destroy();
+          this.domHudElement = null as unknown as Phaser.GameObjects.DOMElement;
+          this.domHud = null as unknown as DomHudElements;
+        }
         this.scene.start("HubScene", {
           gold: 0,
           cleared: false,
@@ -4292,6 +4304,7 @@ export class DungeonScene extends Phaser.Scene {
     if (this.settingsOpen) return;
     sfxMenuOpen();
     this.settingsOpen = true;
+    if (this.domHud) setDomHudInteractive(this.domHud, false);
 
     // Dark overlay
     const overlay = this.add.rectangle(
@@ -4434,6 +4447,7 @@ export class DungeonScene extends Phaser.Scene {
   private closeSettings() {
     sfxMenuClose();
     this.settingsOpen = false;
+    if (this.domHud) setDomHudInteractive(this.domHud, true);
     this.settingsUI.forEach(obj => obj.destroy());
     this.settingsUI = [];
   }
@@ -4474,6 +4488,8 @@ export class DungeonScene extends Phaser.Scene {
           this.showLog("No PP left!");
           return;
         }
+        // Show skill description tooltip
+        this.showSkillDescTooltip(skill);
         this.showSkillPreview(i);
       });
     }
@@ -4511,6 +4527,23 @@ export class DungeonScene extends Phaser.Scene {
     if (this.pickupBtnPhaser) this.pickupBtnPhaser.setAlpha(0).disableInteractive();
     if (this.teamBtnPhaser) this.teamBtnPhaser.setAlpha(0).disableInteractive();
   }
+
+  /** Show skill description tooltip at top of screen, auto-dismiss */
+  private showSkillDescTooltip(skill: Skill) {
+    if (!this.domHud) return;
+    const box = this.domHud.skillDescBox;
+    const typeStr = skill.type ? ` [${skill.type}]` : "";
+    const rangeStr = skill.range !== "front1" ? ` Range:${skill.range}` : "";
+    const effectStr = skill.effect ? ` (${skill.effect})` : "";
+    box.innerHTML = `<b style="color:#fbbf24">${skill.name}</b>${typeStr} — Pow:${skill.power} PP:${skill.currentPp}/${skill.pp}${rangeStr}${effectStr}<br><span style="color:#94a3b8">${skill.description ?? ""}</span>`;
+    box.style.display = "block";
+    // Auto-hide after 3 seconds
+    if (this.skillDescTimer) clearTimeout(this.skillDescTimer);
+    this.skillDescTimer = window.setTimeout(() => {
+      box.style.display = "none";
+    }, 3000);
+  }
+  private skillDescTimer: number | null = null;
 
   /** Sync DOM HUD text from Phaser text values */
   private syncDomHud() {
@@ -4705,6 +4738,7 @@ export class DungeonScene extends Phaser.Scene {
     if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen) return;
     sfxMenuOpen();
     this.bagOpen = true;
+    if (this.domHud) setDomHudInteractive(this.domHud, false);
 
     // Dark overlay
     const overlay = this.add.rectangle(
@@ -4785,6 +4819,7 @@ export class DungeonScene extends Phaser.Scene {
   private closeBag() {
     sfxMenuClose();
     this.bagOpen = false;
+    if (this.domHud) setDomHudInteractive(this.domHud, true);
     this.bagUI.forEach(obj => obj.destroy());
     this.bagUI = [];
   }
@@ -5464,8 +5499,10 @@ export class DungeonScene extends Phaser.Scene {
       atk: this.player.stats.atk,
       def: this.player.stats.def,
       totalExp: this.totalExp,
+      belly: this.belly,
       skills: serializeSkills(this.player.skills),
       inventory: serializeInventory(this.inventory),
+      allies: this.serializeAllies(),
       starter: this.starterId,
       challengeMode: this.challengeMode ?? undefined,
       modifiers: this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined,
@@ -5487,8 +5524,10 @@ export class DungeonScene extends Phaser.Scene {
       atk: this.player.stats.atk,
       def: this.player.stats.def,
       totalExp: this.totalExp,
+      belly: this.belly,
       skills: serializeSkills(this.player.skills),
       inventory: serializeInventory(this.inventory),
+      allies: this.serializeAllies(),
       starter: this.starterId,
       challengeMode: this.challengeMode ?? undefined,
       modifiers: this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined,
@@ -7516,6 +7555,7 @@ export class DungeonScene extends Phaser.Scene {
     if (this.shrineOpen || !this.floorShrine || this.shrineUsed) return;
     sfxMenuOpen();
     this.shrineOpen = true;
+    if (this.domHud) setDomHudInteractive(this.domHud, false);
     this.stopAutoExplore();
 
     const shrine = this.floorShrine;
@@ -7594,6 +7634,7 @@ export class DungeonScene extends Phaser.Scene {
     for (const obj of this.shrineUI) obj.destroy();
     this.shrineUI = [];
     this.shrineOpen = false;
+    if (this.domHud) setDomHudInteractive(this.domHud, true);
   }
 
   /** Show a brief result message after shrine use */
@@ -9023,8 +9064,15 @@ export class DungeonScene extends Phaser.Scene {
     // Pass modifier IDs through floor transitions
     const modifierIds = this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined;
 
+    if (this.domHud) setDomHudInteractive(this.domHud, false);
     this.cameras.main.fadeOut(500, 0, 0, 0);
-    this.time.delayedCall(600, () => {
+    this.cameras.main.once("camerafadeoutcomplete", () => {
+      // Clean up DOM HUD before restart
+      if (this.domHudElement) {
+        this.domHudElement.destroy();
+        this.domHudElement = null as unknown as Phaser.GameObjects.DOMElement;
+        this.domHud = null as unknown as DomHudElements;
+      }
       this.scene.restart({
         floor: this.currentFloor + 1,
         hp: this.player.stats.hp,
@@ -9432,7 +9480,12 @@ export class DungeonScene extends Phaser.Scene {
     for (const enemy of this.enemies) {
       if (enemy.sprite) enemy.sprite.destroy();
     }
+    // Also remove enemies from allEntities to prevent stale references
+    this.allEntities = this.allEntities.filter(e => !this.enemies.includes(e));
     this.enemies = [];
+
+    // Reset turn manager busy state to unblock input after rescue
+    this.turnManager.forceIdle();
 
     // Ensure gameOver stays false (was not set since we intercepted before showGameOverScreen)
     this.gameOver = false;
@@ -13443,6 +13496,7 @@ export class DungeonScene extends Phaser.Scene {
   private showRelicFoundOverlay(relic: Relic) {
     if (this.gameOver) return;
     this.relicOverlayOpen = true;
+    if (this.domHud) setDomHudInteractive(this.domHud, false);
     const ui: Phaser.GameObjects.GameObject[] = [];
     ui.push(this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75).setScrollFactor(0).setDepth(400).setInteractive());
     const tc = getRelicRarityColor(relic.rarity);
@@ -13498,6 +13552,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private closeRelicOverlay() {
     this.relicOverlayOpen = false;
+    if (this.domHud) setDomHudInteractive(this.domHud, true);
     for (const obj of this.relicOverlayUI) {
       if (obj && (obj as Phaser.GameObjects.GameObject).scene) obj.destroy();
     }

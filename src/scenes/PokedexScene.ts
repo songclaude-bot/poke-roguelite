@@ -352,13 +352,17 @@ export class PokedexScene extends Phaser.Scene {
     });
 
     // ── Back button ──
-    const back = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 18, "[Back to Town]", {
-      fontSize: "13px", color: "#60a5fa", fontFamily: "monospace",
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    back.on("pointerdown", () => {
+    const backBg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 30, 180, 34, 0x1a1a2e, 0.95)
+      .setStrokeStyle(1, 0x334155).setInteractive({ useHandCursor: true });
+    backBg.on("pointerover", () => backBg.setFillStyle(0x2a2a4e, 1));
+    backBg.on("pointerout", () => backBg.setFillStyle(0x1a1a2e, 0.95));
+    backBg.on("pointerdown", () => {
       if (detailOpen) return;
       this.scene.start("HubScene");
     });
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 30, "Back to Town", {
+      fontSize: "13px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5);
 
     // ═══════════════════════════════════════════════════════
     // ── Detail Panel (overlay) ──

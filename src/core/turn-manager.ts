@@ -14,6 +14,11 @@ export class TurnManager {
     return this.processing;
   }
 
+  /** Force-reset busy state (e.g. after rescue clears all enemies mid-turn) */
+  forceIdle(): void {
+    this.processing = false;
+  }
+
   /**
    * Execute a full turn: player action, then all enemy actions.
    */

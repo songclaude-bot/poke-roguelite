@@ -359,23 +359,37 @@ export class HubScene extends Phaser.Scene {
       .setStrokeStyle(1, 0x334155);
     this.tabContent.push(cardBg);
 
-    // Load and show starter sprite
+    // Load and show starter sprite with idle animation
     const dexNum = SPRITE_DEX[currentStarter];
     if (dexNum && sp) {
       const textureKey = `${currentStarter}-idle`;
-      if (this.textures.exists(textureKey)) {
+      const animKey = `${currentStarter}-hub-idle`;
+      const addStarterSprite = () => {
+        if (!this.textures.exists(textureKey) || this.activeTab !== "home") return;
         const spr = this.add.sprite(50, cardY, textureKey, 0).setScale(2.5);
         this.tabContent.push(spr);
+        // Create and play idle animation
+        if (!this.anims.exists(animKey)) {
+          const frameCount = this.textures.get(textureKey).frameTotal - 1;
+          if (frameCount > 1) {
+            this.anims.create({
+              key: animKey,
+              frames: this.anims.generateFrameNumbers(textureKey, { start: 0, end: frameCount - 1 }),
+              frameRate: 6,
+              repeat: -1,
+            });
+          }
+        }
+        if (this.anims.exists(animKey)) spr.play(animKey);
+      };
+
+      if (this.textures.exists(textureKey)) {
+        addStarterSprite();
       } else {
         this.load.spritesheet(textureKey, `sprites/${dexNum}/Idle-Anim.png`, {
           frameWidth: sp.idleFrameWidth, frameHeight: sp.idleFrameHeight,
         });
-        this.load.once("complete", () => {
-          if (this.textures.exists(textureKey) && this.activeTab === "home") {
-            const spr = this.add.sprite(50, cardY, textureKey, 0).setScale(2.5);
-            this.tabContent.push(spr);
-          }
-        });
+        this.load.once("complete", addStarterSprite);
         this.load.start();
       }
     }
@@ -446,23 +460,36 @@ export class HubScene extends Phaser.Scene {
 
       if (npcDex && npcSp) {
         const textureKey = `${npc.species}-idle`;
-        if (this.textures.exists(textureKey)) {
+        const npcAnimKey = `${npc.species}-hub-idle`;
+        const addNpcSprite = (ref: typeof npc) => {
+          if (!this.textures.exists(textureKey) || this.activeTab !== "home") return;
           const spr = this.add.sprite(cx, npcRowY - 2, textureKey, 0).setScale(1.2).setInteractive({ useHandCursor: true });
-          spr.on("pointerdown", () => this.showNpcDialogue(npc));
+          spr.on("pointerdown", () => this.showNpcDialogue(ref));
           this.tabContent.push(spr);
-          npcSpriteLoaded = true;
+          // Play idle animation
+          if (!this.anims.exists(npcAnimKey)) {
+            const frameCount = this.textures.get(textureKey).frameTotal - 1;
+            if (frameCount > 1) {
+              this.anims.create({
+                key: npcAnimKey,
+                frames: this.anims.generateFrameNumbers(textureKey, { start: 0, end: frameCount - 1 }),
+                frameRate: 6,
+                repeat: -1,
+              });
+            }
+          }
+          if (this.anims.exists(npcAnimKey)) spr.play(npcAnimKey);
+          return true;
+        };
+
+        if (this.textures.exists(textureKey)) {
+          npcSpriteLoaded = !!addNpcSprite(npc);
         } else {
           this.load.spritesheet(textureKey, `sprites/${npcDex}/Idle-Anim.png`, {
             frameWidth: npcSp.idleFrameWidth, frameHeight: npcSp.idleFrameHeight,
           });
           const npcRef = npc;
-          this.load.once("complete", () => {
-            if (this.textures.exists(textureKey) && this.activeTab === "home") {
-              const spr = this.add.sprite(cx, npcRowY - 2, textureKey, 0).setScale(1.2).setInteractive({ useHandCursor: true });
-              spr.on("pointerdown", () => this.showNpcDialogue(npcRef));
-              this.tabContent.push(spr);
-            }
-          });
+          this.load.once("complete", () => addNpcSprite(npcRef));
           this.load.start();
         }
       }
@@ -860,7 +887,7 @@ export class HubScene extends Phaser.Scene {
       { label: talentPoints > 0 ? `Talents (${talentPoints} pts)` : "Talent Tree", desc: "Invest gold in permanent talents", color: "#fbbf24", bgColor: 0x2a2a1a, scene: "TalentTreeScene" },
     ];
 
-    let iy = 58;
+    let iy = 62;
     for (const item of items) {
       const bgColor = item.bgColor;
       const strokeColor = parseInt(item.color.replace("#", ""), 16);
@@ -868,7 +895,7 @@ export class HubScene extends Phaser.Scene {
         item.label, item.desc,
         bgColor, strokeColor, item.color,
         () => this.scene.start(item.scene));
-      iy += 48;
+      iy += 50;
     }
   }
 
@@ -949,8 +976,10 @@ export class HubScene extends Phaser.Scene {
         hp: save.hp, maxHp: save.maxHp,
         level: save.level, atk: save.atk, def: save.def,
         exp: save.totalExp,
+        belly: save.belly,
         skills: deserializeSkills(save.skills),
         inventory: deserializeInventory(save.inventory),
+        allies: save.allies ?? null,
         fromHub: true,
         dungeonId: save.dungeonId,
         starter: save.starter ?? this.meta.starter ?? "mudkip",

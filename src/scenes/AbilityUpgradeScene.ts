@@ -200,16 +200,13 @@ export class AbilityUpgradeScene extends Phaser.Scene {
   }
 
   private addBackButton() {
-    const backBtn = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 40, 200, 36, 0x1a1a2e, 0.9)
-      .setStrokeStyle(1, 0x334155)
-      .setInteractive({ useHandCursor: true });
-
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 40, "[ Back to Town ]", {
+    const backBg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 30, 180, 34, 0x1a1a2e, 0.95)
+      .setStrokeStyle(1, 0x334155).setInteractive({ useHandCursor: true });
+    backBg.on("pointerover", () => backBg.setFillStyle(0x2a2a4e, 1));
+    backBg.on("pointerout", () => backBg.setFillStyle(0x1a1a2e, 0.95));
+    backBg.on("pointerdown", () => this.scene.start("HubScene"));
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 30, "Back to Town", {
       fontSize: "13px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5);
-
-    backBtn.on("pointerover", () => backBtn.setFillStyle(0x2a2a4e, 1));
-    backBtn.on("pointerout", () => backBtn.setFillStyle(0x1a1a2e, 0.9));
-    backBtn.on("pointerdown", () => this.scene.start("HubScene"));
   }
 }
