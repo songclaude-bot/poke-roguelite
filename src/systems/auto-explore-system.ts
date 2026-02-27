@@ -10,6 +10,7 @@ import { ItemDef } from "../core/item";
 import { DungeonData, TerrainType } from "../core/dungeon-generator";
 import { TurnManager } from "../core/turn-manager";
 import { PuzzleSystem } from "./puzzle-system";
+import { TrapHazardSystem } from "./trap-hazard-system";
 
 // ── Host interface: what AutoExploreSystem needs from DungeonScene ──
 
@@ -27,6 +28,7 @@ export interface AutoExploreHost {
   readonly gameOver: boolean;
   readonly floorItems: { x: number; y: number; item: ItemDef; sprite: Phaser.GameObjects.Text }[];
   readonly puzzleSys: PuzzleSystem;
+  readonly trapHazardSys: TrapHazardSystem;
 
   // UI guard flags (read-only for stop-condition checks)
   readonly bagOpen: boolean;
@@ -45,9 +47,6 @@ export interface AutoExploreHost {
   canEntityMove(entity: Entity, dir: Direction): boolean;
   moveEntity(entity: Entity, dir: Direction): Promise<void>;
   recoverPP(entity: Entity): void;
-  checkTraps(): void;
-  checkPlayerHazard(): void;
-  revealNearbyTraps(): void;
   checkShop(): void;
   checkMonsterHouse(): void;
   checkEventRoom(): void;
@@ -304,9 +303,9 @@ export class AutoExploreSystem {
     }
 
     // Traps, hazards, stairs, shop, monster house checks
-    this.host.checkTraps();
-    this.host.checkPlayerHazard();
-    this.host.revealNearbyTraps();
+    this.host.trapHazardSys.checkTraps();
+    this.host.trapHazardSys.checkPlayerHazard();
+    this.host.trapHazardSys.revealNearbyTraps();
     // Don't call checkStairs — that would auto-advance the floor. Let the stop condition handle it.
     this.host.checkShop();
     this.host.checkMonsterHouse();

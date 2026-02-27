@@ -16,6 +16,7 @@ import { RunLog, RunLogEvent } from "../core/run-log";
 import { TurnManager } from "../core/turn-manager";
 import { FloorTrap } from "../core/trap";
 import { FloorHazard } from "../core/hazard-tiles";
+import { TrapHazardSystem } from "./trap-hazard-system";
 import { DungeonMutation, MutationType, hasMutation, getMutationEffect } from "../core/dungeon-mutations";
 import { FloorEvent, FloorEventType } from "../core/floor-events";
 import { ActiveBlessing, getBlessingEffect } from "../core/blessings";
@@ -53,8 +54,7 @@ export interface MinimapHost {
   readonly shrineTileY: number;
   readonly shrineUsed: boolean;
   readonly secretRoomSys: SecretRoomSystem;
-  readonly floorTraps: FloorTrap[];
-  readonly floorHazards: FloorHazard[];
+  readonly trapHazardSys: TrapHazardSystem;
 
   // Theme
   readonly currentTheme: FloorTheme;
@@ -401,7 +401,7 @@ export class MinimapSystem {
     }
 
     // ── Revealed traps ──
-    for (const tr of this.host.floorTraps) {
+    for (const tr of this.host.trapHazardSys.floorTraps) {
       if (tr.revealed) {
         gfx.fillStyle(tr.trap.hexColor, 1);
         gfx.fillRect(mx + tr.x * t, my + tr.y * t, t, t);
@@ -409,7 +409,7 @@ export class MinimapSystem {
     }
 
     // ── Hazard tiles (visible in explored areas) ──
-    for (const hz of this.host.floorHazards) {
+    for (const hz of this.host.trapHazardSys.floorHazards) {
       if (this.visited[hz.y]?.[hz.x]) {
         gfx.fillStyle(hz.def.color, 0.8);
         gfx.fillRect(mx + hz.x * t, my + hz.y * t, t, t);

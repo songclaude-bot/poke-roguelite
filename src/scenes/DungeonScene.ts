@@ -35,10 +35,6 @@ import {
   deserializeSkills as deserializeSkillsFn,
   goldFromRun, loadMeta, saveMeta,
 } from "../core/save-system";
-import { TrapDef, TrapType, rollTrap, trapsPerFloor, FloorTrap, TRAPS, generateTraps } from "../core/trap";
-import {
-  HazardType, FloorHazard, isImmuneToHazard, generateHazards,
-} from "../core/hazard-tiles";
 import { AbilityId, SPECIES_ABILITIES, ABILITIES } from "../core/ability";
 import {
   getAbilityLevel, getTorrentValues, getSturdyHp,
@@ -72,11 +68,10 @@ import {
   sfxHit, sfxSuperEffective, sfxNotEffective, sfxMove, sfxPickup,
   sfxLevelUp, sfxRecruit, sfxStairs, sfxDeath, sfxBossDefeat,
   sfxHeal, sfxSkill, sfxMenuOpen, sfxMenuClose,
-  sfxEvolution, sfxTrap, sfxVictory, sfxGameOver, sfxShop,
+  sfxEvolution, sfxVictory, sfxGameOver, sfxShop,
   sfxCombo, sfxCritical, sfxDodge, sfxItemPickup, sfxBuff, sfxWeatherChange,
   getBgmVolume, getSfxVolume, setBgmVolume, setSfxVolume,
 } from "../core/sound-manager";
-import { DungeonEvent, EventChoice, rollDungeonEvent } from "../core/dungeon-events";
 import {
   FloorEvent, FloorEventType, rollFloorEvent, invertEffectiveness, floorEventColorHex,
 } from "../core/floor-events";
@@ -97,6 +92,7 @@ import { PuzzleSystem } from "../systems/puzzle-system";
 import { SecretRoomSystem } from "../systems/secret-room-system";
 import { AutoExploreSystem } from "../systems/auto-explore-system";
 import { MinimapSystem } from "../systems/minimap-system";
+import { TrapHazardSystem } from "../systems/trap-hazard-system";
 import {
   LegendaryEncounter,
   shouldEncounterLegendary,
@@ -132,10 +128,8 @@ import {
   activateBlessing, rollBlessingOrCurse, getRandomBlessing, getRandomCurse,
   serializeBlessings, deserializeBlessings,
 } from "../core/blessings";
-import {
-  ShrineType, Shrine, ShrineChoice, ShrineEffect,
-  generateShrine, shouldSpawnShrine,
-} from "../core/dungeon-shrines";
+import { ShrineSystem } from "../systems/shrine-system";
+import { EventRoomSystem } from "../systems/event-room-system";
 import {
   RescueOption, MAX_RESCUES_PER_RUN,
   getRescueOptions,
@@ -260,14 +254,8 @@ export class DungeonScene extends Phaser.Scene {
   private questItemsCollected = 0;
   private questItemsUsed = false;
 
-  // Trap state
-  private floorTraps: FloorTrap[] = [];
-  private trapGraphics: Phaser.GameObjects.Graphics[] = [];
-
-  // Hazard tile state
-  private floorHazards: FloorHazard[] = [];
-  private hazardGraphics: Phaser.GameObjects.Graphics[] = [];
-  private hazardTweens: Phaser.Tweens.Tween[] = [];
+  // Trap & hazard system
+  private trapHazardSys!: TrapHazardSystem;
 
   // Belly (hunger) state
   private belly = 100;
@@ -299,13 +287,8 @@ export class DungeonScene extends Phaser.Scene {
   private monsterHouseCleared = false;
   private monsterHouseEnemies: Entity[] = []; // track enemies spawned in monster house
 
-  // Event Room
-  private eventRoom: { x: number; y: number; w: number; h: number } | null = null;
-  private eventTriggered = false;
-  private eventOpen = false;
-  private eventUI: Phaser.GameObjects.GameObject[] = [];
-  private currentEvent: DungeonEvent | null = null;
-  private eventMarker: Phaser.GameObjects.Text | null = null;
+  // Event Room (delegated to EventRoomSystem)
+  private eventRoomSys!: EventRoomSystem;
 
   // Floor Event (floor-wide global effect)
   private floorEvent: FloorEvent | null = null;
@@ -474,15 +457,8 @@ export class DungeonScene extends Phaser.Scene {
   private activeBlessings: ActiveBlessing[] = [];
   private blessingHudIcons: Phaser.GameObjects.Text[] = [];
 
-  // Shrine state (per-floor)
-  private floorShrine: Shrine | null = null;
-  private shrineTileX = -1;
-  private shrineTileY = -1;
-  private shrineUsed = false;
-  private shrineUI: Phaser.GameObjects.GameObject[] = [];
-  private shrineOpen = false;
-  private shrineGraphic: Phaser.GameObjects.Graphics | null = null;
-  private shrineMarker: Phaser.GameObjects.Text | null = null;
+  // Shrine system (per-floor, extracted)
+  private shrineSys!: ShrineSystem;
 
   // Type Gem state (per-floor: active type boosts, cleared on each new floor)
   private activeTypeGems: Map<string, number> = new Map(); // PokemonType -> boostPercent
@@ -677,15 +653,9 @@ export class DungeonScene extends Phaser.Scene {
     // Blessing/curse state: restore from floor transition or reset on new run
     this.activeBlessings = data?.blessings ? deserializeBlessings(data.blessings) : [];
     this.blessingHudIcons = [];
-    // Reset shrine state
-    this.floorShrine = null;
-    this.shrineTileX = -1;
-    this.shrineTileY = -1;
-    this.shrineUsed = false;
-    this.shrineUI = [];
-    this.shrineOpen = false;
-    this.shrineGraphic = null;
-    this.shrineMarker = null;
+    // Reset shrine system
+    this.shrineSys = new ShrineSystem(this as any);
+    this.shrineSys.reset();
     // Reset type gem boosts (per-floor)
     this.activeTypeGems = new Map();
     this.typeGemHudIcons = [];
@@ -704,11 +674,7 @@ export class DungeonScene extends Phaser.Scene {
     this.chainActionThisTurn = false;
     this.turnManager = new TurnManager();
     this.persistentAllies = data?.allies ?? null;
-    this.floorTraps = [];
-    this.trapGraphics = [];
-    this.floorHazards = [];
-    this.hazardGraphics = [];
-    this.hazardTweens = [];
+    // trapHazardSys reset is handled in create() after system construction
     const bellyBonus = getUpgradeBonus(meta, "bellyMax") * 20;
     this.maxBelly = 100 + bellyBonus;
     this.belly = data?.belly ?? this.maxBelly;
@@ -734,16 +700,16 @@ export class DungeonScene extends Phaser.Scene {
     this.monsterHouseType = MonsterHouseType.Standard;
     this.monsterHouseCleared = false;
     this.monsterHouseEnemies = [];
-    this.eventRoom = null;
-    this.eventTriggered = false;
-    this.eventOpen = false;
-    this.eventUI = [];
-    this.currentEvent = null;
-    this.eventMarker = null;
+    // Reset event room state (delegated to EventRoomSystem)
+    this.eventRoomSys = new EventRoomSystem(this as any);
+    this.eventRoomSys.reset();
     // Reset puzzle room state (delegated to PuzzleSystem)
     this.puzzleSys = new PuzzleSystem(this as any);
     // Reset secret room state (delegated to SecretRoomSystem)
     this.secretRoomSys = new SecretRoomSystem(this as any);
+    // Reset trap & hazard state (delegated to TrapHazardSystem)
+    this.trapHazardSys = new TrapHazardSystem(this as any);
+    this.trapHazardSys.reset();
     // Reset auto-explore state (delegated to AutoExploreSystem)
     this.autoExploreSys = new AutoExploreSystem(this as any);
     // Reset minimap state (delegated to MinimapSystem)
@@ -1770,37 +1736,13 @@ export class DungeonScene extends Phaser.Scene {
       this.floorItems.push({ x: ix, y: iy, item, sprite });
     }
 
-    // ── Spawn floor traps (hidden) ──
-    const trapCount = Math.floor(trapsPerFloor(this.currentFloor, this.dungeonDef.difficulty) * this.difficultyMods.trapFreqMult);
-    // Collect occupied positions (items, enemies, etc.)
+    // ── Spawn floor traps and hazard tiles (delegated to TrapHazardSystem) ──
     const occupiedPositions = new Set<string>();
     for (const fi of this.floorItems) occupiedPositions.add(`${fi.x},${fi.y}`);
     for (const e of this.enemies) occupiedPositions.add(`${e.tileX},${e.tileY}`);
     for (const a of this.allies) occupiedPositions.add(`${a.tileX},${a.tileY}`);
-    this.floorTraps = generateTraps(
-      width, height, terrain as unknown as number[][],
-      trapCount,
-      stairsPos.x, stairsPos.y,
-      playerStart.x, playerStart.y,
-      occupiedPositions,
-      TerrainType.GROUND as unknown as number,
-    );
-
-    // ── Spawn hazard tiles (visible terrain dangers) ──
-    // Add trap positions to occupied set so hazards don't overlap
-    const hazardOccupied = new Set<string>(occupiedPositions);
-    for (const ft of this.floorTraps) hazardOccupied.add(`${ft.x},${ft.y}`);
-    this.floorHazards = generateHazards(
-      width, height, terrain as unknown as number[][],
-      this.currentFloor,
-      this.dungeonDef.id,
-      stairsPos.x, stairsPos.y,
-      playerStart.x, playerStart.y,
-      hazardOccupied,
-      TerrainType.GROUND as unknown as number,
-    );
-    // Render hazard tiles and start visual effect tweens
-    this.renderHazardTiles();
+    const hazardOccupied = this.trapHazardSys.spawnTraps(occupiedPositions);
+    this.trapHazardSys.spawnHazards(hazardOccupied);
 
     // ── Kecleon Shop (20% chance, not on boss floors) ──
     const isBossFloor = (this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors) || this.isBossRush;
@@ -1926,51 +1868,11 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // ── Event Room (20% chance on floor 3+, not boss floor) ──
-    if (this.currentFloor >= 3 && !isBossFloor && Math.random() < 0.20 && rooms.length > 2) {
-      const eventCandidates = rooms.filter(r =>
-        // Not the player's room
-        !(playerStart.x >= r.x && playerStart.x < r.x + r.w &&
-          playerStart.y >= r.y && playerStart.y < r.y + r.h) &&
-        // Not the stairs room
-        !(stairsPos.x >= r.x && stairsPos.x < r.x + r.w &&
-          stairsPos.y >= r.y && stairsPos.y < r.y + r.h) &&
-        // Not the shop room
-        r !== this.shopRoom &&
-        // Not the monster house room
-        r !== this.monsterHouseRoom
-      );
-      if (eventCandidates.length > 0) {
-        const evRoom = eventCandidates[Math.floor(Math.random() * eventCandidates.length)];
-        const rolledEvent = rollDungeonEvent(this.currentFloor);
-        if (rolledEvent) {
-          this.eventRoom = evRoom;
-          this.currentEvent = rolledEvent;
-
-          // Place "!" marker at center of event room
-          const markerX = Math.floor(evRoom.x + evRoom.w / 2);
-          const markerY = Math.floor(evRoom.y + evRoom.h / 2);
-          this.eventMarker = this.add.text(
-            markerX * TILE_DISPLAY + TILE_DISPLAY / 2,
-            markerY * TILE_DISPLAY + TILE_DISPLAY / 2 - 8,
-            "!", { fontSize: "18px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-              stroke: "#000000", strokeThickness: 3 }
-          ).setOrigin(0.5).setDepth(8);
-
-          // Pulse animation on the marker
-          this.tweens.add({
-            targets: this.eventMarker,
-            scaleX: { from: 1, to: 1.3 },
-            scaleY: { from: 1, to: 1.3 },
-            alpha: { from: 1, to: 0.6 },
-            duration: 800,
-            yoyo: true,
-            repeat: -1,
-            ease: "Sine.easeInOut",
-          });
-        }
-      }
-    }
+    // ── Event Room (delegated to EventRoomSystem) ──
+    this.eventRoomSys.trySpawnEventRoom(
+      rooms, playerStart, stairsPos, isBossFloor,
+      [this.shopRoom, this.monsterHouseRoom],
+    );
 
     // ── Puzzle Room (10% chance on floor 2+, not boss/first/last) ──
     if (!isBossFloor && shouldSpawnPuzzle(this.currentFloor, this.dungeonDef.floors) && rooms.length > 2) {
@@ -1984,7 +1886,7 @@ export class DungeonScene extends Phaser.Scene {
         // Not shop, monster house, or event room
         r !== this.shopRoom &&
         r !== this.monsterHouseRoom &&
-        r !== this.eventRoom &&
+        r !== this.eventRoomSys.eventRoom &&
         // Needs enough space (at least 3x3 interior)
         r.w >= 4 && r.h >= 4
       );
@@ -2016,37 +1918,11 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // ── Shrine (15% chance, floor 2+, not boss) ──
-    if (shouldSpawnShrine(this.currentFloor, this.dungeonDef.floors, isBossFloor) && rooms.length > 2) {
-      // Pick a valid ground tile not in player room, stairs room, or any special room
-      const shrineCandidates: { x: number; y: number }[] = [];
-      for (const rm of rooms) {
-        // Skip player room, stairs room, and special rooms
-        if (playerStart.x >= rm.x && playerStart.x < rm.x + rm.w &&
-            playerStart.y >= rm.y && playerStart.y < rm.y + rm.h) continue;
-        if (stairsPos.x >= rm.x && stairsPos.x < rm.x + rm.w &&
-            stairsPos.y >= rm.y && stairsPos.y < rm.y + rm.h) continue;
-        if (rm === this.shopRoom || rm === this.monsterHouseRoom ||
-            rm === this.eventRoom || rm === this.puzzleSys.puzzleRoom) continue;
-        // Collect interior ground tiles
-        for (let ry = rm.y + 1; ry < rm.y + rm.h - 1; ry++) {
-          for (let rx = rm.x + 1; rx < rm.x + rm.w - 1; rx++) {
-            if (terrain[ry]?.[rx] === TerrainType.GROUND) {
-              shrineCandidates.push({ x: rx, y: ry });
-            }
-          }
-        }
-      }
-      if (shrineCandidates.length > 0) {
-        const spot = shrineCandidates[Math.floor(Math.random() * shrineCandidates.length)];
-        this.shrineTileX = spot.x;
-        this.shrineTileY = spot.y;
-        this.floorShrine = generateShrine(this.currentFloor, this.dungeonDef.difficulty);
-        this.shrineUsed = false;
-        this.drawShrine();
-        this.showLog("You sense a mysterious shrine on this floor...");
-      }
-    }
+    // ── Shrine (delegated to ShrineSystem) ──
+    this.shrineSys.trySpawnShrine(
+      rooms, terrain, playerStart, stairsPos, isBossFloor,
+      [this.shopRoom, this.monsterHouseRoom, this.eventRoomSys.eventRoom, this.puzzleSys.puzzleRoom],
+    );
 
     // ── Fog of War (delegated to MinimapSystem) ──
     this.minimapSys.initFogOfWar(width, height);
@@ -2122,7 +1998,7 @@ export class DungeonScene extends Phaser.Scene {
       callback: () => {
         // Don't count time when game is over or menus/overlays are open
         if (this.gameOver) return;
-        if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.teamPanelOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
+        if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventRoomSys.eventOpen || this.teamPanelOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
         this.runElapsedSeconds++;
         const timeStr = this.formatTime(this.runElapsedSeconds);
         this.timerText.setText(timeStr);
@@ -2660,7 +2536,7 @@ export class DungeonScene extends Phaser.Scene {
 
       btn.on("pointerdown", () => {
         if (this.autoExploreSys.autoExploring) { this.autoExploreSys.stopAutoExplore("Stopped."); return; }
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
         txt.setColor("#fbbf24");
         this.time.delayedCall(150, () => txt.setColor("#8899bb"));
         this.handlePlayerAction(d.dir);
@@ -2678,7 +2554,7 @@ export class DungeonScene extends Phaser.Scene {
 
     waitBtn.on("pointerdown", () => {
       if (this.autoExploreSys.autoExploring) { this.autoExploreSys.stopAutoExplore("Stopped."); return; }
-      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
       waitTxt.setAlpha(0.5);
       this.time.delayedCall(150, () => waitTxt.setAlpha(1));
       this.turnManager.executeTurn(
@@ -2932,7 +2808,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeMenu();
       return;
     }
-    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
+    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
 
     sfxMenuOpen();
     this.menuOpen = true;
@@ -3000,7 +2876,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeTeamPanel();
       return;
     }
-    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.gameOver || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
+    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventRoomSys.eventOpen || this.gameOver || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
 
     const liveAllies = this.allies.filter(a => a.alive);
     if (liveAllies.length === 0) {
@@ -3780,7 +3656,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private openBag() {
-    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen) return;
+    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen) return;
     sfxMenuOpen();
     this.bagOpen = true;
     if (this.domHud) setDomHudInteractive(this.domHud, false);
@@ -4916,544 +4792,67 @@ export class DungeonScene extends Phaser.Scene {
 
   // ── Stairs ──
 
-  // ── Traps ──
+  // ── Summon Trap Enemy Spawn (callback for TrapHazardSystem) ──
 
-  private checkTraps() {
-    const ft = this.floorTraps.find(
-      t => t.x === this.player.tileX && t.y === this.player.tileY && !t.triggered
-    );
-    if (!ft) return;
-
-    sfxTrap();
-    ft.triggered = true;
-    ft.revealed = true;
-
-    // Ability: Rock Head — immune to trap damage
-    if (this.player.ability === AbilityId.RockHead) {
-      this.showLog(`Stepped on a ${ft.trap.name}! Rock Head negated it!`);
-      this.drawTrap(ft);
-      this.updateHUD();
-      return;
-    }
-
-    // Ability: Levitate — immune to ground-based traps (Spike, Warp, Blast, Sticky, Hunger)
-    if (this.player.ability === AbilityId.Levitate &&
-        (ft.trap.type === TrapType.Spike || ft.trap.type === TrapType.Warp || ft.trap.type === TrapType.Blast ||
-         ft.trap.type === TrapType.Sticky || ft.trap.type === TrapType.Hunger)) {
-      this.showLog(`Stepped on a ${ft.trap.name}! Levitate avoided it!`);
-      this.drawTrap(ft);
-      this.updateHUD();
-      return;
-    }
-
-    this.showLog(`Stepped on a ${ft.trap.name}! ${ft.trap.description}`);
-    this.cameras.main.shake(150, 0.008);
-
-    switch (ft.trap.type) {
-      case TrapType.Spike: {
-        const dmg = Math.floor(this.player.stats.maxHp * 0.15);
-        this.player.stats.hp = Math.max(1, this.player.stats.hp - dmg);
-        if (this.player.sprite) this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, dmg, 1.0);
-        // Score chain: taking trap damage resets chain
-        if (this.scoreChain.currentMultiplier > 1.0) {
-          resetChain(this.scoreChain);
-          this.showLog("Chain broken!");
-          this.updateChainHUD();
+  private spawnSummonTrapEnemies(trapX: number, trapY: number) {
+    const summonSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
+      ? this.getEndlessEnemies(this.currentFloor)
+      : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
+    const summonSpecies = summonSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
+    if (summonSpecies.length > 0) {
+      const adjOffsets = [{x:0,y:-1},{x:1,y:0},{x:0,y:1},{x:-1,y:0},{x:1,y:-1},{x:1,y:1},{x:-1,y:1},{x:-1,y:-1}];
+      let spawned = 0;
+      for (const off of adjOffsets) {
+        if (spawned >= 2) break;
+        const sx = this.player.tileX + off.x;
+        const sy = this.player.tileY + off.y;
+        if (sx < 0 || sx >= this.dungeon.width || sy < 0 || sy >= this.dungeon.height) continue;
+        if (this.dungeon.terrain[sy]?.[sx] !== TerrainType.GROUND) continue;
+        if (this.allEntities.some(e => e.alive && e.tileX === sx && e.tileY === sy)) continue;
+        const sp = summonSpecies[Math.floor(Math.random() * summonSpecies.length)];
+        const summonStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
+        if (this.difficultyMods.enemyHpMult !== 1) {
+          summonStats.hp = Math.floor(summonStats.hp * this.difficultyMods.enemyHpMult);
+          summonStats.maxHp = Math.floor(summonStats.maxHp * this.difficultyMods.enemyHpMult);
         }
-        this.checkPlayerDeath();
-        break;
+        if (this.difficultyMods.enemyAtkMult !== 1) {
+          summonStats.atk = Math.floor(summonStats.atk * this.difficultyMods.enemyAtkMult);
+        }
+        const summonEnemy: Entity = {
+          tileX: sx, tileY: sy,
+          facing: Direction.Down,
+          stats: { ...summonStats },
+          alive: true,
+          spriteKey: sp.spriteKey,
+          name: sp.name,
+          types: sp.types,
+          attackType: sp.attackType,
+          skills: createSpeciesSkills(sp),
+          statusEffects: [],
+          speciesId: sp.spriteKey,
+          ability: SPECIES_ABILITIES[sp.spriteKey],
+        };
+        const seTex = `${sp.spriteKey}-idle`;
+        if (this.textures.exists(seTex)) {
+          summonEnemy.sprite = this.add.sprite(
+            this.tileToPixelX(sx), this.tileToPixelY(sy), seTex
+          );
+          summonEnemy.sprite.setScale(TILE_SCALE).setDepth(9);
+          const seAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
+          if (this.anims.exists(seAnim)) summonEnemy.sprite.play(seAnim);
+        }
+        this.enemies.push(summonEnemy);
+        this.allEntities.push(summonEnemy);
+        this.seenSpecies.add(sp.spriteKey);
+        spawned++;
       }
-      case TrapType.Poison:
-        if (!this.player.statusEffects.some(s => s.type === SkillEffect.Burn)) {
-          this.player.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
-          this.showLog("You were burned!");
-        }
-        if (this.player.sprite) this.player.sprite.setTint(0xa855f7);
-        this.time.delayedCall(300, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
-        break;
-      case TrapType.Warp: {
-        const { terrain, width, height, stairsPos } = this.dungeon;
-        let wx: number, wy: number;
-        let tries = 0;
-
-        // Ability: RunAway — warp near stairs instead of random
-        if (this.player.ability === AbilityId.RunAway) {
-          const offsets = [{x:0,y:-1},{x:1,y:0},{x:0,y:1},{x:-1,y:0},{x:1,y:-1},{x:1,y:1},{x:-1,y:1},{x:-1,y:-1}];
-          let found = false;
-          for (const off of offsets) {
-            const tx = stairsPos.x + off.x;
-            const ty = stairsPos.y + off.y;
-            if (tx >= 0 && tx < width && ty >= 0 && ty < height &&
-                terrain[ty][tx] === TerrainType.GROUND &&
-                !this.allEntities.some(e => e !== this.player && e.alive && e.tileX === tx && e.tileY === ty)) {
-              wx = tx; wy = ty; found = true; break;
-            }
-          }
-          if (!found) { wx = stairsPos.x; wy = stairsPos.y; }
-          this.showLog("Run Away warped you near the stairs!");
-        } else {
-          do {
-            wx = Math.floor(Math.random() * width);
-            wy = Math.floor(Math.random() * height);
-            tries++;
-          } while (tries < 200 && (terrain[wy][wx] !== TerrainType.GROUND ||
-            this.allEntities.some(e => e !== this.player && e.alive && e.tileX === wx && e.tileY === wy)));
-        }
-
-        this.player.tileX = wx!;
-        this.player.tileY = wy!;
-        if (this.player.sprite) {
-          this.player.sprite.setPosition(this.tileToPixelX(wx!), this.tileToPixelY(wy!));
-        }
-        this.cameras.main.flash(200, 100, 100, 255);
-        break;
-      }
-      case TrapType.Spin: {
-        // Confusion: reduce accuracy for 5 turns (shown as paralyze debuff)
-        this.showLog("You got confused!");
-        if (!this.player.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
-          this.player.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 5 });
-        }
-        this.cameras.main.shake(200, 0.01);
-        break;
-      }
-      case TrapType.Slowdown: {
-        const reduction = Math.floor(this.player.stats.atk * 0.1);
-        this.player.stats.atk = Math.max(1, this.player.stats.atk - reduction);
-        this.showLog(`ATK reduced by ${reduction} for this floor!`);
-        if (this.player.sprite) this.player.sprite.setTint(0xf97316);
-        this.time.delayedCall(400, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
-        break;
-      }
-      case TrapType.Blast: {
-        // Deal 25% max HP damage to player
-        const blastDmg = Math.floor(this.player.stats.maxHp * 0.25);
-        this.player.stats.hp = Math.max(1, this.player.stats.hp - blastDmg);
-        if (this.player.sprite) this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, blastDmg, 1.0);
-        // Also damage nearby enemies/allies in 3x3 area
-        for (const entity of this.allEntities) {
-          if (entity === this.player || !entity.alive) continue;
-          const dx = Math.abs(entity.tileX - ft.x);
-          const dy = Math.abs(entity.tileY - ft.y);
-          if (dx <= 1 && dy <= 1) {
-            const entityDmg = Math.floor(entity.stats.maxHp * 0.25);
-            entity.stats.hp = Math.max(1, entity.stats.hp - entityDmg);
-            if (entity.sprite) this.showDamagePopup(entity.sprite.x, entity.sprite.y, entityDmg, 1.0);
-            this.showLog(`${entity.name} was caught in the blast!`);
-          }
-        }
-        // Visual: flash red
+      if (spawned > 0) {
+        this.showLog(`${spawned} enemies appeared!`);
         this.cameras.main.flash(200, 255, 50, 50);
-        this.checkPlayerDeath();
-        break;
-      }
-      case TrapType.Trip:
-        if (this.inventory.length > 0) {
-          const lostIdx = Math.floor(Math.random() * this.inventory.length);
-          const lost = this.inventory[lostIdx];
-          this.showLog(`Dropped ${lost.item.name}!`);
-          lost.count--;
-          if (lost.count <= 0) this.inventory.splice(lostIdx, 1);
-        } else {
-          this.showLog("Nothing to drop!");
-        }
-        break;
-      case TrapType.Seal: {
-        const usableSkills = this.player.skills.filter(s => s.currentPp > 0);
-        if (usableSkills.length > 0) {
-          const skill = usableSkills[Math.floor(Math.random() * usableSkills.length)];
-          skill.currentPp = 0;
-          this.showLog(`${skill.name} was sealed!`);
-          if (this.player.sprite) this.player.sprite.setTint(0x6366f1);
-          this.time.delayedCall(400, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
-        } else {
-          this.showLog("No skills to seal!");
-        }
-        break;
-      }
-      case TrapType.Sticky: {
-        // Reduce belly by 5 as a simplified sticky penalty
-        this.belly = Math.max(0, this.belly - 5);
-        this.showLog("Sticky goo drains your energy! Belly -5!");
-        if (this.player.sprite) this.player.sprite.setTint(0xf59e0b);
-        this.time.delayedCall(400, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
-        break;
-      }
-      case TrapType.Hunger: {
-        // Drain 20 belly instantly
-        this.belly = Math.max(0, this.belly - 20);
-        this.showLog("Extreme hunger strikes! Belly -20!");
-        if (this.player.sprite) this.player.sprite.setTint(0x92400e);
-        this.time.delayedCall(400, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
-        break;
-      }
-      case TrapType.Summon: {
-        // Spawn 2 enemies around the player
-        const summonSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
-          ? this.getEndlessEnemies(this.currentFloor)
-          : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
-        const summonSpecies = summonSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
-        if (summonSpecies.length > 0) {
-          const adjOffsets = [{x:0,y:-1},{x:1,y:0},{x:0,y:1},{x:-1,y:0},{x:1,y:-1},{x:1,y:1},{x:-1,y:1},{x:-1,y:-1}];
-          let spawned = 0;
-          for (const off of adjOffsets) {
-            if (spawned >= 2) break;
-            const sx = this.player.tileX + off.x;
-            const sy = this.player.tileY + off.y;
-            if (sx < 0 || sx >= this.dungeon.width || sy < 0 || sy >= this.dungeon.height) continue;
-            if (this.dungeon.terrain[sy]?.[sx] !== TerrainType.GROUND) continue;
-            if (this.allEntities.some(e => e.alive && e.tileX === sx && e.tileY === sy)) continue;
-            const sp = summonSpecies[Math.floor(Math.random() * summonSpecies.length)];
-            const summonStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
-            if (this.difficultyMods.enemyHpMult !== 1) {
-              summonStats.hp = Math.floor(summonStats.hp * this.difficultyMods.enemyHpMult);
-              summonStats.maxHp = Math.floor(summonStats.maxHp * this.difficultyMods.enemyHpMult);
-            }
-            if (this.difficultyMods.enemyAtkMult !== 1) {
-              summonStats.atk = Math.floor(summonStats.atk * this.difficultyMods.enemyAtkMult);
-            }
-            const summonEnemy: Entity = {
-              tileX: sx, tileY: sy,
-              facing: Direction.Down,
-              stats: { ...summonStats },
-              alive: true,
-              spriteKey: sp.spriteKey,
-              name: sp.name,
-              types: sp.types,
-              attackType: sp.attackType,
-              skills: createSpeciesSkills(sp),
-              statusEffects: [],
-              speciesId: sp.spriteKey,
-              ability: SPECIES_ABILITIES[sp.spriteKey],
-            };
-            const seTex = `${sp.spriteKey}-idle`;
-            if (this.textures.exists(seTex)) {
-              summonEnemy.sprite = this.add.sprite(
-                this.tileToPixelX(sx), this.tileToPixelY(sy), seTex
-              );
-              summonEnemy.sprite.setScale(TILE_SCALE).setDepth(9);
-              const seAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
-              if (this.anims.exists(seAnim)) summonEnemy.sprite.play(seAnim);
-            }
-            this.enemies.push(summonEnemy);
-            this.allEntities.push(summonEnemy);
-            this.seenSpecies.add(sp.spriteKey);
-            spawned++;
-          }
-          if (spawned > 0) {
-            this.showLog(`${spawned} enemies appeared!`);
-            this.cameras.main.flash(200, 255, 50, 50);
-          } else {
-            this.showLog("The trap fizzled...");
-          }
-        }
-        break;
-      }
-      case TrapType.Grudge: {
-        // Apply Cursed status for 8 turns
-        if (!this.player.statusEffects.some(s => s.type === SkillEffect.Cursed)) {
-          this.player.statusEffects.push({ type: SkillEffect.Cursed, turnsLeft: 8 });
-          this.showLog("A dark curse falls upon you!");
-        } else {
-          this.showLog("The curse deepens...");
-        }
-        if (this.player.sprite) this.player.sprite.setTint(0x581c87);
-        this.time.delayedCall(400, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
-        break;
+      } else {
+        this.showLog("The trap fizzled...");
       }
     }
-
-    this.drawTrap(ft);
-    this.updateHUD();
-  }
-
-  /** Draw a revealed trap marker as a small colored circle on the tile */
-  private drawTrap(trap: FloorTrap) {
-    if (!trap.revealed) return;
-    const gfx = this.add.graphics();
-    const cx = trap.x * TILE_DISPLAY + TILE_DISPLAY / 2;
-    const cy = trap.y * TILE_DISPLAY + TILE_DISPLAY / 2;
-    gfx.fillStyle(trap.trap.hexColor, 0.6);
-    gfx.fillCircle(cx, cy, 4);
-    gfx.setDepth(3);
-    this.trapGraphics.push(gfx);
-  }
-
-  /** Reveal traps adjacent to the player (1 tile radius) */
-  private revealNearbyTraps() {
-    for (const trap of this.floorTraps) {
-      if (trap.revealed) continue;
-      const dx = Math.abs(trap.x - this.player.tileX);
-      const dy = Math.abs(trap.y - this.player.tileY);
-      if (dx <= 1 && dy <= 1) {
-        trap.revealed = true;
-        this.drawTrap(trap);
-      }
-    }
-  }
-
-  // ── Hazard Tiles ──
-
-  /** Render all hazard tiles as colored semi-transparent rectangles with visual effects */
-  private renderHazardTiles() {
-    // Clean up any prior hazard graphics/tweens
-    for (const gfx of this.hazardGraphics) gfx.destroy();
-    for (const tw of this.hazardTweens) tw.destroy();
-    this.hazardGraphics = [];
-    this.hazardTweens = [];
-
-    for (const hazard of this.floorHazards) {
-      const gfx = this.add.graphics();
-      const px = hazard.x * TILE_DISPLAY;
-      const py = hazard.y * TILE_DISPLAY;
-
-      gfx.fillStyle(hazard.def.color, 0.4);
-      gfx.fillRect(px, py, TILE_DISPLAY, TILE_DISPLAY);
-      gfx.setDepth(2); // Above floor theme overlay (1), below traps (3)
-      this.hazardGraphics.push(gfx);
-
-      // Per-hazard visual effect tweens
-      switch (hazard.type) {
-        case HazardType.Lava: {
-          // Subtle pulsing orange glow
-          const lavaT = this.tweens.add({
-            targets: gfx,
-            alpha: { from: 0.6, to: 1.0 },
-            duration: 800 + Math.random() * 400,
-            yoyo: true,
-            repeat: -1,
-            ease: "Sine.easeInOut",
-          });
-          this.hazardTweens.push(lavaT);
-          break;
-        }
-        case HazardType.Water: {
-          // Gentle blue shimmer
-          const waterT = this.tweens.add({
-            targets: gfx,
-            alpha: { from: 0.5, to: 0.85 },
-            duration: 1200 + Math.random() * 600,
-            yoyo: true,
-            repeat: -1,
-            ease: "Sine.easeInOut",
-          });
-          this.hazardTweens.push(waterT);
-          break;
-        }
-        case HazardType.ToxicSwamp: {
-          // Bubbling animation: scale tween
-          const swampT = this.tweens.add({
-            targets: gfx,
-            scaleX: { from: 1.0, to: 1.04 },
-            scaleY: { from: 1.0, to: 1.04 },
-            alpha: { from: 0.5, to: 0.8 },
-            duration: 1000 + Math.random() * 800,
-            yoyo: true,
-            repeat: -1,
-            ease: "Sine.easeInOut",
-            delay: Math.random() * 1000,
-          });
-          this.hazardTweens.push(swampT);
-          break;
-        }
-        case HazardType.IcePatch: {
-          // Static light blue with slight sparkle (gentle alpha oscillation)
-          const iceT = this.tweens.add({
-            targets: gfx,
-            alpha: { from: 0.55, to: 0.75 },
-            duration: 2000 + Math.random() * 1000,
-            yoyo: true,
-            repeat: -1,
-            ease: "Sine.easeInOut",
-          });
-          this.hazardTweens.push(iceT);
-          break;
-        }
-        case HazardType.Quicksand: {
-          // Slow rotation-like effect (gentle alpha pulse to suggest movement)
-          const qsT = this.tweens.add({
-            targets: gfx,
-            alpha: { from: 0.5, to: 0.8 },
-            duration: 1500 + Math.random() * 500,
-            yoyo: true,
-            repeat: -1,
-            ease: "Quad.easeInOut",
-          });
-          this.hazardTweens.push(qsT);
-          break;
-        }
-        case HazardType.ElectricFloor: {
-          // Rapid flicker (random alpha changes)
-          const elecT = this.tweens.add({
-            targets: gfx,
-            alpha: { from: 0.3, to: 0.9 },
-            duration: 200 + Math.random() * 200,
-            yoyo: true,
-            repeat: -1,
-            ease: "Stepped",
-          });
-          this.hazardTweens.push(elecT);
-          break;
-        }
-      }
-    }
-  }
-
-  /**
-   * Check if the player is standing on a hazard tile and apply its effects.
-   * Called after player movement.
-   */
-  private checkPlayerHazard() {
-    this.checkEntityHazard(this.player, true);
-  }
-
-  /**
-   * Check if an entity is standing on a hazard tile and apply effects.
-   * @param entity The entity to check
-   * @param isPlayer Whether this is the player (for log messaging)
-   */
-  private checkEntityHazard(entity: Entity, isPlayer: boolean) {
-    if (!entity.alive) return;
-
-    const hazard = this.floorHazards.find(
-      h => h.x === entity.tileX && h.y === entity.tileY
-    );
-    if (!hazard) return;
-
-    const entityTypes = entity.types as PokemonType[];
-
-    // Check immunity
-    if (isImmuneToHazard(hazard.type, entityTypes)) {
-      if (isPlayer) {
-        this.showLog(`${entity.name} is immune to ${hazard.def.name}!`);
-      }
-      return;
-    }
-
-    // Show step message
-    if (isPlayer) {
-      this.showLog(`Stepped on ${hazard.def.name}!`);
-    } else if (this.minimapSys.currentlyVisible[entity.tileY]?.[entity.tileX]) {
-      this.showLog(`${entity.name} stepped on ${hazard.def.name}!`);
-    }
-
-    // Apply damage
-    if (hazard.def.damage > 0) {
-      entity.stats.hp = Math.max(1, entity.stats.hp - hazard.def.damage);
-      if (entity.sprite) {
-        this.showDamagePopup(entity.sprite.x, entity.sprite.y, hazard.def.damage, 1.0);
-      }
-      // Visual flash on the entity
-      if (entity.sprite) {
-        entity.sprite.setTint(hazard.def.color);
-        this.time.delayedCall(300, () => {
-          if (entity.sprite) entity.sprite.clearTint();
-        });
-      }
-    }
-
-    // Apply special effect
-    const effectRoll = Math.random();
-    if (effectRoll < hazard.def.effectChance) {
-      switch (hazard.def.effect) {
-        case "slow": {
-          // Skip next turn: apply paralyze-like status for 1 turn
-          if (!entity.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
-            entity.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 1 });
-            if (isPlayer) this.showLog("Slowed by water!");
-          }
-          break;
-        }
-        case "slide": {
-          // Slide in movement direction until hitting wall/entity
-          const dx = DIR_DX[entity.facing];
-          const dy = DIR_DY[entity.facing];
-          let slideX = entity.tileX;
-          let slideY = entity.tileY;
-          const { terrain, width, height } = this.dungeon;
-
-          for (let step = 0; step < 5; step++) {
-            const nx = slideX + dx;
-            const ny = slideY + dy;
-            if (nx < 0 || nx >= width || ny < 0 || ny >= height) break;
-            if (terrain[ny][nx] !== TerrainType.GROUND) break;
-            // Check entity collision
-            if (this.allEntities.some(e => e !== entity && e.alive && e.tileX === nx && e.tileY === ny)) break;
-            slideX = nx;
-            slideY = ny;
-          }
-
-          if (slideX !== entity.tileX || slideY !== entity.tileY) {
-            entity.tileX = slideX;
-            entity.tileY = slideY;
-            if (entity.sprite) {
-              entity.sprite.setPosition(
-                this.tileToPixelX(slideX),
-                this.tileToPixelY(slideY)
-              );
-            }
-            if (isPlayer) {
-              this.showLog("Slid on the ice!");
-              this.cameras.main.flash(150, 170, 220, 255);
-            }
-          }
-          break;
-        }
-        case "trap": {
-          // Trapped — skip next turn
-          if (!entity.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
-            entity.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 1 });
-            if (isPlayer) this.showLog("Trapped in quicksand!");
-          }
-          break;
-        }
-        case "poison": {
-          // Chance of burn (poison-like) status
-          if (!entity.statusEffects.some(s => s.type === SkillEffect.Burn)) {
-            entity.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
-            if (isPlayer) {
-              this.showLog("Poisoned by toxic swamp!");
-            } else if (this.minimapSys.currentlyVisible[entity.tileY]?.[entity.tileX]) {
-              this.showLog(`${entity.name} was poisoned!`);
-            }
-            if (entity.sprite) {
-              entity.sprite.setTint(0xa855f7);
-              this.time.delayedCall(300, () => {
-                if (entity.sprite) entity.sprite.clearTint();
-              });
-            }
-          }
-          break;
-        }
-        case "paralyze": {
-          // Chance to inflict paralysis
-          if (!entity.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
-            entity.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 3 });
-            if (isPlayer) {
-              this.showLog("Paralyzed by electric floor!");
-            } else if (this.minimapSys.currentlyVisible[entity.tileY]?.[entity.tileX]) {
-              this.showLog(`${entity.name} was paralyzed!`);
-            }
-            if (entity.sprite) {
-              entity.sprite.setTint(0xffee44);
-              this.time.delayedCall(300, () => {
-                if (entity.sprite) entity.sprite.clearTint();
-              });
-            }
-          }
-          break;
-        }
-      }
-    }
-
-    // Check death
-    if (isPlayer) {
-      this.checkPlayerDeath();
-    } else if (entity.stats.hp <= 0) {
-      entity.alive = false;
-    }
-
-    this.updateHUD();
   }
 
   // ── Belly (Hunger) ──
@@ -6535,770 +5934,6 @@ export class DungeonScene extends Phaser.Scene {
     for (const obj of this.shopUI) obj.destroy();
     this.shopUI = [];
     this.shopOpen = false;
-  }
-
-  // ── Shrine System ──
-
-  /** Draw the shrine visual on the dungeon floor */
-  private drawShrine() {
-    if (this.shrineTileX < 0 || !this.floorShrine) return;
-    const shrine = this.floorShrine;
-
-    // Diamond glow graphic at the shrine tile
-    this.shrineGraphic = this.add.graphics().setDepth(5);
-    const cx = this.shrineTileX * TILE_DISPLAY + TILE_DISPLAY / 2;
-    const cy = this.shrineTileY * TILE_DISPLAY + TILE_DISPLAY / 2;
-    // Glow circle
-    this.shrineGraphic.fillStyle(shrine.color, 0.25);
-    this.shrineGraphic.fillCircle(cx, cy, TILE_DISPLAY * 0.6);
-    // Inner diamond shape
-    this.shrineGraphic.fillStyle(shrine.color, 0.5);
-    this.shrineGraphic.fillPoints([
-      new Phaser.Geom.Point(cx, cy - 14),
-      new Phaser.Geom.Point(cx + 10, cy),
-      new Phaser.Geom.Point(cx, cy + 14),
-      new Phaser.Geom.Point(cx - 10, cy),
-    ], true);
-    // Border
-    this.shrineGraphic.lineStyle(1, shrine.color, 0.8);
-    this.shrineGraphic.strokePoints([
-      new Phaser.Geom.Point(cx, cy - 14),
-      new Phaser.Geom.Point(cx + 10, cy),
-      new Phaser.Geom.Point(cx, cy + 14),
-      new Phaser.Geom.Point(cx - 10, cy),
-    ], true);
-
-    // Shrine marker icon with pulse animation
-    this.shrineMarker = this.add.text(cx, cy - 12, shrine.icon, {
-      fontSize: "16px", fontFamily: "monospace",
-      stroke: "#000000", strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(8);
-
-    this.tweens.add({
-      targets: this.shrineMarker,
-      scaleX: { from: 1, to: 1.3 },
-      scaleY: { from: 1, to: 1.3 },
-      alpha: { from: 1, to: 0.6 },
-      duration: 900,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.easeInOut",
-    });
-  }
-
-  /** Check if player stepped on the shrine tile */
-  private checkShrine() {
-    if (!this.floorShrine || this.shrineUsed || this.shrineOpen) return;
-    if (this.player.tileX === this.shrineTileX && this.player.tileY === this.shrineTileY) {
-      this.openShrineUI();
-    }
-  }
-
-  /** Open the shrine choice overlay */
-  private openShrineUI() {
-    if (this.shrineOpen || !this.floorShrine || this.shrineUsed) return;
-    sfxMenuOpen();
-    this.shrineOpen = true;
-    if (this.domHud) setDomHudInteractive(this.domHud, false);
-    this.autoExploreSys.stopAutoExplore();
-
-    const shrine = this.floorShrine;
-
-    // Dim overlay
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75)
-      .setScrollFactor(0).setDepth(200).setInteractive();
-    this.shrineUI.push(overlay);
-
-    // Shrine title
-    const clrHex = `#${shrine.color.toString(16).padStart(6, "0")}`;
-    const titleText = this.add.text(GAME_WIDTH / 2, 55, `${shrine.icon} ${shrine.name}`, {
-      fontSize: "16px", color: clrHex, fontFamily: "monospace", fontStyle: "bold",
-      stroke: "#000000", strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    this.shrineUI.push(titleText);
-
-    // Decorative line
-    const line = this.add.graphics().setScrollFactor(0).setDepth(201);
-    line.lineStyle(1, shrine.color, 0.5);
-    line.lineBetween(GAME_WIDTH / 2 - 120, 77, GAME_WIDTH / 2 + 120, 77);
-    this.shrineUI.push(line);
-
-    // Description
-    const descText = this.add.text(GAME_WIDTH / 2, 100, shrine.description, {
-      fontSize: "10px", color: "#c0c8e0", fontFamily: "monospace",
-      wordWrap: { width: 280 }, align: "center", lineSpacing: 4,
-    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
-    this.shrineUI.push(descText);
-
-    // Choice buttons
-    const choiceStartY = 210;
-    for (let i = 0; i < shrine.choices.length; i++) {
-      const choice = shrine.choices[i];
-      const cy = choiceStartY + i * 80;
-
-      // Button background
-      const btnColor = Phaser.Display.Color.HexStringToColor(choice.color).color;
-      const btnBg = this.add.rectangle(GAME_WIDTH / 2, cy, 280, 60, 0x1a1a2e, 0.95)
-        .setScrollFactor(0).setDepth(201).setInteractive()
-        .setStrokeStyle(1, btnColor, 0.6);
-      this.shrineUI.push(btnBg);
-
-      // Choice label
-      const labelText = this.add.text(GAME_WIDTH / 2, cy - 12, choice.label, {
-        fontSize: "12px", color: choice.color, fontFamily: "monospace", fontStyle: "bold",
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-      this.shrineUI.push(labelText);
-
-      // Choice description
-      const choiceDesc = this.add.text(GAME_WIDTH / 2, cy + 8, choice.description, {
-        fontSize: "9px", color: "#888ea8", fontFamily: "monospace",
-        wordWrap: { width: 250 }, align: "center",
-      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(202);
-      this.shrineUI.push(choiceDesc);
-
-      // Hover effects
-      btnBg.on("pointerover", () => {
-        btnBg.setStrokeStyle(2, 0xfbbf24, 1);
-        labelText.setColor("#ffffff");
-      });
-      btnBg.on("pointerout", () => {
-        btnBg.setStrokeStyle(1, btnColor, 0.6);
-        labelText.setColor(choice.color);
-      });
-
-      // Click handler
-      btnBg.on("pointerdown", () => {
-        this.applyShrineEffect(choice);
-      });
-    }
-  }
-
-  /** Close shrine overlay */
-  private closeShrineUI() {
-    for (const obj of this.shrineUI) obj.destroy();
-    this.shrineUI = [];
-    this.shrineOpen = false;
-    if (this.domHud) setDomHudInteractive(this.domHud, true);
-  }
-
-  /** Show a brief result message after shrine use */
-  private showShrineResult(message: string, color = "#4ade80") {
-    this.closeShrineUI();
-    this.shrineUsed = true;
-
-    // Remove shrine visuals
-    if (this.shrineGraphic) {
-      this.shrineGraphic.destroy();
-      this.shrineGraphic = null;
-    }
-    if (this.shrineMarker) {
-      this.shrineMarker.destroy();
-      this.shrineMarker = null;
-    }
-
-    // Brief result overlay
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6)
-      .setScrollFactor(0).setDepth(200).setInteractive();
-
-    const resultText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, message, {
-      fontSize: "12px", color, fontFamily: "monospace", fontStyle: "bold",
-      wordWrap: { width: 280 }, align: "center",
-      stroke: "#000000", strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-
-    // Auto-dismiss after 1.5 seconds
-    this.time.delayedCall(1500, () => {
-      overlay.destroy();
-      resultText.destroy();
-      this.updateHUD();
-      this.minimapSys.updateMinimap();
-    });
-  }
-
-  /** Apply the chosen shrine effect */
-  private applyShrineEffect(choice: ShrineChoice) {
-    const eff = choice.effect;
-
-    switch (eff.type) {
-      case "heal": {
-        if (eff.value === 0) {
-          // "Leave" / "Walk Away" — no effect
-          this.closeShrineUI();
-          this.shrineUsed = true;
-          // Remove shrine visuals
-          if (this.shrineGraphic) { this.shrineGraphic.destroy(); this.shrineGraphic = null; }
-          if (this.shrineMarker) { this.shrineMarker.destroy(); this.shrineMarker = null; }
-          this.showLog("You left the shrine.");
-          return;
-        }
-        if (eff.value === -1) {
-          // Full heal
-          this.player.stats.hp = this.player.stats.maxHp;
-          sfxHeal();
-          this.showShrineResult("The shrine's light washes over you.\nHP fully restored!", "#22c55e");
-          this.showLog("The shrine fully healed your HP!");
-        } else if (eff.value && eff.value > 0) {
-          // Percentage heal
-          const healAmt = Math.floor(this.player.stats.maxHp * (eff.value / 100));
-          this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + healAmt);
-          sfxHeal();
-          this.showShrineResult(`Restored ${healAmt} HP!`, "#22c55e");
-          this.showLog(`The shrine restored ${healAmt} HP!`);
-        }
-        break;
-      }
-
-      case "hpSacrifice": {
-        const sacrificeAmt = Math.floor(this.player.stats.maxHp * ((eff.value ?? 25) / 100));
-        if (this.player.stats.hp <= sacrificeAmt) {
-          this.showLog("Not enough HP to sacrifice!");
-          return; // Don't close — let player pick another option
-        }
-        this.player.stats.hp -= sacrificeAmt;
-        if (eff.blessing) {
-          this.grantBlessing(eff.blessing);
-        }
-        this.showShrineResult(`Sacrificed ${sacrificeAmt} HP.\nBlessing granted!`, "#f97316");
-        this.showLog(`You sacrificed ${sacrificeAmt} HP at the shrine!`);
-        break;
-      }
-
-      case "bellySacrifice": {
-        const bellyCost = eff.value ?? 30;
-        if (this.belly < bellyCost) {
-          this.showLog("Not enough belly to sacrifice!");
-          return; // Don't close
-        }
-        this.belly -= bellyCost;
-        // Give gold (look at the shrine's second choice label for gold amount)
-        const goldAmt = this.floorShrine?.type === ShrineType.Sacrifice
-          ? Math.floor(100 + this.currentFloor * 15 + this.dungeonDef.difficulty * 20)
-          : 150;
-        this.gold += goldAmt;
-        this.showShrineResult(`Sacrificed ${bellyCost} belly.\nGained ${goldAmt}G!`, "#fbbf24");
-        this.showLog(`Sacrificed belly at the shrine. Gained ${goldAmt}G!`);
-        break;
-      }
-
-      case "gold": {
-        const goldAmt = eff.value ?? 100;
-        this.gold += goldAmt;
-        this.showShrineResult(`Found ${goldAmt} gold!`, "#fbbf24");
-        this.showLog(`The shrine granted ${goldAmt} gold!`);
-        break;
-      }
-
-      case "blessing": {
-        if (eff.blessing) {
-          this.grantBlessing(eff.blessing);
-          this.showShrineResult(`Blessed!\n${eff.blessing.name}`, "#4ade80");
-        } else {
-          const b = getRandomBlessing();
-          this.grantBlessing(b);
-          this.showShrineResult(`Blessed!\n${b.name}`, "#4ade80");
-        }
-        break;
-      }
-
-      case "curse": {
-        if (eff.blessing) {
-          this.grantBlessing(eff.blessing);
-          this.showShrineResult(`Cursed!\n${eff.blessing.name}`, "#ef4444");
-        } else {
-          const c = getRandomCurse();
-          this.grantBlessing(c);
-          this.showShrineResult(`Cursed!\n${c.name}`, "#ef4444");
-        }
-        break;
-      }
-
-      case "random": {
-        // 50/50 blessing or curse (gamble)
-        const rolled = eff.blessing ?? rollBlessingOrCurse();
-        this.grantBlessing(rolled);
-        if (rolled.isCurse) {
-          this.showShrineResult(`Bad luck!\n${rolled.name}`, "#ef4444");
-          this.showLog(`The gamble shrine cursed you: ${rolled.name}`);
-        } else {
-          this.showShrineResult(`Lucky!\n${rolled.name}`, "#4ade80");
-          this.showLog(`The gamble shrine blessed you: ${rolled.name}`);
-        }
-        break;
-      }
-
-      case "restorePP": {
-        for (const sk of this.player.skills) {
-          sk.currentPp = sk.pp;
-        }
-        sfxHeal();
-        this.showShrineResult("All skill PP restored!", "#38bdf8");
-        this.showLog("The shrine restored all your PP!");
-        break;
-      }
-
-      case "exp": {
-        const expAmt = eff.value ?? 50;
-        this.totalExp += expAmt;
-        const lvlResult = processLevelUp(this.player.stats, expAmt, this.totalExp);
-        this.totalExp = lvlResult.totalExp;
-        this.showShrineResult(`Gained ${expAmt} EXP!`, "#c084fc");
-        this.showLog(`The shrine granted ${expAmt} EXP!`);
-        break;
-      }
-
-      case "learnSkill": {
-        // For now, just grant EXP as a placeholder
-        const expAmtSk = eff.value ?? 50;
-        this.totalExp += expAmtSk;
-        const lvlResultSk = processLevelUp(this.player.stats, expAmtSk, this.totalExp);
-        this.totalExp = lvlResultSk.totalExp;
-        this.showShrineResult(`Gained ${expAmtSk} EXP from ancient knowledge!`, "#38bdf8");
-        this.showLog(`The shrine imparted ancient knowledge: ${expAmtSk} EXP!`);
-        break;
-      }
-
-      case "item": {
-        // Reserved for future use
-        this.showShrineResult("Nothing happened.", "#888888");
-        break;
-      }
-
-      default: {
-        this.closeShrineUI();
-        this.shrineUsed = true;
-        break;
-      }
-    }
-  }
-
-  // ── Event Room System ──
-
-  private checkEventRoom() {
-    if (!this.eventRoom || this.eventTriggered || this.eventOpen) return;
-    const r = this.eventRoom;
-    const px = this.player.tileX;
-    const py = this.player.tileY;
-    if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h) {
-      this.eventTriggered = true;
-      // Remove the "!" marker
-      if (this.eventMarker) {
-        this.eventMarker.destroy();
-        this.eventMarker = null;
-      }
-      // Open the event overlay
-      this.openEventUI();
-    }
-  }
-
-  private openEventUI() {
-    if (this.eventOpen || !this.currentEvent) return;
-    sfxMenuOpen();
-    this.eventOpen = true;
-    this.autoExploreSys.stopAutoExplore();
-
-    const event = this.currentEvent;
-
-    // Dim overlay
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75)
-      .setScrollFactor(0).setDepth(200).setInteractive();
-    this.eventUI.push(overlay);
-
-    // Event name (title)
-    const titleText = this.add.text(GAME_WIDTH / 2, 60, event.name, {
-      fontSize: "16px", color: "#22d3ee", fontFamily: "monospace", fontStyle: "bold",
-      stroke: "#000000", strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    this.eventUI.push(titleText);
-
-    // Decorative line
-    const line = this.add.graphics().setScrollFactor(0).setDepth(201);
-    line.lineStyle(1, 0x22d3ee, 0.5);
-    line.lineBetween(GAME_WIDTH / 2 - 120, 82, GAME_WIDTH / 2 + 120, 82);
-    this.eventUI.push(line);
-
-    // Description text (word-wrapped)
-    const descText = this.add.text(GAME_WIDTH / 2, 105, event.description, {
-      fontSize: "10px", color: "#c0c8e0", fontFamily: "monospace",
-      wordWrap: { width: 280 }, align: "center", lineSpacing: 4,
-    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
-    this.eventUI.push(descText);
-
-    // Choice buttons
-    const choiceStartY = 220;
-    for (let i = 0; i < event.choices.length; i++) {
-      const choice = event.choices[i];
-      const cy = choiceStartY + i * 80;
-
-      // Choice button background
-      const btnBg = this.add.rectangle(GAME_WIDTH / 2, cy, 280, 60, 0x1a1a2e, 0.95)
-        .setScrollFactor(0).setDepth(201).setInteractive()
-        .setStrokeStyle(1, 0x22d3ee, 0.6);
-      this.eventUI.push(btnBg);
-
-      // Choice label
-      const labelText = this.add.text(GAME_WIDTH / 2, cy - 12, choice.label, {
-        fontSize: "12px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-      this.eventUI.push(labelText);
-
-      // Choice description
-      const choiceDesc = this.add.text(GAME_WIDTH / 2, cy + 8, choice.description, {
-        fontSize: "9px", color: "#888ea8", fontFamily: "monospace",
-        wordWrap: { width: 250 }, align: "center",
-      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(202);
-      this.eventUI.push(choiceDesc);
-
-      // Hover effects
-      btnBg.on("pointerover", () => {
-        btnBg.setStrokeStyle(2, 0xfbbf24, 1);
-        labelText.setColor("#ffffff");
-      });
-      btnBg.on("pointerout", () => {
-        btnBg.setStrokeStyle(1, 0x22d3ee, 0.6);
-        labelText.setColor("#fbbf24");
-      });
-
-      // Click handler
-      btnBg.on("pointerdown", () => {
-        this.applyEventEffect(choice);
-      });
-    }
-  }
-
-  private closeEventUI() {
-    for (const obj of this.eventUI) obj.destroy();
-    this.eventUI = [];
-    this.eventOpen = false;
-  }
-
-  private showEventResult(message: string, color = "#4ade80") {
-    this.closeEventUI();
-
-    // Brief result overlay
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6)
-      .setScrollFactor(0).setDepth(200).setInteractive();
-
-    const resultText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, message, {
-      fontSize: "12px", color, fontFamily: "monospace", fontStyle: "bold",
-      wordWrap: { width: 280 }, align: "center",
-      stroke: "#000000", strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-
-    // Auto-dismiss after 1.5 seconds
-    this.time.delayedCall(1500, () => {
-      overlay.destroy();
-      resultText.destroy();
-      this.updateHUD();
-      this.minimapSys.updateMinimap();
-    });
-  }
-
-  private applyEventEffect(choice: EventChoice) {
-    const effectId = choice.effectId;
-    const value = choice.effectValue ?? 0;
-
-    switch (effectId) {
-      case "nothing": {
-        this.closeEventUI();
-        this.showLog("You decided to move on.");
-        break;
-      }
-
-      case "wishingWell_toss": {
-        // Requires 50G
-        if (this.gold < value) {
-          this.showLog(`Not enough gold! Need ${value}G.`);
-          return; // Don't close UI, let player pick another choice
-        }
-        this.gold -= value;
-        const roll = Math.random();
-        if (roll < 0.33) {
-          this.player.stats.atk += 3;
-          this.showEventResult("The well grants power!\nATK +3!", "#ff6b6b");
-        } else if (roll < 0.66) {
-          this.player.stats.def += 3;
-          this.showEventResult("The well grants resilience!\nDEF +3!", "#60a5fa");
-        } else {
-          this.player.stats.maxHp += 20;
-          this.player.stats.hp = Math.min(this.player.stats.hp + 20, this.player.stats.maxHp);
-          this.showEventResult("The well grants vitality!\nMax HP +20!", "#4ade80");
-        }
-        sfxBuff();
-        this.showLog("Your wish was granted!");
-        break;
-      }
-
-      case "stash_open": {
-        this.closeEventUI();
-        if (Math.random() < 0.5) {
-          // Good outcome: 2-3 items
-          const itemCount = 2 + Math.floor(Math.random() * 2);
-          let addedCount = 0;
-          for (let i = 0; i < itemCount; i++) {
-            if (this.inventory.length >= MAX_INVENTORY) break;
-            const item = rollFloorItem();
-            const existing = this.inventory.find(s => s.item.id === item.id && item.stackable);
-            if (existing) existing.count++;
-            else this.inventory.push({ item, count: 1 });
-            addedCount++;
-          }
-          sfxItemPickup();
-          this.showEventResult(`Found ${addedCount} items in the stash!`, "#4ade80");
-          this.showLog(`Found ${addedCount} items!`);
-        } else {
-          // Bad outcome: spawn 2-3 enemies
-          this.showLog("It was a trap! Enemies appear!");
-          this.spawnEventEnemies(2 + Math.floor(Math.random() * 2));
-          this.showEventResult("Enemies burst out of the stash!", "#ef4444");
-        }
-        break;
-      }
-
-      case "statue_pray": {
-        this.player.stats.hp = this.player.stats.maxHp;
-        sfxHeal();
-        this.showEventResult("The statue's warmth heals you fully!\nHP fully restored!", "#4ade80");
-        this.showLog("HP fully restored!");
-        break;
-      }
-
-      case "statue_smash": {
-        // Take damage
-        this.player.stats.hp = Math.max(1, this.player.stats.hp - value);
-        // Give 3 random items
-        let addedCount = 0;
-        for (let i = 0; i < 3; i++) {
-          if (this.inventory.length >= MAX_INVENTORY) break;
-          const item = rollFloorItem();
-          const existing = this.inventory.find(s => s.item.id === item.id && item.stackable);
-          if (existing) existing.count++;
-          else this.inventory.push({ item, count: 1 });
-          addedCount++;
-        }
-        sfxHit();
-        this.showEventResult(`Smashed! Took ${value} damage.\nFound ${addedCount} items!`, "#fbbf24");
-        this.showLog(`Took ${value} damage but found ${addedCount} items!`);
-        break;
-      }
-
-      case "traveler_feed": {
-        // Check if player has an Apple
-        const appleIdx = this.inventory.findIndex(s => s.item.id === "apple" || s.item.id === "bigApple" || s.item.id === "goldenApple");
-        if (appleIdx === -1) {
-          this.showLog("You don't have any Apples!");
-          return; // Don't close UI
-        }
-        // Consume the apple
-        const stack = this.inventory[appleIdx];
-        stack.count--;
-        if (stack.count <= 0) this.inventory.splice(appleIdx, 1);
-
-        // Recruit a random ally
-        this.spawnEventAlly();
-        sfxRecruit();
-        this.showEventResult("The traveler is grateful!\nThey join your team!", "#ff6b9d");
-        this.showLog("A grateful traveler joins you!");
-        break;
-      }
-
-      case "chest_open": {
-        // Give a powerful item (orb or rare seed)
-        const powerfulItems = ["allPowerOrb", "reviveSeed", "luminousOrb", "maxElixir", "sitrusBerry"];
-        const itemId = powerfulItems[Math.floor(Math.random() * powerfulItems.length)];
-        const item = ITEM_DB[itemId];
-        if (this.inventory.length < MAX_INVENTORY && item) {
-          const existing = this.inventory.find(s => s.item.id === item.id && item.stackable);
-          if (existing) existing.count++;
-          else this.inventory.push({ item, count: 1 });
-        }
-        // Apply Burn status
-        this.player.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
-        sfxItemPickup();
-        this.showEventResult(`Got ${item?.name ?? "an item"}!\nBut you were cursed with Burn!`, "#bb44ff");
-        this.showLog(`Got ${item?.name ?? "an item"}, but burned!`);
-        break;
-      }
-
-      case "train_do": {
-        // Grant EXP but lose 30% belly
-        const bellyLoss = Math.floor(this.maxBelly * 0.3);
-        this.belly = Math.max(0, this.belly - bellyLoss);
-        // Process level ups
-        const prevLevel = this.player.stats.level;
-        const levelResult = processLevelUp(this.player.stats, value, this.totalExp);
-        this.totalExp = levelResult.totalExp;
-        for (const r of levelResult.results) {
-          sfxLevelUp();
-          this.showLog(`Level up! Lv.${r.newLevel}! HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
-        }
-        sfxBuff();
-        this.showEventResult(`Intense training!\n+${value} EXP, Belly -${bellyLoss}`, "#fbbf24");
-        this.showLog(`Gained ${value} EXP! Belly -${bellyLoss}.`);
-        break;
-      }
-
-      case "fortune_pay": {
-        if (this.gold < value) {
-          this.showLog(`Not enough gold! Need ${value}G.`);
-          return; // Don't close UI
-        }
-        this.gold -= value;
-        // Reveal entire floor
-        const { width, height } = this.dungeon;
-        for (let fy = 0; fy < height; fy++) {
-          for (let fx = 0; fx < width; fx++) {
-            this.minimapSys.visited[fy][fx] = true;
-            this.minimapSys.currentlyVisible[fy][fx] = true;
-          }
-        }
-        // Reveal all traps too
-        for (const trap of this.floorTraps) {
-          trap.revealed = true;
-        }
-        this.minimapSys.updateMinimap();
-        this.minimapSys.checkExplorationRewards();
-        sfxBuff();
-        this.showEventResult("The orb reveals all secrets!\nFloor map fully revealed!", "#22d3ee");
-        this.showLog("Floor layout fully revealed!");
-        break;
-      }
-
-      case "rest_do": {
-        this.player.stats.hp = this.player.stats.maxHp;
-        this.belly = Math.min(this.maxBelly, this.belly + value);
-        this.resetBellyWarnings();
-        sfxHeal();
-        this.showEventResult(`You rest peacefully...\nHP fully restored! Belly +${value}`, "#4ade80");
-        this.showLog(`Rested! HP restored, Belly +${value}.`);
-        break;
-      }
-
-      default: {
-        this.closeEventUI();
-        this.showLog("Nothing happened.");
-        break;
-      }
-    }
-  }
-
-  /** Spawn enemies in the event room (for Abandoned Stash trap) */
-  private spawnEventEnemies(count: number) {
-    if (!this.eventRoom) return;
-    const r = this.eventRoom;
-    const floorSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
-      ? this.getEndlessEnemies(this.currentFloor)
-      : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
-    const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
-    if (floorSpecies.length === 0) return;
-
-    for (let i = 0; i < count; i++) {
-      const ex = r.x + 1 + Math.floor(Math.random() * Math.max(1, r.w - 2));
-      const ey = r.y + 1 + Math.floor(Math.random() * Math.max(1, r.h - 2));
-      if (this.dungeon.terrain[ey]?.[ex] !== TerrainType.GROUND) continue;
-      if (this.allEntities.some(e => e.alive && e.tileX === ex && e.tileY === ey)) continue;
-
-      const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
-      const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
-
-      if (this.difficultyMods.enemyHpMult !== 1) {
-        enemyStats.hp = Math.floor(enemyStats.hp * this.difficultyMods.enemyHpMult);
-        enemyStats.maxHp = Math.floor(enemyStats.maxHp * this.difficultyMods.enemyHpMult);
-      }
-      if (this.difficultyMods.enemyAtkMult !== 1) {
-        enemyStats.atk = Math.floor(enemyStats.atk * this.difficultyMods.enemyAtkMult);
-      }
-
-      const enemy: Entity = {
-        tileX: ex, tileY: ey,
-        facing: Direction.Down,
-        stats: { ...enemyStats },
-        alive: true,
-        spriteKey: sp.spriteKey,
-        name: sp.name,
-        types: sp.types,
-        attackType: sp.attackType,
-        skills: createSpeciesSkills(sp),
-        statusEffects: [],
-        speciesId: sp.spriteKey,
-        ability: SPECIES_ABILITIES[sp.spriteKey],
-      };
-      const eTex = `${sp.spriteKey}-idle`;
-      if (this.textures.exists(eTex)) {
-        enemy.sprite = this.add.sprite(
-          this.tileToPixelX(ex), this.tileToPixelY(ey), eTex
-        );
-        enemy.sprite.setScale(TILE_SCALE).setDepth(9);
-        const eAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
-        if (this.anims.exists(eAnim)) enemy.sprite.play(eAnim);
-      }
-      this.enemies.push(enemy);
-      this.allEntities.push(enemy);
-      this.seenSpecies.add(sp.spriteKey);
-    }
-  }
-
-  /** Spawn a temporary ally from the Lost Traveler event */
-  private spawnEventAlly() {
-    if (!this.eventRoom || this.allies.length >= MAX_ALLIES) return;
-    const r = this.eventRoom;
-
-    // Pick a random species from the current floor's enemy pool
-    const floorSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
-      ? this.getEndlessEnemies(this.currentFloor)
-      : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
-    const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
-    if (floorSpecies.length === 0) return;
-
-    const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
-    const allyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty * 0.9, sp, this.ngPlusLevel);
-
-    // Place ally near event room center
-    const ax = Math.floor(r.x + r.w / 2);
-    const ay = Math.floor(r.y + r.h / 2);
-
-    const ally: Entity = {
-      tileX: ax, tileY: ay,
-      facing: Direction.Down,
-      stats: { ...allyStats },
-      alive: true,
-      spriteKey: sp.spriteKey,
-      name: sp.name,
-      types: sp.types,
-      attackType: sp.attackType,
-      skills: createSpeciesSkills(sp),
-      statusEffects: [],
-      isAlly: true,
-      speciesId: sp.spriteKey,
-      ability: SPECIES_ABILITIES[sp.spriteKey],
-      allyTactic: AllyTactic.FollowMe,
-    };
-
-    const recruitTex = `${sp.spriteKey}-idle`;
-    if (this.textures.exists(recruitTex)) {
-      ally.sprite = this.add.sprite(
-        this.tileToPixelX(ax), this.tileToPixelY(ay), recruitTex
-      ).setScale(TILE_SCALE).setDepth(10);
-      const recruitAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
-      if (this.anims.exists(recruitAnim)) ally.sprite.play(recruitAnim);
-    }
-
-    // Pink tint flash for recruitment
-    if (ally.sprite) ally.sprite.setTint(0xff88cc);
-    this.time.delayedCall(400, () => { if (ally.sprite) ally.sprite.clearTint(); });
-
-    const heart = this.add.text(
-      this.tileToPixelX(ax), this.tileToPixelY(ay) - 20,
-      "♥", { fontSize: "18px", color: "#ff6b9d", fontFamily: "monospace" }
-    ).setOrigin(0.5).setDepth(50);
-    this.tweens.add({
-      targets: heart, y: heart.y - 30, alpha: { from: 1, to: 0 },
-      duration: 1000, ease: "Quad.easeOut",
-      onComplete: () => heart.destroy(),
-    });
-
-    this.allies.push(ally);
-    this.allEntities.push(ally);
-    this.seenSpecies.add(sp.spriteKey);
   }
 
   // Puzzle Room System is now in systems/puzzle-system.ts (PuzzleSystem class)
@@ -8459,16 +7094,16 @@ export class DungeonScene extends Phaser.Scene {
         this.showLog(`There's a ${itemHere.item.name} here. [줍기] to pick up.`);
       }
 
-      this.checkTraps();
-      this.checkPlayerHazard();
-      this.revealNearbyTraps();
+      this.trapHazardSys.checkTraps();
+      this.trapHazardSys.checkPlayerHazard();
+      this.trapHazardSys.revealNearbyTraps();
       this.checkStairs();
       this.checkShop();
       this.checkMonsterHouse();
-      this.checkEventRoom();
+      this.eventRoomSys.checkEventRoom();
       this.puzzleSys.checkPuzzleRoom();
       this.secretRoomSys.checkSecretRoom();
-      this.checkShrine();
+      this.shrineSys.checkShrine();
     }
 
     // Belly drain per turn (movement or attack)
@@ -10637,7 +9272,7 @@ export class DungeonScene extends Phaser.Scene {
           if (moveDir !== null && this.canEntityMove(enemy, moveDir)) {
             await this.moveEntity(enemy, moveDir);
             // Check hazard tiles for enemies after movement
-            this.checkEntityHazard(enemy, false);
+            this.trapHazardSys.checkEntityHazard(enemy, false);
           }
 
           // ── Floor Mutation: FastEnemies — 20% chance of a bonus move ──
@@ -10651,7 +9286,7 @@ export class DungeonScene extends Phaser.Scene {
               );
               if (bonusDir !== null && this.canEntityMove(enemy, bonusDir)) {
                 await this.moveEntity(enemy, bonusDir);
-                this.checkEntityHazard(enemy, false);
+                this.trapHazardSys.checkEntityHazard(enemy, false);
               }
             }
           }
@@ -10778,7 +9413,7 @@ export class DungeonScene extends Phaser.Scene {
             await this.moveEntity(ally, moveDir);
             this.recoverPP(ally);
             // Check hazard tiles for allies after movement
-            this.checkEntityHazard(ally, false);
+            this.trapHazardSys.checkEntityHazard(ally, false);
           }
         };
       });
