@@ -9471,11 +9471,29 @@ export class DungeonScene extends Phaser.Scene {
     // Increment rescue count
     this.rescueCount++;
 
-    // Restore HP
+    // Restore HP and alive state
     this.player.stats.hp = Math.floor(this.player.stats.maxHp * option.hpPercent / 100);
     this.player.alive = true;
+
+    // Stop any ongoing tweens on the player sprite (e.g. death fade-out)
     if (this.player.sprite) {
+      this.tweens.killTweensOf(this.player.sprite);
       this.player.sprite.setAlpha(1);
+    } else {
+      // Sprite was already destroyed by death tween — recreate it
+      const sp = SPECIES[this.starterId];
+      if (sp) {
+        const texKey = `${sp.spriteKey}-idle`;
+        if (this.textures.exists(texKey)) {
+          this.player.sprite = this.add.sprite(
+            this.tileToPixelX(this.player.tileX),
+            this.tileToPixelY(this.player.tileY),
+            texKey
+          ).setScale(TILE_SCALE).setDepth(10);
+          const animKey = `${sp.spriteKey}-idle-${this.player.facing}`;
+          if (this.anims.exists(animKey)) this.player.sprite.play(animKey);
+        }
+      }
     }
 
     // If basic rescue, remove half the inventory items randomly
@@ -9500,6 +9518,9 @@ export class DungeonScene extends Phaser.Scene {
 
     // Ensure gameOver stays false (was not set since we intercepted before showGameOverScreen)
     this.gameOver = false;
+
+    // Re-enable DOM HUD buttons (rescue overlay may have blocked them)
+    if (this.domHud) setDomHudInteractive(this.domHud, true);
 
     // Visual feedback: rescue flash
     this.cameras.main.flash(600, 100, 200, 255);
