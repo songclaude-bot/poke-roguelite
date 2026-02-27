@@ -353,7 +353,7 @@ export class HubScene extends Phaser.Scene {
     }
 
     // ── Starter Card ──
-    const cardY = 120;
+    const cardY = 150;
     const cardH = 90;
     const cardBg = this.add.rectangle(GAME_WIDTH / 2, cardY, BTN_W, cardH, 0x151d30, 0.95)
       .setStrokeStyle(1, 0x334155);
@@ -515,45 +515,64 @@ export class HubScene extends Phaser.Scene {
     }
 
     // ── Quick Actions ──
-    let qy = npcRowY + 44;
+    // Collect action buttons to distribute them evenly
+    const actionItems: { label: string; desc: string; bg: number; stroke: number; color: string; fn: () => void }[] = [];
 
     // Continue saved run
     const hasSave = hasDungeonSave();
     if (hasSave) {
       const save = loadDungeon();
       const saveName = save ? (DUNGEONS[save.dungeonId]?.name ?? save.dungeonId) : "Unknown";
-      this.addBtn(GAME_WIDTH / 2, qy, BTN_W, 38,
-        `Continue: ${saveName} B${save?.floor ?? "?"}F`, "Resume your saved run",
-        0x1a3a2e, 0x4ade80, "#4ade80", () => this.continueSave());
-      qy += 44;
+      actionItems.push({
+        label: `Continue: ${saveName} B${save?.floor ?? "?"}F`, desc: "Resume your saved run",
+        bg: 0x1a3a2e, stroke: 0x4ade80, color: "#4ade80", fn: () => this.continueSave(),
+      });
     }
 
     // Last dungeon quick access
     if (this.meta.lastDungeonId && !hasSave) {
       const lastDungeon = DUNGEONS[this.meta.lastDungeonId];
       if (lastDungeon) {
-        this.addBtn(GAME_WIDTH / 2, qy, BTN_W, 38,
-          `Quick Re-enter: ${lastDungeon.name}`, "Same dungeon, new run",
-          0x3a2a1a, 0xf59e0b, "#f59e0b",
-          () => {
+        actionItems.push({
+          label: `Quick Re-enter: ${lastDungeon.name}`, desc: "Same dungeon, new run",
+          bg: 0x3a2a1a, stroke: 0xf59e0b, color: "#f59e0b",
+          fn: () => {
             if (this.meta.lastChallenge) {
               this.enterDungeonWithChallenge(this.meta.lastDungeonId!, this.meta.lastChallenge);
             } else {
               this.enterDungeon(this.meta.lastDungeonId!);
             }
-          });
-        qy += 44;
+          },
+        });
       }
     }
 
-    // Go to dungeon selection
-    this.addBtn(GAME_WIDTH / 2, qy, BTN_W, 44,
-      "Enter Dungeon", "Choose your next adventure",
-      0x1e3a5f, 0x3b82f6, "#ffffff",
-      () => this.switchTab("dungeon"));
-    qy += 50;
+    // Go to dungeon selection (always present)
+    actionItems.push({
+      label: "Enter Dungeon", desc: "Choose your next adventure",
+      bg: 0x1e3a5f, stroke: 0x3b82f6, color: "#ffffff",
+      fn: () => this.switchTab("dungeon"),
+    });
 
-    // Settings row at bottom
+    // Distribute action buttons evenly between NPC row bottom and settings area
+    const actionsTopY = npcRowY + 50;
+    const settingsAreaY = CONTENT_BOTTOM - 40;
+    const actionBtnH = 48;
+    const actionSpacing = actionItems.length > 1
+      ? Math.min(60, (settingsAreaY - actionsTopY - actionBtnH) / (actionItems.length - 1))
+      : 0;
+    // Center the group vertically in the available space
+    const totalActionH = actionBtnH + actionSpacing * (actionItems.length - 1);
+    const actionStartY = actionsTopY + (settingsAreaY - actionsTopY - totalActionH) / 2;
+
+    for (let ai = 0; ai < actionItems.length; ai++) {
+      const a = actionItems[ai];
+      const ay = actionStartY + ai * actionSpacing + actionBtnH / 2;
+      this.addBtn(GAME_WIDTH / 2, ay, BTN_W, actionBtnH,
+        a.label, a.desc, a.bg, a.stroke, a.color, a.fn);
+    }
+
+    // Settings row near bottom
     const settingsY = CONTENT_BOTTOM - 20;
     const settingsBtn = this.add.rectangle(GAME_WIDTH / 2 - 55, settingsY, 90, 24, 0x1a1a2e, 0.9)
       .setStrokeStyle(1, 0x334155).setInteractive({ useHandCursor: true });
@@ -887,15 +906,22 @@ export class HubScene extends Phaser.Scene {
       { label: talentPoints > 0 ? `Talents (${talentPoints} pts)` : "Talent Tree", desc: "Invest gold in permanent talents", color: "#fbbf24", bgColor: 0x2a2a1a, scene: "TalentTreeScene" },
     ];
 
-    let iy = 62;
-    for (const item of items) {
+    // Distribute buttons evenly in available vertical space
+    const btnH = 42;
+    const topY = 56;
+    const bottomY = CONTENT_BOTTOM - 16;
+    const totalSlots = items.length;
+    const spacing = (bottomY - topY - btnH) / (totalSlots - 1);
+
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      const iy = topY + idx * spacing + btnH / 2;
       const bgColor = item.bgColor;
       const strokeColor = parseInt(item.color.replace("#", ""), 16);
-      this.addBtn(GAME_WIDTH / 2, iy, BTN_W, 42,
+      this.addBtn(GAME_WIDTH / 2, iy, BTN_W, btnH,
         item.label, item.desc,
         bgColor, strokeColor, item.color,
         () => this.scene.start(item.scene));
-      iy += 50;
     }
   }
 
@@ -921,11 +947,18 @@ export class HubScene extends Phaser.Scene {
       { label: "Dungeon Journal", desc: "Exploration history & bestiary", color: "#f97316", bgColor: 0x2a1a0a, scene: "JournalScene" },
     ];
 
-    let iy = 50;
-    for (const item of items) {
+    // Distribute buttons evenly in available vertical space
+    const infoBtnH = 48;
+    const infoTopY = 50;
+    const infoBottomY = CONTENT_BOTTOM - 16;
+    const infoSpacing = (infoBottomY - infoTopY - infoBtnH) / (items.length - 1);
+
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      const iy = infoTopY + idx * infoSpacing + infoBtnH / 2;
       const bgColor = item.bgColor;
       const strokeColor = parseInt(item.color.replace("#", ""), 16);
-      this.addBtn(GAME_WIDTH / 2, iy, BTN_W, 48,
+      this.addBtn(GAME_WIDTH / 2, iy, BTN_W, infoBtnH,
         item.label, item.desc,
         bgColor, strokeColor, item.color,
         () => this.scene.start(item.scene));
@@ -941,8 +974,6 @@ export class HubScene extends Phaser.Scene {
         }).setOrigin(0.5).setDepth(13);
         this.tabContent.push(badgeT);
       }
-
-      iy += 56;
     }
   }
 
