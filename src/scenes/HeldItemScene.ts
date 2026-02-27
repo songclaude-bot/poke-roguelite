@@ -230,27 +230,31 @@ export class HeldItemScene extends Phaser.Scene {
 
     // Equip / Unequip button
     if (isEquipped) {
-      const unequipBtn = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 12, y + 16, "[Unequip]", {
-        fontSize: "10px", color: "#ef4444", fontFamily: "monospace",
-        backgroundColor: "#2e1a1a",
-        padding: { x: 6, y: 4 },
-      }).setOrigin(1, 0).setInteractive();
-      this.listContainer.add(unequipBtn);
-
-      unequipBtn.on("pointerdown", () => {
+      const unequipBtnBg = this.add.rectangle(GAME_WIDTH / 2 + btnW / 2 - 45, y + 22, 80, 24, 0x1e3a5f, 0.9)
+        .setStrokeStyle(1, 0x3b82f6).setInteractive({ useHandCursor: true });
+      this.listContainer.add(unequipBtnBg);
+      const unequipBtnText = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 45, y + 22, "Unequip", {
+        fontSize: "11px", color: "#3b82f6", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5);
+      this.listContainer.add(unequipBtnText);
+      unequipBtnBg.on("pointerover", () => unequipBtnBg.setFillStyle(0x2e5a8f, 1));
+      unequipBtnBg.on("pointerout", () => unequipBtnBg.setFillStyle(0x1e3a5f, 0.9));
+      unequipBtnBg.on("pointerdown", () => {
         this.meta.equippedHeldItem = undefined;
         saveMeta(this.meta);
         this.scene.restart();
       });
     } else {
-      const equipBtn = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 12, y + 16, "[Equip]", {
-        fontSize: "10px", color: "#4ade80", fontFamily: "monospace",
-        backgroundColor: "#1a2e1a",
-        padding: { x: 6, y: 4 },
-      }).setOrigin(1, 0).setInteractive();
-      this.listContainer.add(equipBtn);
-
-      equipBtn.on("pointerdown", () => {
+      const equipBtnBg = this.add.rectangle(GAME_WIDTH / 2 + btnW / 2 - 45, y + 22, 80, 24, 0x1a3a2e, 0.9)
+        .setStrokeStyle(1, 0x4ade80).setInteractive({ useHandCursor: true });
+      this.listContainer.add(equipBtnBg);
+      const equipBtnText = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 45, y + 22, "Equip", {
+        fontSize: "11px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5);
+      this.listContainer.add(equipBtnText);
+      equipBtnBg.on("pointerover", () => equipBtnBg.setFillStyle(0x2a5a3e, 1));
+      equipBtnBg.on("pointerout", () => equipBtnBg.setFillStyle(0x1a3a2e, 0.9));
+      equipBtnBg.on("pointerdown", () => {
         this.meta.equippedHeldItem = item.id;
         saveMeta(this.meta);
         this.scene.restart();
@@ -293,19 +297,20 @@ export class HeldItemScene extends Phaser.Scene {
     this.listContainer.add(descText);
 
     // Buy button
-    const buyBtn = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 12, y + 16,
-      canAfford ? "[Buy]" : "[Buy]", {
-      fontSize: "10px",
-      color: canAfford ? "#fbbf24" : "#444460",
-      fontFamily: "monospace",
-      backgroundColor: canAfford ? "#2e2a1a" : "#1a1a1a",
-      padding: { x: 6, y: 4 },
-    }).setOrigin(1, 0);
-    this.listContainer.add(buyBtn);
+    const buyBtnBg = this.add.rectangle(GAME_WIDTH / 2 + btnW / 2 - 45, y + 22, 80, 24,
+      canAfford ? 0x3a2a1a : 0x1a1a1a, 0.9)
+      .setStrokeStyle(1, canAfford ? 0xf59e0b : 0x333344);
+    this.listContainer.add(buyBtnBg);
+    const buyBtnText = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 45, y + 22, "Buy", {
+      fontSize: "11px", color: canAfford ? "#f59e0b" : "#444460", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5);
+    this.listContainer.add(buyBtnText);
 
     if (canAfford) {
-      buyBtn.setInteractive();
-      buyBtn.on("pointerdown", () => {
+      buyBtnBg.setInteractive({ useHandCursor: true });
+      buyBtnBg.on("pointerover", () => buyBtnBg.setFillStyle(0x5a4a2a, 1));
+      buyBtnBg.on("pointerout", () => buyBtnBg.setFillStyle(0x3a2a1a, 0.9));
+      buyBtnBg.on("pointerdown", () => {
         this.purchaseItem(item);
       });
     }
@@ -357,41 +362,46 @@ export class HeldItemScene extends Phaser.Scene {
 
       // Enchant button
       if (isCurrentEnchant) {
-        // Show "Applied" badge instead of button
-        const appliedBtn = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 12, y + 16, "[Active]", {
-          fontSize: "10px", color: "#c084fc", fontFamily: "monospace",
-          backgroundColor: "#2a1a3e",
-          padding: { x: 6, y: 4 },
-        }).setOrigin(1, 0);
-        this.listContainer.add(appliedBtn);
+        // Show "Active" badge (non-interactive label with styled rect)
+        const activeBg = this.add.rectangle(GAME_WIDTH / 2 + btnW / 2 - 45, y + 22, 80, 24, 0x2a1a3e, 0.9)
+          .setStrokeStyle(1, 0xc084fc);
+        this.listContainer.add(activeBg);
+        const activeText = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 45, y + 22, "Active", {
+          fontSize: "11px", color: "#c084fc", fontFamily: "monospace", fontStyle: "bold",
+        }).setOrigin(0.5);
+        this.listContainer.add(activeText);
       } else {
         // Determine if button should be enabled
         const canEnchant = hasEquippedItem && canAfford;
-        let btnLabel = "[Enchant]";
-        let btnColor = "#c084fc";
-        let btnBg = "#2a1a3e";
 
         if (!hasEquippedItem) {
-          btnLabel = "[No Item]";
-          btnColor = "#444460";
-          btnBg = "#1a1a1a";
-        } else if (!canAfford) {
-          btnColor = "#444460";
-          btnBg = "#1a1a1a";
-        }
+          // [No Item] — non-interactive label
+          const noItemBg = this.add.rectangle(GAME_WIDTH / 2 + btnW / 2 - 45, y + 22, 80, 24, 0x1a1a1a, 0.9)
+            .setStrokeStyle(1, 0x333344);
+          this.listContainer.add(noItemBg);
+          const noItemText = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 45, y + 22, "No Item", {
+            fontSize: "11px", color: "#444460", fontFamily: "monospace", fontStyle: "bold",
+          }).setOrigin(0.5);
+          this.listContainer.add(noItemText);
+        } else {
+          // [Enchant] button (enabled or disabled based on gold)
+          const enchBtnBg = this.add.rectangle(GAME_WIDTH / 2 + btnW / 2 - 45, y + 22, 80, 24,
+            canAfford ? 0x1a0a2a : 0x1a1a1a, 0.9)
+            .setStrokeStyle(1, canAfford ? 0xa855f7 : 0x333344);
+          this.listContainer.add(enchBtnBg);
+          const enchBtnText = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 45, y + 22, "Enchant", {
+            fontSize: "11px", color: canAfford ? "#a855f7" : "#444460", fontFamily: "monospace", fontStyle: "bold",
+          }).setOrigin(0.5);
+          this.listContainer.add(enchBtnText);
 
-        const enchantBtn = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 12, y + 16, btnLabel, {
-          fontSize: "10px", color: btnColor, fontFamily: "monospace",
-          backgroundColor: btnBg,
-          padding: { x: 6, y: 4 },
-        }).setOrigin(1, 0);
-        this.listContainer.add(enchantBtn);
-
-        if (canEnchant) {
-          enchantBtn.setInteractive();
-          enchantBtn.on("pointerdown", () => {
-            this.applyEnchantment(ench);
-          });
+          if (canEnchant) {
+            enchBtnBg.setInteractive({ useHandCursor: true });
+            enchBtnBg.on("pointerover", () => enchBtnBg.setFillStyle(0x2a1a4a, 1));
+            enchBtnBg.on("pointerout", () => enchBtnBg.setFillStyle(0x1a0a2a, 0.9));
+            enchBtnBg.on("pointerdown", () => {
+              this.applyEnchantment(ench);
+            });
+          }
         }
       }
 

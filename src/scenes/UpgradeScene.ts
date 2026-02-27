@@ -125,16 +125,17 @@ export class UpgradeScene extends Phaser.Scene {
         });
         this.costTexts.push(costText);
 
-        const buyBtn = this.add.text(280, y + 10, "[BUY]", {
-          fontSize: "12px",
-          color: canAfford ? "#4ade80" : "#444460",
-          fontFamily: "monospace",
-          backgroundColor: canAfford ? "#1a2e1a" : "#1a1a1a",
-          padding: { x: 8, y: 6 },
-        }).setInteractive();
+        const buyBtnBg = this.add.rectangle(295, y + 18, 80, 30, canAfford ? 0x1a3a2e : 0x1a1a1a, 0.9)
+          .setStrokeStyle(1, canAfford ? 0x4ade80 : 0x333344);
+        const buyBtnText = this.add.text(295, y + 18, "BUY", {
+          fontSize: "11px", color: canAfford ? "#4ade80" : "#444460", fontFamily: "monospace", fontStyle: "bold",
+        }).setOrigin(0.5);
 
         if (canAfford) {
-          buyBtn.on("pointerdown", () => {
+          buyBtnBg.setInteractive({ useHandCursor: true });
+          buyBtnBg.on("pointerover", () => buyBtnBg.setFillStyle(0x2a5a3e, 1));
+          buyBtnBg.on("pointerout", () => buyBtnBg.setFillStyle(0x1a3a2e, 0.9));
+          buyBtnBg.on("pointerdown", () => {
             this.purchaseUpgrade(upg.id, cost);
           });
         }

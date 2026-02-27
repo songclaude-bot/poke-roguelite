@@ -305,12 +305,16 @@ export class QuestBoardScene extends Phaser.Scene {
 
       // Claim button or checkmark
       if (quest.completed && !quest.claimed) {
-        const claimBtn = this.add.text(GAME_WIDTH / 2 + cardW / 2 - 12, cy + 20, "[Claim]", {
+        const claimBtnBg = this.add.rectangle(GAME_WIDTH / 2 + cardW / 2 - 45, cy + 20, 80, 24, 0x1a3a2e, 0.9)
+          .setStrokeStyle(1, 0x4ade80).setInteractive({ useHandCursor: true });
+        container.add(claimBtnBg);
+        const claimBtnText = this.add.text(GAME_WIDTH / 2 + cardW / 2 - 45, cy + 20, "Claim", {
           fontSize: "11px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
-        }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true });
-        container.add(claimBtn);
-
-        claimBtn.on("pointerdown", () => {
+        }).setOrigin(0.5);
+        container.add(claimBtnText);
+        claimBtnBg.on("pointerover", () => claimBtnBg.setFillStyle(0x2a5a3e, 1));
+        claimBtnBg.on("pointerout", () => claimBtnBg.setFillStyle(0x1a3a2e, 0.9));
+        claimBtnBg.on("pointerdown", () => {
           this.claimQuest(quest);
         });
       } else if (quest.claimed) {
@@ -374,13 +378,18 @@ export class QuestBoardScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(202);
     uiItems.push(rewardT);
 
-    const closeBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 32, "[OK]", {
-      fontSize: "12px", color: "#60a5fa", fontFamily: "monospace",
-    }).setOrigin(0.5).setDepth(202).setInteractive({ useHandCursor: true });
-    uiItems.push(closeBtn);
+    const closeBtnBg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 32, 80, 28, 0x1e3a5f, 0.9)
+      .setStrokeStyle(1, 0x3b82f6).setDepth(202).setInteractive({ useHandCursor: true });
+    uiItems.push(closeBtnBg);
+    const closeBtnText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 32, "OK", {
+      fontSize: "11px", color: "#3b82f6", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(203);
+    uiItems.push(closeBtnText);
+    closeBtnBg.on("pointerover", () => closeBtnBg.setFillStyle(0x2e5a8f, 1));
+    closeBtnBg.on("pointerout", () => closeBtnBg.setFillStyle(0x1e3a5f, 0.9));
 
     const cleanup = () => { uiItems.forEach(o => o.destroy()); };
-    closeBtn.on("pointerdown", cleanup);
+    closeBtnBg.on("pointerdown", cleanup);
     overlay.on("pointerdown", cleanup);
 
     // Auto-dismiss after 3s

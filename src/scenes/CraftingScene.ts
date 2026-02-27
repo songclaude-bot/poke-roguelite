@@ -326,14 +326,16 @@ export class CraftingScene extends Phaser.Scene {
 
     // Craft button
     if (craftable) {
-      const craftBtn = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 12, y + 38, "[Craft]", {
-        fontSize: "11px", color: "#ff8c42", fontFamily: "monospace",
-        backgroundColor: "#2e2a1a",
-        padding: { x: 6, y: 3 },
-      }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
-      this.listContainer.add(craftBtn);
-
-      craftBtn.on("pointerdown", () => {
+      const craftBtnBg = this.add.rectangle(GAME_WIDTH / 2 + btnW / 2 - 45, y + 46, 80, 24, 0x1a3a2e, 0.9)
+        .setStrokeStyle(1, 0x4ade80).setInteractive({ useHandCursor: true });
+      this.listContainer.add(craftBtnBg);
+      const craftBtnText = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 45, y + 46, "Craft", {
+        fontSize: "11px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5);
+      this.listContainer.add(craftBtnText);
+      craftBtnBg.on("pointerover", () => craftBtnBg.setFillStyle(0x2a5a3e, 1));
+      craftBtnBg.on("pointerout", () => craftBtnBg.setFillStyle(0x1a3a2e, 0.9));
+      craftBtnBg.on("pointerdown", () => {
         this.executeCraft(recipe);
       });
     } else {
@@ -475,14 +477,16 @@ export class CraftingScene extends Phaser.Scene {
 
     // Synthesize button
     if (available) {
-      const synthBtn = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 12, y + 38, "[Synthesize]", {
-        fontSize: "11px", color: "#fbbf24", fontFamily: "monospace",
-        backgroundColor: "#2e2a1a",
-        padding: { x: 6, y: 3 },
-      }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
-      this.listContainer.add(synthBtn);
-
-      synthBtn.on("pointerdown", () => {
+      const synthBtnBg = this.add.rectangle(GAME_WIDTH / 2 + btnW / 2 - 50, y + 46, 90, 24, 0x1a3a2e, 0.9)
+        .setStrokeStyle(1, 0x4ade80).setInteractive({ useHandCursor: true });
+      this.listContainer.add(synthBtnBg);
+      const synthBtnText = this.add.text(GAME_WIDTH / 2 + btnW / 2 - 50, y + 46, "Synthesize", {
+        fontSize: "11px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5);
+      this.listContainer.add(synthBtnText);
+      synthBtnBg.on("pointerover", () => synthBtnBg.setFillStyle(0x2a5a3e, 1));
+      synthBtnBg.on("pointerout", () => synthBtnBg.setFillStyle(0x1a3a2e, 0.9));
+      synthBtnBg.on("pointerdown", () => {
         this.executeSynthesis(recipe);
       });
     } else {

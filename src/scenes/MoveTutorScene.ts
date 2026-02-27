@@ -378,11 +378,16 @@ export class MoveTutorScene extends Phaser.Scene {
 
     // Cancel button
     const cancelY = panelY + panelH / 2 - 22;
-    const cancelBtn = this.add.text(GAME_WIDTH / 2, cancelY, "[Cancel]", {
-      fontSize: "12px", color: "#ef4444", fontFamily: "monospace",
-    }).setOrigin(0.5).setDepth(102).setInteractive({ useHandCursor: true });
-    this.confirmUI.push(cancelBtn);
-    cancelBtn.on("pointerdown", () => this.clearConfirmUI());
+    const cancelBtnBg = this.add.rectangle(GAME_WIDTH / 2, cancelY, 100, 28, 0x3a1a1e, 0.9)
+      .setStrokeStyle(1, 0xef4444).setDepth(102).setInteractive({ useHandCursor: true });
+    this.confirmUI.push(cancelBtnBg);
+    const cancelBtnText = this.add.text(GAME_WIDTH / 2, cancelY, "Cancel", {
+      fontSize: "11px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(103);
+    this.confirmUI.push(cancelBtnText);
+    cancelBtnBg.on("pointerover", () => cancelBtnBg.setFillStyle(0x5a2a2e, 1));
+    cancelBtnBg.on("pointerout", () => cancelBtnBg.setFillStyle(0x3a1a1e, 0.9));
+    cancelBtnBg.on("pointerdown", () => this.clearConfirmUI());
   }
 
   private learnSkill(move: TutorMove, replaceIndex: number) {

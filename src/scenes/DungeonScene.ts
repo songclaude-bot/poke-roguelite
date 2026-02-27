@@ -406,9 +406,6 @@ export class DungeonScene extends Phaser.Scene {
 
   // Quick-slot: last used item
   private lastUsedItemId: string | null = null;
-  private quickSlotBtn: Phaser.GameObjects.Text | null = null;
-  private pickupBtnPhaser: Phaser.GameObjects.Text | null = null;
-  private teamBtnPhaser: Phaser.GameObjects.Text | null = null;
 
   // DOM-based HUD overlay (always crisp text)
   private domHud: DomHudElements | null = null;
@@ -2637,34 +2634,10 @@ export class DungeonScene extends Phaser.Scene {
       this.openFullMap();
     });
 
-    // ── Skill Buttons ──
-    // ── Virtual D-Pad (bottom-left) ──
+    // ── Virtual D-Pad ──
     this.createDPad();
 
-    // ── Skill Buttons (bottom-right, 2x2 grid) ──
-    this.createSkillButtons();
-
-    // ── Action buttons: Pickup, Quick-slot, Team (above skill bar) ──
-    const menuCX = GAME_WIDTH / 2;
-    const actionRowY = GAME_HEIGHT - 70 - 50 - 42 - 34; // matches DOM ACTION_ROW_Y
-    const iconStyle = { fontSize: "16px", color: "#aab0c8", fontFamily: "monospace", backgroundColor: "#1a1a2ecc", padding: { x: 6, y: 3 } };
-
-    this.pickupBtnPhaser = this.add.text(menuCX - 50, actionRowY, "⬇", iconStyle)
-      .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
-      .on("pointerdown", () => this.pickupItem());
-
-    // Quick-slot: use last used item (or show "—" if none)
-    this.quickSlotBtn = this.add.text(menuCX, actionRowY, "—", iconStyle)
-      .setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
-      .on("pointerdown", () => this.useQuickSlot());
-    this.updateQuickSlotLabel();
-
-    // ── Team button ──
-    this.teamBtnPhaser = this.add.text(menuCX + 50, actionRowY, "Team", {
-      fontSize: "10px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
-      backgroundColor: "#1a1a2ecc", padding: { x: 8, y: 3 },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive()
-      .on("pointerdown", () => this.openTeamPanel());
+    // Skill buttons & action buttons are handled entirely by DOM HUD (initDomHud)
 
     // ── Hamburger menu button (top-right corner, clear of minimap) ──
     const hamX = GAME_WIDTH - 20;
@@ -2933,53 +2906,9 @@ export class DungeonScene extends Phaser.Scene {
 
   // ── Skill Buttons (opposite side of D-Pad, 2x2 grid) ──
 
+  /** Skill buttons are now fully handled by DOM HUD — this is a no-op kept for call-site compatibility */
   private createSkillButtons() {
-    const isRight = this.dpadSide === "right";
-    // If D-Pad is right, skills go left; if D-Pad is left, skills go right
-    const baseX = isRight ? 10 : GAME_WIDTH - 120;
-    const baseY = GAME_HEIGHT - 95;
-    const cellW = 58;
-    const cellH = 38;
-    const skills = this.player.skills;
-    const positions = [
-      { col: 0, row: 0 }, { col: 1, row: 0 },
-      { col: 0, row: 1 }, { col: 1, row: 1 },
-    ];
-
-    // Relic: Choice Band — only the first skill can be used
-    const choiceBandLimit = (this.relicEffects.skillLimit ?? 0) > 0;
-
-    for (let i = 0; i < 4; i++) {
-      const skill = skills[i];
-      const pos = positions[i];
-      const px = baseX + pos.col * cellW;
-      const py = baseY + pos.row * cellH;
-      const isLocked = choiceBandLimit && i > 0 && !!skill;
-      const label = skill ? (isLocked ? `${skill.name}\nLOCKED` : `${skill.name}\n${skill.currentPp}/${skill.pp}`) : "---";
-      const color = isLocked ? "#ff4444" : (skill && skill.currentPp > 0 ? "#667eea" : "#444460");
-
-      const btn = this.add.text(px, py, label, {
-        fontSize: "9px", color, fontFamily: "monospace",
-        fixedWidth: cellW - 4, align: "center",
-        backgroundColor: "#1a1a2e",
-        padding: { x: 2, y: 3 },
-      }).setScrollFactor(0).setDepth(110).setInteractive();
-
-      btn.on("pointerdown", () => {
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.fullMapOpen) return;
-        if (choiceBandLimit && i > 0) {
-          this.showLog("Choice Band: Only 1st skill allowed!");
-          return;
-        }
-        if (!skill || skill.currentPp <= 0) {
-          this.showLog("No PP left!");
-          return;
-        }
-        this.showSkillPreview(i);
-      });
-
-      this.skillButtons.push(btn);
-    }
+    // Phaser skill buttons removed — DOM HUD handles all skill UI
   }
 
   // Skill preview state
@@ -3031,9 +2960,6 @@ export class DungeonScene extends Phaser.Scene {
     const baseX = isRight ? 10 : GAME_WIDTH - 120;
     const baseY = GAME_HEIGHT - 95;
 
-    // Hide existing skill buttons
-    for (const btn of this.skillButtons) btn.setVisible(false);
-
     const confirmBtn = this.add.text(baseX, baseY + 8, "  OK  ", {
       fontSize: "14px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
       backgroundColor: "#1a3a2e", padding: { x: 8, y: 8 },
@@ -3060,22 +2986,13 @@ export class DungeonScene extends Phaser.Scene {
     for (const obj of this.skillPreviewUI) obj.destroy();
     this.skillPreviewUI = [];
     this.skillPreviewActive = false;
-    for (const btn of this.skillButtons) btn.setVisible(true);
     // Restore DOM skill buttons
     if (this.domHud) setDomSkillsVisible(this.domHud, true);
   }
 
+  /** Skill button updates are now handled by syncDomHud — this is a no-op */
   private updateSkillButtons() {
-    const skills = this.player.skills;
-    for (let i = 0; i < this.skillButtons.length; i++) {
-      const skill = skills[i];
-      if (!skill) continue;
-      const haspp = skill.currentPp > 0;
-      const color = haspp ? "#667eea" : "#444460";
-      this.skillButtons[i].setText(`${skill.name}\n${skill.currentPp}/${skill.pp}`);
-      this.skillButtons[i].setColor(color);
-      this.skillButtons[i].setBackgroundColor("#1a1a2e");
-    }
+    // Phaser skill buttons removed — DOM HUD syncs skill state in syncDomHud()
   }
   /** Reveal tiles around a point (Chebyshev distance) */
   private revealArea(cx: number, cy: number, radius: number) {
@@ -4458,11 +4375,7 @@ export class DungeonScene extends Phaser.Scene {
   private rebuildControls() {
     // Rebuild D-Pad
     this.createDPad();
-    // Rebuild skill buttons
-    this.skillButtons.forEach(btn => btn.destroy());
-    this.skillButtons = [];
-    this.createSkillButtons();
-    // Re-layout DOM HUD buttons if present
+    // Re-layout DOM HUD buttons based on new D-pad side
     if (this.domHud) {
       layoutHudButtons(this.domHud, this.dpadSide, GAME_WIDTH, GAME_HEIGHT);
     }
@@ -4515,7 +4428,7 @@ export class DungeonScene extends Phaser.Scene {
       this.openTeamPanel();
     });
 
-    // Hide original Phaser text elements (keep them updating for logic, just invisible)
+    // Hide original Phaser text elements (keep them updating for data, just invisible)
     this.floorText.setAlpha(0);
     this.hpText.setAlpha(0);
     this.turnText.setAlpha(0);
@@ -4523,12 +4436,7 @@ export class DungeonScene extends Phaser.Scene {
     this.bellyText.setAlpha(0);
     this.logText.setAlpha(0);
     if (this.chainHudText) this.chainHudText.setAlpha(0);
-
-    // Hide original Phaser skill buttons & action buttons
-    for (const btn of this.skillButtons) btn.setAlpha(0).disableInteractive();
-    if (this.quickSlotBtn) this.quickSlotBtn.setAlpha(0).disableInteractive();
-    if (this.pickupBtnPhaser) this.pickupBtnPhaser.setAlpha(0).disableInteractive();
-    if (this.teamBtnPhaser) this.teamBtnPhaser.setAlpha(0).disableInteractive();
+    // Phaser skill buttons & action buttons are no longer created — DOM HUD handles them
   }
 
   /** Show skill description tooltip at top of screen, auto-dismiss */
@@ -4843,26 +4751,25 @@ export class DungeonScene extends Phaser.Scene {
     this.closeBag(); // safety: close bag if somehow open
   }
 
-  /** Update the quick-slot button label to show last used item */
+  /** Update the quick-slot button label to show last used item (DOM HUD) */
   private updateQuickSlotLabel() {
-    if (!this.quickSlotBtn) return;
+    if (!this.domHud) return;
+    const btn = this.domHud.quickSlotBtn;
     if (!this.lastUsedItemId) {
-      this.quickSlotBtn.setText("—");
-      this.quickSlotBtn.setColor("#555570");
+      btn.textContent = "—";
+      btn.style.color = "#555570";
       return;
     }
-    // Find item in inventory to show icon
     const stack = this.inventory.find(s => s.item.id === this.lastUsedItemId);
     if (!stack) {
-      // Item used up - show dimmed
-      this.quickSlotBtn.setText("✕");
-      this.quickSlotBtn.setColor("#555570");
+      btn.textContent = "✕";
+      btn.style.color = "#555570";
       return;
     }
     const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : stack.item.category === "gem" ? "◇" : "★";
     const countStr = stack.count > 1 ? `${stack.count}` : "";
-    this.quickSlotBtn.setText(`${icon}${countStr}`);
-    this.quickSlotBtn.setColor("#4ade80");
+    btn.textContent = `${icon}${countStr}`;
+    btn.style.color = "#4ade80";
   }
 
   private useItem(index: number) {
@@ -9370,6 +9277,8 @@ export class DungeonScene extends Phaser.Scene {
    */
   private showRescuePrompt(options: RescueOption[], availableGold: number) {
     const rescueUI: Phaser.GameObjects.GameObject[] = [];
+    // Disable DOM HUD buttons while rescue prompt is open
+    if (this.domHud) setDomHudInteractive(this.domHud, false);
 
     // Dark overlay
     const bg = this.add.rectangle(
@@ -9435,16 +9344,19 @@ export class DungeonScene extends Phaser.Scene {
       yOffset += 52;
     }
 
-    // "Give up" button
+    // "Give up" button (styled rectangle)
     const giveUpY = yOffset + 16;
-    const giveUpText = this.add.text(GAME_WIDTH / 2, giveUpY, "[Give Up]", {
-      fontSize: "14px", color: "#6b7280", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
-    rescueUI.push(giveUpText);
+    const giveUpBg = this.add.rectangle(GAME_WIDTH / 2, giveUpY, 140, 32, 0x1a1a2e, 0.9)
+      .setStrokeStyle(1, 0x6b7280).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
+    rescueUI.push(giveUpBg);
+    const giveUpLabel = this.add.text(GAME_WIDTH / 2, giveUpY, "Give Up", {
+      fontSize: "13px", color: "#6b7280", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+    rescueUI.push(giveUpLabel);
 
-    giveUpText.on("pointerover", () => giveUpText.setColor("#ef4444"));
-    giveUpText.on("pointerout", () => giveUpText.setColor("#6b7280"));
-    giveUpText.on("pointerdown", () => {
+    giveUpBg.on("pointerover", () => { giveUpBg.setStrokeStyle(1, 0xef4444); giveUpLabel.setColor("#ef4444"); });
+    giveUpBg.on("pointerout", () => { giveUpBg.setStrokeStyle(1, 0x6b7280); giveUpLabel.setColor("#6b7280"); });
+    giveUpBg.on("pointerdown", () => {
       for (const el of rescueUI) el.destroy();
       this.showGameOverScreen();
     });

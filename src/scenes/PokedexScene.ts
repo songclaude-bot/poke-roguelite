@@ -525,16 +525,18 @@ export class PokedexScene extends Phaser.Scene {
 
       // ── Close button ──
       const closeBtnY = panelY + panelH / 2 - 22;
-      const closeBtnBg = this.add.rectangle(centerX, closeBtnY, 100, 22, 0x2a2a4e, 0.95)
-        .setStrokeStyle(1, 0x667eea)
+      const closeBtnBg = this.add.rectangle(centerX, closeBtnY, 100, 28, 0x1a1a2e, 0.9)
+        .setStrokeStyle(1, 0x334155)
         .setDepth(102)
         .setInteractive({ useHandCursor: true });
+      closeBtnBg.on("pointerover", () => closeBtnBg.setFillStyle(0x2a2a4e, 1));
+      closeBtnBg.on("pointerout", () => closeBtnBg.setFillStyle(0x1a1a2e, 0.9));
       closeBtnBg.on("pointerdown", () => closeDetail());
       detailObjects.push(closeBtnBg);
 
-      const closeBtnText = this.add.text(centerX, closeBtnY, "[Close]", {
-        fontSize: "11px", color: "#60a5fa", fontFamily: "monospace",
-      }).setOrigin(0.5).setDepth(102);
+      const closeBtnText = this.add.text(centerX, closeBtnY, "Close", {
+        fontSize: "11px", color: "#334155", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(103);
       detailObjects.push(closeBtnText);
     };
 

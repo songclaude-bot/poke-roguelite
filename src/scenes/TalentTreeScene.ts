@@ -176,10 +176,13 @@ export class TalentTreeScene extends Phaser.Scene {
             container.add(costLabel);
 
             if (canUpgrade) {
-              const upgradeBtn = this.add.text(GAME_WIDTH - 20, cy + 22, "[Upgrade]", {
-                fontSize: "9px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
-              }).setOrigin(1, 0);
-              container.add(upgradeBtn);
+              const upgBtnBg = this.add.rectangle(GAME_WIDTH - 55, cy + 30, 80, 22, 0x2a2a1a, 0.9)
+                .setStrokeStyle(1, 0xfbbf24);
+              container.add(upgBtnBg);
+              const upgBtnText = this.add.text(GAME_WIDTH - 55, cy + 30, "Upgrade", {
+                fontSize: "11px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
+              }).setOrigin(0.5);
+              container.add(upgBtnText);
 
               // Make the whole row tappable
               rowBg.setInteractive({ useHandCursor: true });

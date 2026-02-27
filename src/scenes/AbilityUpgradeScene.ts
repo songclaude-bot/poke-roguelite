@@ -132,17 +132,21 @@ export class AbilityUpgradeScene extends Phaser.Scene {
       const btnStroke = canUpgrade ? 0x4ade80 : 0x333344;
       const btnTextColor = canUpgrade ? "#4ade80" : "#444460";
 
-      const upgBtn = this.add.rectangle(GAME_WIDTH / 2, 340, 200, 40, btnColor, 0.9)
-        .setStrokeStyle(2, btnStroke);
+      const upgBtnColor = canUpgrade ? 0x1e3a5f : 0x222233;
+      const upgBtnStroke = canUpgrade ? 0x667eea : 0x333344;
+      const upgBtnTextColor = canUpgrade ? "#667eea" : "#444460";
 
-      const upgBtnText = this.add.text(GAME_WIDTH / 2, 340, "[ Upgrade ]", {
-        fontSize: "14px", color: btnTextColor, fontFamily: "monospace", fontStyle: "bold",
+      const upgBtn = this.add.rectangle(GAME_WIDTH / 2, 340, 200, 40, upgBtnColor, 0.9)
+        .setStrokeStyle(2, upgBtnStroke);
+
+      const upgBtnText = this.add.text(GAME_WIDTH / 2, 340, "Upgrade", {
+        fontSize: "14px", color: upgBtnTextColor, fontFamily: "monospace", fontStyle: "bold",
       }).setOrigin(0.5);
 
       if (canUpgrade) {
         upgBtn.setInteractive({ useHandCursor: true });
-        upgBtn.on("pointerover", () => upgBtn.setFillStyle(0x3a5a4a, 1));
-        upgBtn.on("pointerout", () => upgBtn.setFillStyle(0x2a4a3a, 0.9));
+        upgBtn.on("pointerover", () => upgBtn.setFillStyle(0x2e5a8f, 1));
+        upgBtn.on("pointerout", () => upgBtn.setFillStyle(0x1e3a5f, 0.9));
         upgBtn.on("pointerdown", () => {
           // Perform upgrade
           this.meta.gold -= nextUpgrade.cost;
