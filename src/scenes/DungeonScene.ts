@@ -43,10 +43,7 @@ import {
 } from "../core/ability-upgrade";
 import { WeatherType, WEATHERS, weatherDamageMultiplier, isWeatherImmune, rollFloorWeather, WeatherIntensity, INTENSITY_MULTIPLIER, INTENSITY_COLOR, getWeatherIntensity, shouldWeatherTransition, getWeatherSynergyBonus } from "../core/weather";
 import { generateForecast, forecastToString } from "../core/weather-forecast";
-import {
-  ShopItem, ShopConfig, generateShopInventory, shouldSpawnShop,
-  getItemSellPrice,
-} from "../core/dungeon-shop";
+// dungeon-shop imports moved to ShopSystem
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
 import { HeldItemEffect, getHeldItem } from "../core/held-items";
 import { getForgeBonus } from "../core/forge";
@@ -68,7 +65,7 @@ import {
   sfxHit, sfxSuperEffective, sfxNotEffective, sfxMove, sfxPickup,
   sfxLevelUp, sfxRecruit, sfxDeath, sfxBossDefeat,
   sfxHeal, sfxSkill, sfxMenuOpen, sfxMenuClose,
-  sfxEvolution, sfxVictory, sfxGameOver, sfxShop,
+  sfxEvolution, sfxVictory, sfxGameOver,
   sfxCombo, sfxCritical, sfxDodge, sfxItemPickup, sfxBuff, sfxWeatherChange,
   getBgmVolume, getSfxVolume, setBgmVolume, setSfxVolume,
 } from "../core/sound-manager";
@@ -130,9 +127,13 @@ import {
   deserializeBlessings,
 } from "../core/blessings";
 import { ShrineSystem } from "../systems/shrine-system";
+import { CombatSystem } from "../systems/combat-system";
 import { StairsSystem } from "../systems/stairs-system";
+import { DeathRescueSystem } from "../systems/death-rescue-system";
 import { WeatherBellySystem } from "../systems/weather-belly-system";
 import { EventRoomSystem } from "../systems/event-room-system";
+import { MonsterHouseSystem } from "../systems/monster-house-system";
+import { ShopSystem } from "../systems/shop-system";
 import {
   RescueOption, MAX_RESCUES_PER_RUN,
   getRescueOptions,
@@ -159,12 +160,6 @@ function enemiesPerRoom(floor: number): number {
   return Math.min(3, 1 + Math.floor((floor - 1) / 3)); // 1→2→3
 }
 
-/** Monster House types */
-enum MonsterHouseType {
-  Standard = "standard",   // Extra enemies spawn
-  Treasure = "treasure",   // More items + more enemies, 2x gold on clear
-  Ambush = "ambush",       // Enemies invisible until triggered, then all attack
-}
 const MAX_ALLIES = 4; // max party members (excluding player)
 
 // Per-floor enemy scaling (uses species base stats + dungeon difficulty + NG+ bonus)
@@ -244,11 +239,12 @@ export class DungeonScene extends Phaser.Scene {
   // Item System (floor items, bag UI, item usage — delegated)
   private itemSys!: ItemSystem;
 
-  // Game state
-  private gameOver = false;
+  // Game state — Death/rescue/clear delegated to DeathRescueSystem
+  private deathRescueSys!: DeathRescueSystem;
+  /** Public getter: gameOver flag (lives in DeathRescueSystem) */
+  get gameOver() { return this.deathRescueSys?.gameOver ?? false; }
+  set gameOver(v: boolean) { if (this.deathRescueSys) this.deathRescueSys.gameOver = v; }
   private enemiesDefeated = 0;
-  // Rescue system — second chance on faint
-  private rescueCount = 0;
   // Quest tracking
   private questItemsCollected = 0;
   private questItemsUsed = false;
@@ -263,30 +259,22 @@ export class DungeonScene extends Phaser.Scene {
   set maxBelly(v: number) { this.weatherBellySys.maxBelly = v; }
   private persistentBelly: number | null = null;
 
-  // Shop state
-  private shopConfig: ShopConfig | null = null;
-  private shopItems: ShopItem[] = [];
-  private shopRoom: { x: number; y: number; w: number; h: number } | null = null;
-  private shopUI: Phaser.GameObjects.GameObject[] = [];
-  private shopOpen = false;
+  // Shop (delegated to ShopSystem)
+  private shopSys!: ShopSystem;
+  /** Expose shop state for other system host interfaces (MonsterHouse, Item, Minimap, etc.) */
+  get shopRoom() { return this.shopSys?.shopRoom ?? null; }
+  get shopOpen() { return this.shopSys?.shopOpen ?? false; }
+  get shopClosed() { return this.shopSys?.shopClosed ?? false; }
+  get playerInShopRoom() { return this.shopSys?.isPlayerInShopRoom ?? false; }
+  get shopItems() { return this.shopSys?.shopItems ?? []; }
+  get shopTiles() { return this.shopSys?.shopTiles ?? []; }
   private gold = 0;
-  private shopTiles: { x: number; y: number; shopIdx: number; sprite: Phaser.GameObjects.Text; priceTag: Phaser.GameObjects.Text }[] = [];
-  private shopCarpet: Phaser.GameObjects.Graphics | null = null;
-  private shopWelcomeShown = false;
-  private playerInShopRoom = false;
-  private shopGoldHud: Phaser.GameObjects.Text | null = null;
-  private shopTheftTriggered = false;
-  private shopClosed = false; // set true after theft — shop closes for this floor
 
   // Starter species
   private starterId = "mudkip";
 
-  // Monster House
-  private monsterHouseRoom: { x: number; y: number; w: number; h: number } | null = null;
-  private monsterHouseTriggered = false;
-  private monsterHouseType: MonsterHouseType = MonsterHouseType.Standard;
-  private monsterHouseCleared = false;
-  private monsterHouseEnemies: Entity[] = []; // track enemies spawned in monster house
+  // Monster House (delegated to MonsterHouseSystem)
+  private monsterHouseSys!: MonsterHouseSystem;
 
   // Event Room (delegated to EventRoomSystem)
   private eventRoomSys!: EventRoomSystem;
@@ -449,6 +437,8 @@ export class DungeonScene extends Phaser.Scene {
 
   // Shrine system (per-floor, extracted)
   private shrineSys!: ShrineSystem;
+  // Combat system (extracted)
+  private combatSys!: CombatSystem;
   // Stairs system (extracted)
   private stairsSys!: StairsSystem;
 
@@ -581,6 +571,9 @@ export class DungeonScene extends Phaser.Scene {
     this.allEntities = [];
     this.enemyVariantMap = new Map();
     this.variantAuraGraphics = new Map();
+    // Construct deathRescueSys early so gameOver getter/setter works
+    this.deathRescueSys = new DeathRescueSystem(this as any);
+    this.deathRescueSys.reset();
     this.gameOver = false;
     this.bossEntity = null;
     this.bossHpBar = null;
@@ -635,6 +628,8 @@ export class DungeonScene extends Phaser.Scene {
     // Reset shrine system
     this.shrineSys = new ShrineSystem(this as any);
     this.shrineSys.reset();
+    // Reset combat system
+    this.combatSys = new CombatSystem(this as any);
     // Reset stairs system
     this.stairsSys = new StairsSystem(this as any);
     // Reset gauntlet system
@@ -666,23 +661,12 @@ export class DungeonScene extends Phaser.Scene {
     this.starterId = data?.starter ?? "mudkip";
     this.seenSpecies = new Set<string>();
     this.seenSpecies.add(this.starterId); // starter is always "seen"
-    this.shopConfig = null;
-    this.shopItems = [];
-    this.shopRoom = null;
-    this.shopUI = [];
-    this.shopOpen = false;
-    this.shopTiles = [];
-    this.shopCarpet = null;
-    this.shopWelcomeShown = false;
-    this.playerInShopRoom = false;
-    this.shopGoldHud = null;
-    this.shopTheftTriggered = false;
-    this.shopClosed = false;
-    this.monsterHouseRoom = null;
-    this.monsterHouseTriggered = false;
-    this.monsterHouseType = MonsterHouseType.Standard;
-    this.monsterHouseCleared = false;
-    this.monsterHouseEnemies = [];
+    // Reset shop state (delegated to ShopSystem)
+    this.shopSys = new ShopSystem(this as any);
+    this.shopSys.reset();
+    // Reset monster house state (delegated to MonsterHouseSystem)
+    this.monsterHouseSys = new MonsterHouseSystem(this as any);
+    this.monsterHouseSys.reset();
     // Reset event room state (delegated to EventRoomSystem)
     this.eventRoomSys = new EventRoomSystem(this as any);
     this.eventRoomSys.reset();
@@ -1687,7 +1671,7 @@ export class DungeonScene extends Phaser.Scene {
     const hazardOccupied = this.trapHazardSys.spawnTraps(occupiedPositions);
     this.trapHazardSys.spawnHazards(hazardOccupied);
 
-    // ── Kecleon Shop (20% chance, not on boss floors) ──
+    // ── Kecleon Shop (delegated to ShopSystem) ──
     const isBossFloor = (this.dungeonDef.boss && this.currentFloor === this.dungeonDef.floors) || this.isBossRush;
 
     // Switch to boss BGM theme on boss floors for dramatic atmosphere
@@ -1695,111 +1679,15 @@ export class DungeonScene extends Phaser.Scene {
       switchToBossTheme();
     }
 
-    if (!isBossFloor && shouldSpawnShop(this.currentFloor, this.dungeonDef.floors) && rooms.length > 2) {
-      // Pick a room that isn't the player's or stairs room
-      const shopCandidates = rooms.filter(r =>
-        // Not the player's room
-        !(playerStart.x >= r.x && playerStart.x < r.x + r.w &&
-          playerStart.y >= r.y && playerStart.y < r.y + r.h) &&
-        // Not the stairs room
-        !(stairsPos.x >= r.x && stairsPos.x < r.x + r.w &&
-          stairsPos.y >= r.y && stairsPos.y < r.y + r.h)
-      );
-      if (shopCandidates.length > 0) {
-        const shopRm = shopCandidates[Math.floor(Math.random() * shopCandidates.length)];
-        this.shopRoom = shopRm;
-        this.shopConfig = generateShopInventory(this.currentFloor, this.dungeonDef.difficulty);
-        this.shopItems = this.shopConfig.items;
+    this.shopSys.trySpawnShop(rooms, playerStart, stairsPos, isBossFloor, terrain);
 
-        // Draw shop carpet (tan rectangle under items)
-        this.shopCarpet = this.add.graphics().setDepth(3);
-        this.shopCarpet.fillStyle(0xd2b48c, 0.3);
-        this.shopCarpet.fillRect(
-          (shopRm.x + 1) * TILE_DISPLAY,
-          (shopRm.y + 1) * TILE_DISPLAY,
-          (shopRm.w - 2) * TILE_DISPLAY,
-          (shopRm.h - 2) * TILE_DISPLAY,
-        );
-        // Carpet border
-        this.shopCarpet.lineStyle(1, 0xd2b48c, 0.5);
-        this.shopCarpet.strokeRect(
-          (shopRm.x + 1) * TILE_DISPLAY,
-          (shopRm.y + 1) * TILE_DISPLAY,
-          (shopRm.w - 2) * TILE_DISPLAY,
-          (shopRm.h - 2) * TILE_DISPLAY,
-        );
-
-        // Place shop items on the floor in the room
-        for (let si = 0; si < this.shopItems.length; si++) {
-          const sx = shopRm.x + 1 + (si % Math.max(1, shopRm.w - 2));
-          const sy = shopRm.y + 1 + Math.floor(si / Math.max(1, shopRm.w - 2));
-          if (sy >= shopRm.y + shopRm.h - 1) break;
-          if (terrain[sy][sx] !== TerrainType.GROUND) continue;
-
-          const shopItem = this.shopItems[si];
-          const itemDef = ITEM_DB[shopItem.itemId];
-          if (!itemDef) continue;
-          const sprite = this.add.text(
-            sx * TILE_DISPLAY + TILE_DISPLAY / 2,
-            sy * TILE_DISPLAY + TILE_DISPLAY / 2,
-            "💰", { fontSize: "14px", fontFamily: "monospace" }
-          ).setOrigin(0.5).setDepth(7);
-
-          // Price tag (yellow, 7px, floating above)
-          const priceTag = this.add.text(
-            sx * TILE_DISPLAY + TILE_DISPLAY / 2,
-            sy * TILE_DISPLAY + TILE_DISPLAY + 2,
-            `${shopItem.price}G`, { fontSize: "7px", color: "#fbbf24", fontFamily: "monospace" }
-          ).setOrigin(0.5).setDepth(7);
-
-          this.shopTiles.push({ x: sx, y: sy, shopIdx: si, sprite, priceTag });
-        }
-
-        // Kecleon shopkeeper sign
-        const kcX = shopRm.x * TILE_DISPLAY + (shopRm.w * TILE_DISPLAY) / 2;
-        const kcY = shopRm.y * TILE_DISPLAY + 4;
-        this.add.text(kcX, kcY, "Kecleon Shop", {
-          fontSize: "8px", color: "#4ade80", fontFamily: "monospace",
-          backgroundColor: "#1a1a2ecc", padding: { x: 4, y: 2 },
-        }).setOrigin(0.5).setDepth(8);
-
-        this.showLog("There's a Kecleon Shop on this floor!");
-      }
-    }
-
-    // ── Monster House (15% chance on floor 3+, not boss/floor 1) ──
-    if (this.currentFloor >= 3 && !isBossFloor && Math.random() < 0.15 && rooms.length > 2) {
-      const mhCandidates = rooms.filter(r =>
-        !(playerStart.x >= r.x && playerStart.x < r.x + r.w &&
-          playerStart.y >= r.y && playerStart.y < r.y + r.h) &&
-        r !== this.shopRoom &&
-        r.w * r.h >= 16
-      );
-      if (mhCandidates.length > 0) {
-        this.monsterHouseRoom = mhCandidates[Math.floor(Math.random() * mhCandidates.length)];
-        // Roll monster house type: 50% Standard, 25% Treasure, 25% Ambush
-        const typeRoll = Math.random();
-        if (typeRoll < 0.50) {
-          this.monsterHouseType = MonsterHouseType.Standard;
-        } else if (typeRoll < 0.75) {
-          this.monsterHouseType = MonsterHouseType.Treasure;
-        } else {
-          this.monsterHouseType = MonsterHouseType.Ambush;
-        }
-
-        // Treasure type: pre-place extra items in the room
-        if (this.monsterHouseType === MonsterHouseType.Treasure) {
-          const mhRoom = this.monsterHouseRoom;
-          const treasureCount = 2 + Math.floor(Math.random() * 3); // 2-4 extra items
-          this.itemSys.spawnMonsterHouseItems(terrain, stairsPos, mhRoom, treasureCount);
-        }
-      }
-    }
+    // ── Monster House (delegated to MonsterHouseSystem) ──
+    this.monsterHouseSys.trySpawnMonsterHouse(rooms, playerStart, terrain, stairsPos, isBossFloor);
 
     // ── Event Room (delegated to EventRoomSystem) ──
     this.eventRoomSys.trySpawnEventRoom(
       rooms, playerStart, stairsPos, isBossFloor,
-      [this.shopRoom, this.monsterHouseRoom],
+      [this.shopSys.shopRoom, this.monsterHouseSys.monsterHouseRoom],
     );
 
     // ── Puzzle Room (10% chance on floor 2+, not boss/first/last) ──
@@ -1812,8 +1700,8 @@ export class DungeonScene extends Phaser.Scene {
         !(stairsPos.x >= r.x && stairsPos.x < r.x + r.w &&
           stairsPos.y >= r.y && stairsPos.y < r.y + r.h) &&
         // Not shop, monster house, or event room
-        r !== this.shopRoom &&
-        r !== this.monsterHouseRoom &&
+        r !== this.shopSys.shopRoom &&
+        r !== this.monsterHouseSys.monsterHouseRoom &&
         r !== this.eventRoomSys.eventRoom &&
         // Needs enough space (at least 3x3 interior)
         r.w >= 4 && r.h >= 4
@@ -1849,7 +1737,7 @@ export class DungeonScene extends Phaser.Scene {
     // ── Shrine (delegated to ShrineSystem) ──
     this.shrineSys.trySpawnShrine(
       rooms, terrain, playerStart, stairsPos, isBossFloor,
-      [this.shopRoom, this.monsterHouseRoom, this.eventRoomSys.eventRoom, this.puzzleSys.puzzleRoom],
+      [this.shopSys.shopRoom, this.monsterHouseSys.monsterHouseRoom, this.eventRoomSys.eventRoom, this.puzzleSys.puzzleRoom],
     );
 
     // ── Fog of War (delegated to MinimapSystem) ──
@@ -1914,7 +1802,7 @@ export class DungeonScene extends Phaser.Scene {
       callback: () => {
         // Don't count time when game is over or menus/overlays are open
         if (this.gameOver) return;
-        if (this.itemSys.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventRoomSys.eventOpen || this.teamPanelOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
+        if (this.itemSys.bagOpen || this.menuOpen || this.settingsOpen || this.shopSys.shopOpen || this.eventRoomSys.eventOpen || this.teamPanelOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
         this.runElapsedSeconds++;
         const timeStr = this.formatTime(this.runElapsedSeconds);
         this.timerText.setText(timeStr);
@@ -2396,7 +2284,7 @@ export class DungeonScene extends Phaser.Scene {
         () => Promise.resolve(),
         [...this.getAllyActions(), ...this.getEnemyActions()]
       ).then(() => {
-        this.recoverPP(this.player);
+        this.combatSys.recoverPP(this.player);
         this.tickBelly();
         this.tickWeather();
         this.tickEntityStatus(this.player);
@@ -2637,7 +2525,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeMenu();
       return;
     }
-    if (this.itemSys.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
+    if (this.itemSys.bagOpen || this.settingsOpen || this.shopSys.shopOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
 
     sfxMenuOpen();
     this.menuOpen = true;
@@ -2657,8 +2545,8 @@ export class DungeonScene extends Phaser.Scene {
       { label: "Settings", icon: "⚙", action: () => { this.closeMenu(); this.openSettings(); } },
     ];
     // Add Shop option when player is in shop room
-    if (this.playerInShopRoom && !this.shopClosed && this.shopItems.some(si => si.price > 0)) {
-      items.splice(1, 0, { label: "Shop", icon: "💰", action: () => { this.closeMenu(); this.openShopUI(); } });
+    if (this.shopSys.isPlayerInShopRoom && !this.shopSys.shopClosed && this.shopSys.hasAvailableItems) {
+      items.splice(1, 0, { label: "Shop", icon: "💰", action: () => { this.closeMenu(); this.shopSys.openShopUI(); } });
     }
 
     // Menu panel (size adjusts to number of items)
@@ -2705,7 +2593,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeTeamPanel();
       return;
     }
-    if (this.itemSys.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventRoomSys.eventOpen || this.gameOver || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
+    if (this.itemSys.bagOpen || this.menuOpen || this.settingsOpen || this.shopSys.shopOpen || this.eventRoomSys.eventOpen || this.gameOver || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
 
     const liveAllies = this.allies.filter(a => a.alive);
     if (liveAllies.length === 0) {
@@ -3516,53 +3404,10 @@ export class DungeonScene extends Phaser.Scene {
 
   // ── Save ──
 
-  private saveGame() {
-    if (this.gameOver) return;
-    saveDungeon({
-      version: 1,
-      timestamp: Date.now(),
-      floor: this.currentFloor,
-      dungeonId: this.dungeonDef.id,
-      hp: this.player.stats.hp,
-      maxHp: this.player.stats.maxHp,
-      level: this.player.stats.level,
-      atk: this.player.stats.atk,
-      def: this.player.stats.def,
-      totalExp: this.totalExp,
-      belly: this.belly,
-      skills: serializeSkills(this.player.skills),
-      inventory: serializeInventory(this.inventory),
-      allies: this.serializeAllies(),
-      starter: this.starterId,
-      challengeMode: this.challengeMode ?? undefined,
-      modifiers: this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined,
-    });
-    this.showLog("Game saved!");
-  }
+  private saveGame() { this.deathRescueSys.saveGame(); }
 
   /** Silent auto-save (no log message) */
-  private autoSave() {
-    if (this.gameOver) return;
-    saveDungeon({
-      version: 1,
-      timestamp: Date.now(),
-      floor: this.currentFloor,
-      dungeonId: this.dungeonDef.id,
-      hp: this.player.stats.hp,
-      maxHp: this.player.stats.maxHp,
-      level: this.player.stats.level,
-      atk: this.player.stats.atk,
-      def: this.player.stats.def,
-      totalExp: this.totalExp,
-      belly: this.belly,
-      skills: serializeSkills(this.player.skills),
-      inventory: serializeInventory(this.inventory),
-      allies: this.serializeAllies(),
-      starter: this.starterId,
-      challengeMode: this.challengeMode ?? undefined,
-      modifiers: this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined,
-    });
-  }
+  private autoSave() { this.deathRescueSys.autoSave(); }
 
   /** Update the chain HUD indicator */
   private updateChainHUD() {
@@ -3714,7 +3559,7 @@ export class DungeonScene extends Phaser.Scene {
       const burnDmg = 5;
       entity.stats.hp = Math.max(0, entity.stats.hp - burnDmg);
       if (entity.sprite) {
-        this.showDamagePopup(entity.sprite.x, entity.sprite.y, burnDmg, 1.0);
+        this.combatSys.showDamagePopup(entity.sprite.x, entity.sprite.y, burnDmg, 1.0);
       }
       this.showLog(`${entity.name} is hurt by its burn!`);
       if (entity.stats.hp <= 0) {
@@ -3727,7 +3572,7 @@ export class DungeonScene extends Phaser.Scene {
     if (bpDmg > 0 && entity.alive) {
       entity.stats.hp = Math.max(0, entity.stats.hp - bpDmg);
       if (entity.sprite) {
-        this.showDamagePopup(entity.sprite.x, entity.sprite.y, bpDmg, 1.0);
+        this.combatSys.showDamagePopup(entity.sprite.x, entity.sprite.y, bpDmg, 1.0);
       }
       this.showLog(`${entity.name} is hurt by bad poison! (${bpDmg} dmg)`);
       if (entity.stats.hp <= 0) {
@@ -3740,7 +3585,7 @@ export class DungeonScene extends Phaser.Scene {
     if (curseDmg > 0 && entity.alive) {
       entity.stats.hp = Math.max(0, entity.stats.hp - curseDmg);
       if (entity.sprite) {
-        this.showDamagePopup(entity.sprite.x, entity.sprite.y, curseDmg, 1.0);
+        this.combatSys.showDamagePopup(entity.sprite.x, entity.sprite.y, curseDmg, 1.0);
       }
       this.showLog(`${entity.name} is afflicted by the curse! (${curseDmg} dmg)`);
       if (entity.stats.hp <= 0) {
@@ -3996,7 +3841,7 @@ export class DungeonScene extends Phaser.Scene {
       if (this.floorTurns > 0 && this.floorTurns % interval === 0 && this.player.stats.hp < this.player.stats.maxHp) {
         this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + amount);
         if (this.player.sprite) {
-          this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, 0, 1, `+${amount} Regen`);
+          this.combatSys.showDamagePopup(this.player.sprite.x, this.player.sprite.y, 0, 1, `+${amount} Regen`);
         }
       }
     }
@@ -4008,7 +3853,7 @@ export class DungeonScene extends Phaser.Scene {
       if (this.floorTurns > 0 && this.floorTurns % relicRegenInterval === 0 && this.player.stats.hp < this.player.stats.maxHp) {
         this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + relicRegenAmount);
         if (this.player.sprite) {
-          this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, 0, 1, `+${relicRegenAmount} Relic`);
+          this.combatSys.showDamagePopup(this.player.sprite.x, this.player.sprite.y, 0, 1, `+${relicRegenAmount} Relic`);
         }
       }
     }
@@ -4019,7 +3864,7 @@ export class DungeonScene extends Phaser.Scene {
     if (bRegenAmt > 0 && this.player.alive && this.floorTurns > 0 && this.floorTurns % bRegenInt === 0 && this.player.stats.hp < this.player.stats.maxHp) {
       this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + bRegenAmt);
       if (this.player.sprite) {
-        this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, 0, 1, `+${bRegenAmt} Grace`);
+        this.combatSys.showDamagePopup(this.player.sprite.x, this.player.sprite.y, 0, 1, `+${bRegenAmt} Grace`);
       }
     }
 
@@ -4030,7 +3875,7 @@ export class DungeonScene extends Phaser.Scene {
       if (this.floorTurns > 0 && this.floorTurns % interval === 0) {
         this.player.stats.hp = Math.max(1, this.player.stats.hp - amount);
         if (this.player.sprite) {
-          this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, amount, 0.5, "Curse");
+          this.combatSys.showDamagePopup(this.player.sprite.x, this.player.sprite.y, amount, 0.5, "Curse");
         }
         this.showLog("The curse saps your strength!");
         this.checkPlayerDeath();
@@ -4046,731 +3891,10 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
-  private checkShop() {
-    if (!this.shopRoom || this.shopOpen || this.shopClosed) return;
-    const r = this.shopRoom;
-    const px = this.player.tileX;
-    const py = this.player.tileY;
-    const inShop = px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h;
 
-    if (inShop && !this.playerInShopRoom) {
-      // Player just entered the shop room
-      this.playerInShopRoom = true;
-      if (!this.shopWelcomeShown) {
-        this.shopWelcomeShown = true;
-        this.showLog("Welcome to the Shop!");
-        // Run log: shop visited
-        this.runLog.add(RunLogEvent.ShopVisited, "Kecleon Shop", this.currentFloor, this.turnManager.turn);
-        sfxShop();
-      }
-      if (this.shopItems.length > 0) {
-        this.showLog(`Gold: ${this.gold}G. Step on items to buy!`);
-      }
-      // Show gold HUD
-      this.showShopGoldHud();
-    } else if (!inShop && this.playerInShopRoom) {
-      // Player just left the shop room — check for theft
-      this.playerInShopRoom = false;
-      this.hideShopGoldHud();
-      this.checkShopTheft();
-    }
-
-    // Step-on-item buy prompt
-    if (inShop) {
-      const shopTile = this.shopTiles.find(st => st.x === px && st.y === py);
-      if (shopTile) {
-        const si = this.shopItems[shopTile.shopIdx];
-        if (si) {
-          const itemDef = ITEM_DB[si.itemId];
-          if (itemDef) {
-            this.showShopBuyPrompt(shopTile.shopIdx);
-          }
-        }
-      }
-      // Update gold HUD
-      this.updateShopGoldHud();
-    }
-  }
-
-  /** Show prominent gold balance when in shop room */
-  private showShopGoldHud() {
-    this.hideShopGoldHud();
-    this.shopGoldHud = this.add.text(GAME_WIDTH / 2, 50, `Gold: ${this.gold}G`, {
-      fontSize: "12px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-      backgroundColor: "#1a1a2ecc", padding: { x: 8, y: 4 },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(105);
-  }
-
-  private updateShopGoldHud() {
-    if (this.shopGoldHud) {
-      this.shopGoldHud.setText(`Gold: ${this.gold}G`);
-    }
-  }
-
-  private hideShopGoldHud() {
-    if (this.shopGoldHud) {
-      this.shopGoldHud.destroy();
-      this.shopGoldHud = null;
-    }
-  }
-
-  /** Check if the player took items from the shop without paying (anti-theft) */
-  private checkShopTheft() {
-    if (this.shopTheftTriggered || this.shopClosed) return;
-    // not implemented as walking-out-with-item since items use the buy prompt system
-    // Theft only triggers if player picked up a shop item using the floor pickup action
-    // (This is checked in pickupItem)
-  }
-
-  /** Spawn anti-theft security enemies at shop room exits */
-  private triggerShopTheft() {
-    if (this.shopTheftTriggered) return;
-    this.shopTheftTriggered = true;
-    this.shopClosed = true;
-
-    // Big warning text
-    this.showLog("Stop, thief!");
-    this.cameras.main.shake(300, 0.015);
-    this.cameras.main.flash(200, 255, 0, 0);
-
-    const warningText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "Stop, thief!", {
-      fontSize: "22px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
-      stroke: "#000000", strokeThickness: 4,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(300);
-    this.tweens.add({
-      targets: warningText,
-      y: GAME_HEIGHT / 2 - 80,
-      alpha: { from: 1, to: 0 },
-      scaleX: { from: 1, to: 1.3 },
-      scaleY: { from: 1, to: 1.3 },
-      duration: 2000,
-      ease: "Quad.easeOut",
-      onComplete: () => warningText.destroy(),
-    });
-
-    // Spawn 2-3 powerful security enemies at room exits
-    const r = this.shopRoom!;
-    const terrain = this.dungeon.terrain;
-    const width = this.dungeon.width;
-    const height = this.dungeon.height;
-    const securityLevel = this.player.stats.level + 5;
-    const securityCount = 2 + Math.floor(Math.random() * 2); // 2-3
-    const exitTiles: { x: number; y: number }[] = [];
-
-    // Find exit tiles: ground tiles just outside the room borders
-    for (let x = r.x; x < r.x + r.w; x++) {
-      // Top edge exit
-      if (r.y - 1 >= 0 && terrain[r.y - 1][x] === TerrainType.GROUND) exitTiles.push({ x, y: r.y - 1 });
-      // Bottom edge exit
-      if (r.y + r.h < height && terrain[r.y + r.h][x] === TerrainType.GROUND) exitTiles.push({ x, y: r.y + r.h });
-    }
-    for (let y = r.y; y < r.y + r.h; y++) {
-      // Left edge exit
-      if (r.x - 1 >= 0 && terrain[y][r.x - 1] === TerrainType.GROUND) exitTiles.push({ x: r.x - 1, y });
-      // Right edge exit
-      if (r.x + r.w < width && terrain[y][r.x + r.w] === TerrainType.GROUND) exitTiles.push({ x: r.x + r.w, y });
-    }
-
-    // Deduplicate and filter occupied tiles
-    const uniqueExits = exitTiles.filter((t, i, arr) =>
-      arr.findIndex(e => e.x === t.x && e.y === t.y) === i &&
-      !this.allEntities.some(e => e.alive && e.tileX === t.x && e.tileY === t.y)
-    );
-
-    // Spawn enemies at up to securityCount exits
-    const floorSpeciesIds = getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
-    const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
-    const securitySpecies = floorSpecies.length > 0 ? floorSpecies[0] : SPECIES.zubat;
-
-    for (let i = 0; i < Math.min(securityCount, uniqueExits.length); i++) {
-      const pos = uniqueExits[i];
-      const secStats = {
-        hp: Math.floor(securitySpecies.baseStats.hp * 3),
-        maxHp: Math.floor(securitySpecies.baseStats.hp * 3),
-        atk: Math.floor(securitySpecies.baseStats.atk * 2.5),
-        def: Math.floor(securitySpecies.baseStats.def * 2),
-        level: securityLevel,
-      };
-
-      const enemy: Entity = {
-        tileX: pos.x, tileY: pos.y,
-        facing: Direction.Down,
-        stats: secStats,
-        alive: true,
-        spriteKey: securitySpecies.spriteKey,
-        name: `Security ${securitySpecies.name}`,
-        types: securitySpecies.types,
-        attackType: securitySpecies.attackType,
-        skills: createSpeciesSkills(securitySpecies),
-        statusEffects: [],
-        speciesId: securitySpecies.spriteKey,
-        ability: SPECIES_ABILITIES[securitySpecies.spriteKey],
-      };
-      const eTex = `${securitySpecies.spriteKey}-idle`;
-      if (this.textures.exists(eTex)) {
-        enemy.sprite = this.add.sprite(
-          this.tileToPixelX(pos.x), this.tileToPixelY(pos.y), eTex
-        );
-        enemy.sprite.setScale(TILE_SCALE).setDepth(9);
-        // Red tint for security
-        enemy.sprite.setTint(0xff4444);
-        const eAnim = `${securitySpecies.spriteKey}-idle-${Direction.Down}`;
-        if (this.anims.exists(eAnim)) enemy.sprite.play(eAnim);
-      }
-      this.enemies.push(enemy);
-      this.allEntities.push(enemy);
-    }
-
-    // Remove shop visuals (carpet, item sprites, price tags)
-    this.clearShopVisuals();
-    this.hideShopGoldHud();
-  }
-
-  /** Remove all shop visual elements */
-  private clearShopVisuals() {
-    for (const st of this.shopTiles) {
-      st.sprite.destroy();
-      st.priceTag.destroy();
-    }
-    this.shopTiles = [];
-    if (this.shopCarpet) {
-      this.shopCarpet.destroy();
-      this.shopCarpet = null;
-    }
-  }
-
-  /** Show buy prompt overlay when player steps on a shop item */
-  private showShopBuyPrompt(shopIdx: number) {
-    if (this.shopOpen || this.shopClosed) return;
-    const si = this.shopItems[shopIdx];
-    if (!si) return;
-    const itemDef = ITEM_DB[si.itemId];
-    if (!itemDef) return;
-
-    sfxShop();
-    this.shopOpen = true;
-
-    // Semi-transparent dark background
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6)
-      .setScrollFactor(0).setDepth(200).setInteractive();
-    this.shopUI.push(overlay);
-
-    // Prompt box
-    const boxW = 260;
-    const boxH = 120;
-    const boxX = (GAME_WIDTH - boxW) / 2;
-    const boxY = (GAME_HEIGHT - boxH) / 2;
-    const box = this.add.graphics().setScrollFactor(0).setDepth(201);
-    box.fillStyle(0x1a1a2e, 0.95);
-    box.fillRoundedRect(boxX, boxY, boxW, boxH, 8);
-    box.lineStyle(2, 0xfbbf24, 1);
-    box.strokeRoundedRect(boxX, boxY, boxW, boxH, 8);
-    this.shopUI.push(box);
-
-    // Item name and price
-    const nameText = this.add.text(GAME_WIDTH / 2, boxY + 18, `${itemDef.name} - ${si.price}G`, {
-      fontSize: "13px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-    this.shopUI.push(nameText);
-
-    // Description
-    const descText = this.add.text(GAME_WIDTH / 2, boxY + 38, itemDef.description, {
-      fontSize: "9px", color: "#aaaaaa", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-    this.shopUI.push(descText);
-
-    // "Buy?" label
-    const buyLabel = this.add.text(GAME_WIDTH / 2, boxY + 58, "Buy?", {
-      fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-    this.shopUI.push(buyLabel);
-
-    const canBuy = this.gold >= si.price;
-
-    // Yes button
-    const yesBtn = this.add.text(GAME_WIDTH / 2 - 50, boxY + 80, "[Yes]", {
-      fontSize: "13px", color: canBuy ? "#4ade80" : "#666666", fontFamily: "monospace",
-      backgroundColor: "#2a2a4e", padding: { x: 12, y: 6 },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202).setInteractive();
-    this.shopUI.push(yesBtn);
-
-    if (canBuy) {
-      yesBtn.on("pointerdown", () => {
-        this.buyShopItemNew(shopIdx);
-        this.closeShopUI();
-      });
-    } else {
-      yesBtn.on("pointerdown", () => {
-        this.showLog("Not enough gold!");
-        this.closeShopUI();
-      });
-    }
-
-    // No button
-    const noBtn = this.add.text(GAME_WIDTH / 2 + 50, boxY + 80, "[No]", {
-      fontSize: "13px", color: "#ef4444", fontFamily: "monospace",
-      backgroundColor: "#2a2a4e", padding: { x: 12, y: 6 },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202).setInteractive();
-    this.shopUI.push(noBtn);
-    noBtn.on("pointerdown", () => this.closeShopUI());
-  }
-
-  /** Buy an item from the step-on shop system */
-  private buyShopItemNew(shopIdx: number) {
-    const si = this.shopItems[shopIdx];
-    if (!si || this.gold < si.price) return;
-    const itemDef = ITEM_DB[si.itemId];
-    if (!itemDef) return;
-
-    // Check inventory space
-    if (this.inventory.length >= MAX_INVENTORY) {
-      const existing = this.inventory.find(s => s.item.id === si.itemId && itemDef.stackable);
-      if (!existing) {
-        this.showLog("Bag is full! Can't buy.");
-        return;
-      }
-    }
-
-    // Deduct gold
-    this.gold -= si.price;
-
-    // Add to inventory
-    const existing = this.inventory.find(s => s.item.id === si.itemId && itemDef.stackable);
-    if (existing) {
-      existing.count++;
-    } else {
-      this.inventory.push({ item: itemDef, count: 1 });
-    }
-    this.showLog(`Bought ${itemDef.name} for ${si.price}G!`);
-
-    // Decrease stock
-    si.stock--;
-    if (si.stock <= 0) {
-      // Remove from shop — find and destroy the tile sprite
-      const tileIdx = this.shopTiles.findIndex(st => st.shopIdx === shopIdx);
-      if (tileIdx >= 0) {
-        this.shopTiles[tileIdx].sprite.destroy();
-        this.shopTiles[tileIdx].priceTag.destroy();
-        this.shopTiles.splice(tileIdx, 1);
-      }
-      // Mark item as empty (set price to 0 to indicate sold out)
-      this.shopItems[shopIdx] = { itemId: "", price: 0, stock: 0 };
-    }
-
-    this.updateHUD();
-    this.updateShopGoldHud();
-  }
-
-  private checkMonsterHouse() {
-    if (!this.monsterHouseRoom || this.monsterHouseTriggered) return;
-    const r = this.monsterHouseRoom;
-    const px = this.player.tileX;
-    const py = this.player.tileY;
-    if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h) {
-      this.monsterHouseTriggered = true;
-
-      // Type-specific warning colors and messages
-      const typeConfig: Record<MonsterHouseType, { color: string, hexColor: number, label: string, flashR: number, flashG: number, flashB: number }> = {
-        [MonsterHouseType.Standard]: { color: "#ff4444", hexColor: 0xff4444, label: "Monster House!", flashR: 255, flashG: 0, flashB: 0 },
-        [MonsterHouseType.Treasure]: { color: "#ffd700", hexColor: 0xffd700, label: "Treasure House!", flashR: 255, flashG: 215, flashB: 0 },
-        [MonsterHouseType.Ambush]: { color: "#bb44ff", hexColor: 0xbb44ff, label: "Ambush House!", flashR: 187, flashG: 68, flashB: 255 },
-      };
-      const cfg = typeConfig[this.monsterHouseType];
-
-      // Camera shake (stronger for Ambush)
-      const shakeIntensity = this.monsterHouseType === MonsterHouseType.Ambush ? 0.02 : 0.01;
-      this.cameras.main.shake(400, shakeIntensity);
-      this.cameras.main.flash(250, cfg.flashR, cfg.flashG, cfg.flashB);
-
-      // Big warning text popup (centered, fades out)
-      const warningText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, cfg.label, {
-        fontSize: "24px", color: cfg.color, fontFamily: "monospace", fontStyle: "bold",
-        stroke: "#000000", strokeThickness: 4,
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(300);
-      this.tweens.add({
-        targets: warningText,
-        y: GAME_HEIGHT / 2 - 80,
-        alpha: { from: 1, to: 0 },
-        scaleX: { from: 1, to: 1.3 },
-        scaleY: { from: 1, to: 1.3 },
-        duration: 2000,
-        ease: "Quad.easeOut",
-        onComplete: () => warningText.destroy(),
-      });
-
-      this.showLog(`It's a ${cfg.label}`);
-
-      // Determine enemy count based on type + dungeon difficulty scaling
-      const diffScale = 1 + (this.currentFloor - 3) * 0.15; // extra enemies on deeper floors
-      let baseMin: number, baseMax: number;
-      switch (this.monsterHouseType) {
-        case MonsterHouseType.Standard:  baseMin = 3; baseMax = 5; break;
-        case MonsterHouseType.Treasure:  baseMin = 5; baseMax = 8; break;
-        case MonsterHouseType.Ambush:    baseMin = 4; baseMax = 6; break;
-      }
-      const scaledMin = Math.floor(baseMin * diffScale);
-      const scaledMax = Math.floor(baseMax * diffScale);
-      const count = scaledMin + Math.floor(Math.random() * (scaledMax - scaledMin + 1));
-
-      const floorSpeciesIds = (this.dungeonDef.id === "endlessDungeon" || this.dungeonDef.id === "dailyDungeon")
-        ? this.getEndlessEnemies(this.currentFloor)
-        : getDungeonFloorEnemies(this.dungeonDef, this.currentFloor);
-      const floorSpecies = floorSpeciesIds.map(id => SPECIES[id]).filter(Boolean);
-      if (floorSpecies.length === 0) return;
-
-      // Difficulty multiplier for monster house enemies
-      const diffMult = this.monsterHouseType === MonsterHouseType.Ambush ? 1.3 : 1.2;
-
-      this.monsterHouseEnemies = [];
-
-      for (let i = 0; i < count; i++) {
-        const ex = r.x + 1 + Math.floor(Math.random() * Math.max(1, r.w - 2));
-        const ey = r.y + 1 + Math.floor(Math.random() * Math.max(1, r.h - 2));
-        if (this.dungeon.terrain[ey]?.[ex] !== TerrainType.GROUND) continue;
-        if (this.allEntities.some(e => e.alive && e.tileX === ex && e.tileY === ey)) continue;
-
-        const sp = floorSpecies[Math.floor(Math.random() * floorSpecies.length)];
-        const enemyStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty * diffMult, sp, this.ngPlusLevel);
-
-        // Apply difficulty setting modifiers to monster house enemies
-        if (this.difficultyMods.enemyHpMult !== 1) {
-          enemyStats.hp = Math.floor(enemyStats.hp * this.difficultyMods.enemyHpMult);
-          enemyStats.maxHp = Math.floor(enemyStats.maxHp * this.difficultyMods.enemyHpMult);
-        }
-        if (this.difficultyMods.enemyAtkMult !== 1) {
-          enemyStats.atk = Math.floor(enemyStats.atk * this.difficultyMods.enemyAtkMult);
-        }
-
-        const enemy: Entity = {
-          tileX: ex, tileY: ey,
-          facing: Direction.Down,
-          stats: { ...enemyStats },
-          alive: true,
-          spriteKey: sp.spriteKey,
-          name: sp.name,
-          types: sp.types,
-          attackType: sp.attackType,
-          skills: createSpeciesSkills(sp),
-          statusEffects: [],
-          speciesId: sp.spriteKey,
-          ability: SPECIES_ABILITIES[sp.spriteKey],
-        };
-        const eTex = `${sp.spriteKey}-idle`;
-        if (this.textures.exists(eTex)) {
-          enemy.sprite = this.add.sprite(
-            this.tileToPixelX(ex), this.tileToPixelY(ey), eTex
-          );
-          enemy.sprite.setScale(TILE_SCALE).setDepth(9);
-          const eAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
-          if (this.anims.exists(eAnim)) enemy.sprite.play(eAnim);
-
-          // Ambush type: enemies start invisible (alpha 0), then fade in on trigger
-          if (this.monsterHouseType === MonsterHouseType.Ambush) {
-            enemy.sprite.setAlpha(0);
-            this.tweens.add({
-              targets: enemy.sprite,
-              alpha: 1,
-              duration: 600,
-              delay: 200 + i * 100,
-              ease: "Power2",
-            });
-          }
-        }
-        this.enemies.push(enemy);
-        this.allEntities.push(enemy);
-        this.monsterHouseEnemies.push(enemy);
-        this.seenSpecies.add(sp.id); // Pokedex tracking
-      }
-
-      // Also track any enemies already in the room before trigger as monster house enemies
-      for (const e of this.enemies) {
-        if (e.alive && !this.monsterHouseEnemies.includes(e) &&
-            e.tileX >= r.x && e.tileX < r.x + r.w &&
-            e.tileY >= r.y && e.tileY < r.y + r.h) {
-          this.monsterHouseEnemies.push(e);
-        }
-      }
-    }
-  }
-
-  /** Check if all monster house enemies are defeated, then reward */
-  private checkMonsterHouseCleared() {
-    if (!this.monsterHouseRoom || !this.monsterHouseTriggered || this.monsterHouseCleared) return;
-    if (this.monsterHouseEnemies.length === 0) return;
-
-    // Check if all monster house enemies are dead
-    const allDefeated = this.monsterHouseEnemies.every(e => !e.alive);
-    if (!allDefeated) return;
-
-    this.monsterHouseCleared = true;
-
-    // "Monster House Cleared!" popup
-    const clearColor = this.monsterHouseType === MonsterHouseType.Treasure ? "#ffd700"
-      : this.monsterHouseType === MonsterHouseType.Ambush ? "#bb44ff" : "#4ade80";
-    const clearText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "Monster House Cleared!", {
-      fontSize: "20px", color: clearColor, fontFamily: "monospace", fontStyle: "bold",
-      stroke: "#000000", strokeThickness: 3,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(300);
-    this.tweens.add({
-      targets: clearText,
-      y: GAME_HEIGHT / 2 - 80,
-      alpha: { from: 1, to: 0 },
-      scaleX: { from: 1, to: 1.2 },
-      scaleY: { from: 1, to: 1.2 },
-      duration: 2500,
-      ease: "Quad.easeOut",
-      onComplete: () => clearText.destroy(),
-    });
-
-    // Rewards based on type
-    const r = this.monsterHouseRoom;
-    switch (this.monsterHouseType) {
-      case MonsterHouseType.Standard: {
-        // 1 random item drop
-        this.spawnMonsterHouseRewardItems(r, 1);
-        this.showLog("Monster House cleared! A reward appeared!");
-        break;
-      }
-      case MonsterHouseType.Treasure: {
-        // 3-5 item drops + bonus gold (2x gold bonus)
-        const itemCount = 3 + Math.floor(Math.random() * 3);
-        this.spawnMonsterHouseRewardItems(r, itemCount);
-        const mutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
-        const bonusGold = Math.floor((20 + this.currentFloor * 10) * 2 * mutGoldMult);
-        this.gold += bonusGold;
-        const meta = loadMeta();
-        meta.gold = this.gold;
-        saveMeta(meta);
-        this.showLog(`Treasure House cleared! +${bonusGold}G and items!`);
-        break;
-      }
-      case MonsterHouseType.Ambush: {
-        // 2 item drops + EXP bonus
-        this.spawnMonsterHouseRewardItems(r, 2);
-        const heldExpMult = 1 + (this.heldItemEffect.expBonus ?? 0) / 100;
-        const ngExpMultAmb = 1 + this.ngPlusBonuses.expPercent / 100;
-        const expBonus = Math.floor((15 + this.currentFloor * 8) * this.modifierEffects.expMult * heldExpMult * ngExpMultAmb);
-        this.totalExp += expBonus;
-        // Process potential level ups from bonus EXP
-        const levelResult = processLevelUp(this.player.stats, 0, this.totalExp);
-        this.totalExp = levelResult.totalExp;
-        this.showLog(`Ambush House survived! +${expBonus} EXP bonus!`);
-        break;
-      }
-    }
-
-    sfxVictory();
-    this.cameras.main.flash(300, 200, 255, 200);
-
-    // Score chain: monster house clear
-    {
-      const mhBonus = addChainAction(this.scoreChain, "monsterHouseClear");
-      this.chainActionThisTurn = true;
-      if (mhBonus > 0) this.showLog(`Monster House chain bonus! +${mhBonus} pts!`);
-      this.updateChainHUD();
-    }
-
-    this.updateHUD();
-  }
-
-  /** Spawn reward items on the floor inside a monster house room */
-  private spawnMonsterHouseRewardItems(room: { x: number; y: number; w: number; h: number }, count: number) {
-    this.itemSys.spawnMonsterHouseRewardItems(room, this.dungeon.terrain, count);
-  }
-
-  private openShopUI() {
-    if (this.shopOpen || this.shopClosed) return;
-    // Filter out sold-out items (price=0 means sold out)
-    const availableItems = this.shopItems.filter(si => si.price > 0);
-    if (availableItems.length === 0) {
-      this.showLog("Shop is empty!");
-      return;
-    }
-    sfxShop();
-    this.shopOpen = true;
-
-    // Dim overlay
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
-      .setScrollFactor(0).setDepth(200).setInteractive();
-    this.shopUI.push(overlay);
-
-    // Title
-    const title = this.add.text(GAME_WIDTH / 2, 40, `Kecleon Shop  Gold: ${this.gold}G`, {
-      fontSize: "12px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    this.shopUI.push(title);
-
-    // Item list
-    const startY = 70;
-    let row = 0;
-    for (let i = 0; i < this.shopItems.length; i++) {
-      const si = this.shopItems[i];
-      if (si.price <= 0) continue; // sold out
-      const itemDef = ITEM_DB[si.itemId];
-      if (!itemDef) continue;
-      const y = startY + row * 32;
-      const canBuy = this.gold >= si.price;
-      const stockStr = si.stock > 1 ? ` x${si.stock}` : "";
-      const label = `${itemDef.name}${stockStr} - ${si.price}G`;
-      const color = canBuy ? "#e0e0e0" : "#666666";
-
-      const itemBtn = this.add.text(GAME_WIDTH / 2 - 80, y, label, {
-        fontSize: "11px", color, fontFamily: "monospace",
-        backgroundColor: "#1a1a2eee", padding: { x: 6, y: 4 },
-      }).setScrollFactor(0).setDepth(201).setInteractive();
-      this.shopUI.push(itemBtn);
-
-      if (canBuy) {
-        const buyBtn = this.add.text(GAME_WIDTH / 2 + 80, y, "[Buy]", {
-          fontSize: "11px", color: "#fbbf24", fontFamily: "monospace",
-          backgroundColor: "#333344ee", padding: { x: 4, y: 4 },
-        }).setScrollFactor(0).setDepth(201).setInteractive();
-        this.shopUI.push(buyBtn);
-
-        const idx = i;
-        buyBtn.on("pointerdown", () => this.buyShopItem(idx));
-      }
-
-      // Description
-      const desc = this.add.text(GAME_WIDTH / 2 - 80, y + 15, itemDef.description, {
-        fontSize: "8px", color: "#888888", fontFamily: "monospace",
-      }).setScrollFactor(0).setDepth(201);
-      this.shopUI.push(desc);
-      row++;
-    }
-
-    // Close button
-    const closeBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 60, "[Close Shop]", {
-      fontSize: "12px", color: "#ef4444", fontFamily: "monospace",
-      backgroundColor: "#1a1a2eee", padding: { x: 10, y: 6 },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
-    this.shopUI.push(closeBtn);
-
-    closeBtn.on("pointerdown", () => this.closeShopUI());
-  }
-
-  private buyShopItem(index: number) {
-    const si = this.shopItems[index];
-    if (!si || si.price <= 0 || this.gold < si.price) return;
-    const itemDef = ITEM_DB[si.itemId];
-    if (!itemDef) return;
-
-    // Check inventory space
-    if (this.inventory.length >= MAX_INVENTORY) {
-      const existing = this.inventory.find(s => s.item.id === si.itemId && itemDef.stackable);
-      if (!existing) {
-        this.showLog("Bag is full! Can't buy.");
-        return;
-      }
-    }
-
-    // Deduct gold
-    this.gold -= si.price;
-
-    // Add to inventory
-    const existing = this.inventory.find(s => s.item.id === si.itemId && itemDef.stackable);
-    if (existing) existing.count++;
-    else this.inventory.push({ item: itemDef, count: 1 });
-    this.showLog(`Bought ${itemDef.name} for ${si.price}G!`);
-
-    // Decrease stock
-    si.stock--;
-    if (si.stock <= 0) {
-      // Remove tile visual
-      const tileIdx = this.shopTiles.findIndex(st => st.shopIdx === index);
-      if (tileIdx >= 0) {
-        this.shopTiles[tileIdx].sprite.destroy();
-        this.shopTiles[tileIdx].priceTag.destroy();
-        this.shopTiles.splice(tileIdx, 1);
-      }
-      this.shopItems[index] = { itemId: "", price: 0, stock: 0 };
-    }
-
-    // Refresh UI
-    this.closeShopUI();
-    if (this.shopItems.some(si2 => si2.price > 0)) {
-      this.openShopUI();
-    }
-    this.updateHUD();
-    this.updateShopGoldHud();
-  }
-
-  /** Show sell prompt for an item when in shop room */
-  private showSellPrompt(inventoryIndex: number) {
-    if (this.shopOpen || !this.playerInShopRoom || this.shopClosed) return;
-    const stack = this.inventory[inventoryIndex];
-    if (!stack) return;
-    const sellPrice = getItemSellPrice(stack.item.id, this.currentFloor);
-
-    sfxShop();
-    this.shopOpen = true;
-
-    // Semi-transparent dark background
-    const overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6)
-      .setScrollFactor(0).setDepth(200).setInteractive();
-    this.shopUI.push(overlay);
-
-    // Prompt box
-    const boxW = 260;
-    const boxH = 100;
-    const boxX = (GAME_WIDTH - boxW) / 2;
-    const boxY = (GAME_HEIGHT - boxH) / 2;
-    const box = this.add.graphics().setScrollFactor(0).setDepth(201);
-    box.fillStyle(0x1a1a2e, 0.95);
-    box.fillRoundedRect(boxX, boxY, boxW, boxH, 8);
-    box.lineStyle(2, 0x4ade80, 1);
-    box.strokeRoundedRect(boxX, boxY, boxW, boxH, 8);
-    this.shopUI.push(box);
-
-    // Sell text
-    const sellText = this.add.text(GAME_WIDTH / 2, boxY + 20, `Sell ${stack.item.name} for ${sellPrice}G?`, {
-      fontSize: "11px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-    this.shopUI.push(sellText);
-
-    // Yes button
-    const yesBtn = this.add.text(GAME_WIDTH / 2 - 50, boxY + 60, "[Yes]", {
-      fontSize: "13px", color: "#4ade80", fontFamily: "monospace",
-      backgroundColor: "#2a2a4e", padding: { x: 12, y: 6 },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202).setInteractive();
-    this.shopUI.push(yesBtn);
-
-    yesBtn.on("pointerdown", () => {
-      this.sellItem(inventoryIndex, sellPrice);
-      this.closeShopUI();
-    });
-
-    // No button
-    const noBtn = this.add.text(GAME_WIDTH / 2 + 50, boxY + 60, "[No]", {
-      fontSize: "13px", color: "#ef4444", fontFamily: "monospace",
-      backgroundColor: "#2a2a4e", padding: { x: 12, y: 6 },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202).setInteractive();
-    this.shopUI.push(noBtn);
-    noBtn.on("pointerdown", () => this.closeShopUI());
-  }
-
-  /** Execute selling an item */
-  private sellItem(inventoryIndex: number, sellPrice: number) {
-    const stack = this.inventory[inventoryIndex];
-    if (!stack) return;
-
-    this.gold += sellPrice;
-    this.showLog(`Sold ${stack.item.name} for ${sellPrice}G!`);
-
-    stack.count--;
-    if (stack.count <= 0) {
-      this.inventory.splice(inventoryIndex, 1);
-    }
-
-    this.updateHUD();
-    this.updateShopGoldHud();
-  }
-
-  private closeShopUI() {
-    for (const obj of this.shopUI) obj.destroy();
-    this.shopUI = [];
-    this.shopOpen = false;
-  }
+  // ── Shop delegates (exposed for ItemSystem host interface) ──
+  private showSellPrompt(inventoryIndex: number) { this.shopSys.showSellPrompt(inventoryIndex); }
+  private triggerShopTheft() { this.shopSys.triggerShopTheft(); }
 
   // Puzzle Room System is now in systems/puzzle-system.ts (PuzzleSystem class)
 
@@ -4801,945 +3925,13 @@ export class DungeonScene extends Phaser.Scene {
     };
   }
 
-  private showDungeonClear() {
-    this.gameOver = true;
-    stopBgm();
-    sfxVictory();
-    clearDungeonSave();
-    // Run log: dungeon cleared
-    this.runLog.add(RunLogEvent.DungeonCleared, `${this.dungeonDef.name} cleared!`, this.currentFloor, this.turnManager.turn);
+  private showDungeonClear() { this.deathRescueSys.showDungeonClear(); }
 
-    // Boss bonus: +50% gold if dungeon has a boss; Boss Rush always counts as boss dungeon
-    const baseGold = goldFromRun(this.currentFloor, this.enemiesDefeated, true);
-    const ngGoldBonus = 1 + this.ngPlusBonuses.goldPercent / 100; // NG+ gold bonus
-    const challengeGoldMultiplier = this.challengeMode === "speedrun" ? 2 : 1; // Speed Run = 2x gold
-    const modGoldMult = this.modifierEffects.goldMult; // Dungeon modifier gold multiplier
-    const clearHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
-    const clearEnchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
-    const hasBoss = this.dungeonDef.boss || this.isBossRush;
-    const clearMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
-    const clearTalentGoldMult = 1 + (this.talentEffects.goldPercent ?? 0) / 100;
-    const clearRelicGoldMult = 1 + (this.relicEffects.goldMult ?? 0);
-    const clearBlessingGoldMult = 1 + getBlessingEffect(this.activeBlessings, "goldMult");
-    const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * this.difficultyMods.goldMult * clearEnchGoldMult * clearMutGoldMult * clearTalentGoldMult * clearRelicGoldMult * clearBlessingGoldMult);
+  private showGameOver() { this.deathRescueSys.showGameOver(); }
 
-    this.add.rectangle(
-      GAME_WIDTH / 2, GAME_HEIGHT / 2,
-      GAME_WIDTH, GAME_HEIGHT,
-      0x000000, 0.85
-    ).setScrollFactor(0).setDepth(200);
+  private showRunSummary(cleared: boolean, totalFloors: number) { this.deathRescueSys.showRunSummary(cleared, totalFloors); }
 
-    // Use top-down layout to avoid overlap
-    let clearY = 60;
-
-    const titleText = this.add.text(GAME_WIDTH / 2, clearY, "DUNGEON CLEAR!", {
-      fontSize: "20px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    clearY += 30;
-
-    // Challenge mode info on clear screen
-    if (this.challengeMode) {
-      const chDef = CHALLENGE_MODES.find(c => c.id === this.challengeMode);
-      if (chDef) {
-        this.add.text(GAME_WIDTH / 2, clearY, `Challenge: ${chDef.name}`, {
-          fontSize: "10px", color: chDef.color, fontFamily: "monospace", fontStyle: "bold",
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-        clearY += 18;
-      }
-    }
-
-    this.add.text(GAME_WIDTH / 2, clearY, `${this.dungeonDef.name} B${this.dungeonDef.floors}F cleared!`, {
-      fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    clearY += 24;
-
-    this.add.text(GAME_WIDTH / 2, clearY, `Earned ${gold} Gold!`, {
-      fontSize: "13px", color: "#fde68a", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    clearY += 22;
-
-    // Daily dungeon: calculate and save score
-    let dailyScoreValue = 0;
-    if (this.dungeonDef.id === "dailyDungeon") {
-      const dailyConfig = getDailyConfig();
-      dailyScoreValue = calculateDailyScore(
-        this.currentFloor, this.enemiesDefeated, this.turnManager.turn, true
-      );
-      saveDailyScore({
-        date: dailyConfig.date,
-        floorsReached: this.currentFloor,
-        enemiesDefeated: this.enemiesDefeated,
-        turnsUsed: this.turnManager.turn,
-        score: dailyScoreValue,
-        cleared: true,
-        starter: this.starterId,
-      });
-    }
-
-    // Leaderboard: calculate and save run score (with chain bonus added)
-    const clearBaseScore = calculateScore({
-      dungeonId: this.dungeonDef.id,
-      starter: this.starterId,
-      floorsCleared: this.dungeonDef.floors,
-      enemiesDefeated: this.enemiesDefeated,
-      turns: this.turnManager.turn,
-      goldEarned: gold,
-      cleared: true,
-      totalFloors: this.dungeonDef.floors,
-      challengeMode: this.challengeMode ?? undefined,
-    });
-    const clearChainBonus = this.scoreChain.totalBonusScore;
-    const clearRunScore = clearBaseScore + clearChainBonus;
-    saveRunScore({
-      dungeonId: this.dungeonDef.id,
-      starter: this.starterId,
-      score: clearRunScore,
-      floorsCleared: this.dungeonDef.floors,
-      enemiesDefeated: this.enemiesDefeated,
-      turns: this.turnManager.turn,
-      goldEarned: gold,
-      cleared: true,
-      date: new Date().toISOString(),
-      challengeMode: this.challengeMode ?? undefined,
-      difficulty: isNonNormalDifficulty(this.difficultyLevel) ? this.difficultyLevel : undefined,
-    });
-
-    // Journal: record dungeon clear with species encountered
-    {
-      const clearJournal = loadJournal();
-      recordDungeonClear(clearJournal, this.dungeonDef.id, this.dungeonDef.floors, this.runElapsedSeconds, this.enemiesDefeated, gold);
-      for (const sid of this.seenSpecies) {
-        recordSpeciesEncountered(clearJournal, this.dungeonDef.id, sid);
-      }
-    }
-
-    // Run counter for this dungeon
-    const clearMeta = loadMeta();
-    const clearDungeonRunCount = (clearMeta.dungeonRunCounts ?? {})[this.dungeonDef.id] ?? 0;
-
-    // Speed run timer: check and save best time
-    const runTime = this.runElapsedSeconds;
-    if (!clearMeta.bestTimes) clearMeta.bestTimes = {};
-    const prevBest = clearMeta.bestTimes[this.dungeonDef.id];
-    const isNewBest = prevBest === undefined || runTime < prevBest;
-    if (isNewBest) {
-      clearMeta.bestTimes[this.dungeonDef.id] = runTime;
-      saveMeta(clearMeta);
-    }
-
-    // Time display on clear screen
-    const timeStr = `Time: ${this.formatTime(runTime)}`;
-    const bestStr = isNewBest
-      ? `Best: ${this.formatTime(runTime)}`
-      : `Best: ${this.formatTime(prevBest!)}`;
-    this.add.text(GAME_WIDTH / 2, clearY, `${timeStr}    ${bestStr}`, {
-      fontSize: "10px", color: "#94a3b8", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    clearY += 16;
-
-    // "New Best Time!" banner
-    if (isNewBest) {
-      this.add.text(GAME_WIDTH / 2, clearY, "New Best Time!", {
-        fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-      clearY += 16;
-    }
-
-    // Chain bonus display
-    const clearMaxTier = getChainTier(this.scoreChain.maxChainReached);
-    const clearChainStr = clearMaxTier
-      ? `Best Chain: ${clearMaxTier} (x${this.scoreChain.maxChainReached.toFixed(1)})  +${clearChainBonus} pts`
-      : "";
-
-    // Stats summary
-    const clearStats = [
-      `Run #${clearDungeonRunCount}`,
-      `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
-      this.allies.length > 0 ? `Team: ${this.allies.filter(a => a.alive).map(a => a.name).join(", ")}` : "",
-      this.ngPlusLevel > 0 ? `NG+${this.ngPlusLevel}` : "",
-      this.challengeMode === "speedrun" ? "Speed Run Bonus: 2x Gold!" : "",
-      this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
-      this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
-      this.gauntletSys.totalWavesCleared > 0 ? `Gauntlet Waves: ${this.gauntletSys.totalWavesCleared}` : "",
-      clearChainStr,
-      `Score: ${clearRunScore}`,
-    ].filter(Boolean).join("\n");
-    clearY += 4;
-    const statsText = this.add.text(GAME_WIDTH / 2, clearY, clearStats, {
-      fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
-    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
-    clearY += statsText.height + 10;
-
-    // Performance grade
-    const clearGrade = calculatePerformanceGrade(this.runLog.getSummaryStats(), true, this.dungeonDef.floors, this.turnManager.turn);
-    this.add.text(GAME_WIDTH / 2, clearY, `Grade: ${clearGrade}`, {
-      fontSize: "13px", color: gradeColor(clearGrade), fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    clearY += 24;
-
-    // Buttons at bottom — use fixed positions from bottom
-    const btnY1 = Math.max(clearY, GAME_HEIGHT - 120);
-    const btnW = 200;
-    const btnH = 32;
-
-    const townBtnBg = this.add.rectangle(GAME_WIDTH / 2, btnY1, btnW, btnH, 0x1e40af, 0.9)
-      .setStrokeStyle(1, 0x60a5fa).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
-    const townBtnText = this.add.text(GAME_WIDTH / 2, btnY1, "Return to Town", {
-      fontSize: "13px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-    townBtnBg.on("pointerover", () => townBtnBg.setFillStyle(0x2563eb, 1));
-    townBtnBg.on("pointerout", () => townBtnBg.setFillStyle(0x1e40af, 0.9));
-    townBtnBg.on("pointerdown", () => {
-      this.scene.start("HubScene", {
-        gold,
-        cleared: true,
-        bestFloor: this.dungeonDef.floors,
-        enemiesDefeated: this.enemiesDefeated,
-        turns: this.turnManager.turn,
-        dungeonId: this.dungeonDef.id,
-        starter: this.starterId,
-        challengeMode: this.challengeMode ?? undefined,
-        pokemonSeen: Array.from(this.seenSpecies),
-        inventory: serializeInventory(this.inventory),
-        ...this.getQuestTrackingData(),
-      });
-    });
-
-    const btnY2 = btnY1 + btnH + 6;
-    const retryBtnBg = this.add.rectangle(GAME_WIDTH / 2, btnY2, btnW, btnH, 0x92400e, 0.9)
-      .setStrokeStyle(1, 0xf59e0b).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
-    this.add.text(GAME_WIDTH / 2, btnY2, "Run Again", {
-      fontSize: "13px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-    retryBtnBg.on("pointerover", () => retryBtnBg.setFillStyle(0xb45309, 1));
-    retryBtnBg.on("pointerout", () => retryBtnBg.setFillStyle(0x92400e, 0.9));
-    retryBtnBg.on("pointerdown", () => {
-      this.quickRetry(gold, true);
-    });
-
-    const btnY3 = btnY2 + btnH + 6;
-    const summaryBtnBg = this.add.rectangle(GAME_WIDTH / 2, btnY3, btnW * 0.8, 26, 0x2a2a4e, 0.9)
-      .setStrokeStyle(1, 0xa855f7).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
-    this.add.text(GAME_WIDTH / 2, btnY3, "Run Summary", {
-      fontSize: "11px", color: "#a855f7", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-    summaryBtnBg.on("pointerdown", () => {
-      this.showRunSummary(true, this.dungeonDef.floors);
-    });
-
-    // Gentle gold glow on title
-    this.tweens.add({
-      targets: titleText,
-      alpha: { from: 1, to: 0.7 },
-      duration: 1200, yoyo: true, repeat: -1,
-    });
-  }
-
-  private showGameOver() {
-    this.autoExploreSys.stopAutoExplore();
-
-    // Check if rescue is available before committing to game over
-    const meta = loadMeta();
-    const rescueGold = meta.gold + this.gold; // meta (saved) gold + run gold
-    const options = getRescueOptions(this.currentFloor, this.dungeonDef.difficulty, rescueGold);
-    if (this.rescueCount < MAX_RESCUES_PER_RUN && options.length > 0) {
-      // Pause the game but don't finalize game over yet
-      stopBgm();
-      this.showRescuePrompt(options, rescueGold);
-      return;
-    }
-
-    // No rescue available — proceed to final game over
-    this.showGameOverScreen();
-  }
-
-  /**
-   * Rescue prompt overlay — shown when the player faints but can afford a rescue.
-   * Displays rescue options as buttons and a "Give up" fallback.
-   */
-  private showRescuePrompt(options: RescueOption[], availableGold: number) {
-    const rescueUI: Phaser.GameObjects.GameObject[] = [];
-    // Disable DOM HUD buttons while rescue prompt is open
-    if (this.domHud) setDomHudInteractive(this.domHud, false);
-
-    // Dark overlay
-    const bg = this.add.rectangle(
-      GAME_WIDTH / 2, GAME_HEIGHT / 2,
-      GAME_WIDTH, GAME_HEIGHT,
-      0x000000, 0.8
-    ).setScrollFactor(0).setDepth(200).setInteractive();
-    rescueUI.push(bg);
-
-    // Title
-    const title = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 90, "You've been knocked out!", {
-      fontSize: "16px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    rescueUI.push(title);
-
-    // Subtitle with remaining rescues
-    const remaining = MAX_RESCUES_PER_RUN - this.rescueCount;
-    const subtitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 68, `Rescue available! (${remaining} left this run)`, {
-      fontSize: "10px", color: "#fbbf24", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    rescueUI.push(subtitle);
-
-    // Gold display
-    const goldInfo = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 52, `Your Gold: ${availableGold}G`, {
-      fontSize: "10px", color: "#fde68a", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    rescueUI.push(goldInfo);
-
-    // Rescue option buttons
-    let yOffset = GAME_HEIGHT / 2 - 28;
-    for (const option of options) {
-      // Option button background
-      const btnBg = this.add.rectangle(
-        GAME_WIDTH / 2, yOffset + 12, 280, 44,
-        0x1e293b, 0.9
-      ).setScrollFactor(0).setDepth(201).setInteractive();
-      rescueUI.push(btnBg);
-
-      // Option label
-      const labelColor = option.hpPercent >= 100 ? "#34d399" : "#60a5fa";
-      const labelText = this.add.text(GAME_WIDTH / 2, yOffset + 4, option.label, {
-        fontSize: "13px", color: labelColor, fontFamily: "monospace", fontStyle: "bold",
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-      rescueUI.push(labelText);
-
-      // Option description
-      const descText = this.add.text(GAME_WIDTH / 2, yOffset + 20, option.description, {
-        fontSize: "9px", color: "#94a3b8", fontFamily: "monospace",
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-      rescueUI.push(descText);
-
-      // Border highlight on hover
-      btnBg.on("pointerover", () => btnBg.setStrokeStyle(1, 0x60a5fa));
-      btnBg.on("pointerout", () => btnBg.setStrokeStyle(0));
-
-      // Handle rescue selection
-      const selectedOption = option;
-      btnBg.on("pointerdown", () => {
-        for (const el of rescueUI) el.destroy();
-        this.executeRescue(selectedOption);
-      });
-
-      yOffset += 52;
-    }
-
-    // "Give up" button (styled rectangle)
-    const giveUpY = yOffset + 16;
-    const giveUpBg = this.add.rectangle(GAME_WIDTH / 2, giveUpY, 140, 32, 0x1a1a2e, 0.9)
-      .setStrokeStyle(1, 0x6b7280).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
-    rescueUI.push(giveUpBg);
-    const giveUpLabel = this.add.text(GAME_WIDTH / 2, giveUpY, "Give Up", {
-      fontSize: "13px", color: "#6b7280", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-    rescueUI.push(giveUpLabel);
-
-    giveUpBg.on("pointerover", () => { giveUpBg.setStrokeStyle(1, 0xef4444); giveUpLabel.setColor("#ef4444"); });
-    giveUpBg.on("pointerout", () => { giveUpBg.setStrokeStyle(1, 0x6b7280); giveUpLabel.setColor("#6b7280"); });
-    giveUpBg.on("pointerdown", () => {
-      for (const el of rescueUI) el.destroy();
-      this.showGameOverScreen();
-    });
-  }
-
-  /**
-   * Execute a rescue: deduct gold, restore HP, optionally remove items, clear enemies, resume play.
-   */
-  private executeRescue(option: RescueOption) {
-    const meta = loadMeta();
-    let costRemaining = option.goldCost;
-
-    // First deduct from run gold, then from meta gold
-    if (this.gold >= costRemaining) {
-      this.gold -= costRemaining;
-      costRemaining = 0;
-    } else {
-      costRemaining -= this.gold;
-      this.gold = 0;
-      meta.gold = Math.max(0, meta.gold - costRemaining);
-      saveMeta(meta);
-    }
-
-    // Increment rescue count
-    this.rescueCount++;
-
-    // Restore HP and alive state
-    this.player.stats.hp = Math.floor(this.player.stats.maxHp * option.hpPercent / 100);
-    this.player.alive = true;
-
-    // Stop any ongoing tweens on the player sprite (e.g. death fade-out)
-    if (this.player.sprite) {
-      this.tweens.killTweensOf(this.player.sprite);
-      this.player.sprite.setAlpha(1);
-    } else {
-      // Sprite was already destroyed by death tween — recreate it
-      const sp = SPECIES[this.starterId];
-      if (sp) {
-        const texKey = `${sp.spriteKey}-idle`;
-        if (this.textures.exists(texKey)) {
-          this.player.sprite = this.add.sprite(
-            this.tileToPixelX(this.player.tileX),
-            this.tileToPixelY(this.player.tileY),
-            texKey
-          ).setScale(TILE_SCALE).setDepth(10);
-          const animKey = `${sp.spriteKey}-idle-${this.player.facing}`;
-          if (this.anims.exists(animKey)) this.player.sprite.play(animKey);
-        }
-      }
-    }
-
-    // If basic rescue, remove half the inventory items randomly
-    if (!option.keepItems && this.inventory.length > 0) {
-      const removeCount = Math.floor(this.inventory.length / 2);
-      for (let i = 0; i < removeCount; i++) {
-        const idx = Math.floor(Math.random() * this.inventory.length);
-        this.inventory.splice(idx, 1);
-      }
-    }
-
-    // Revive fainted allies and restore their sprites
-    for (const ally of this.allies) {
-      if (!ally.alive) {
-        ally.alive = true;
-        ally.stats.hp = Math.floor(ally.stats.maxHp * 0.5);
-      }
-      // Stop any death fade tween and ensure sprite is visible
-      if (ally.sprite) {
-        this.tweens.killTweensOf(ally.sprite);
-        ally.sprite.setAlpha(1);
-      } else {
-        // Recreate destroyed sprite
-        const allySp = ally.speciesId ? SPECIES[ally.speciesId] : undefined;
-        if (allySp) {
-          const allyTex = `${allySp.spriteKey}-idle`;
-          if (this.textures.exists(allyTex)) {
-            ally.sprite = this.add.sprite(
-              this.tileToPixelX(ally.tileX), this.tileToPixelY(ally.tileY), allyTex
-            ).setScale(TILE_SCALE).setDepth(10);
-          }
-        }
-        // Re-add to allEntities if missing
-        if (!this.allEntities.includes(ally)) {
-          this.allEntities.push(ally);
-        }
-      }
-    }
-
-    // Reset turn manager busy state to unblock input after rescue
-    this.turnManager.forceIdle();
-
-    // Ensure gameOver stays false (was not set since we intercepted before showGameOverScreen)
-    this.gameOver = false;
-
-    // Re-enable DOM HUD buttons (rescue overlay may have blocked them)
-    if (this.domHud) setDomHudInteractive(this.domHud, true);
-
-    // Visual feedback: rescue flash
-    this.cameras.main.flash(600, 100, 200, 255);
-    if (this.player.sprite) {
-      this.player.sprite.setTint(0x64b5f6);
-      this.time.delayedCall(800, () => {
-        if (this.player.sprite) this.player.sprite.clearTint();
-      });
-    }
-
-    // Show rescue success message
-    this.showLog(`Rescue successful! Restored to ${option.hpPercent}% HP. (${MAX_RESCUES_PER_RUN - this.rescueCount} rescues left)`);
-
-    // Run log entry
-    this.runLog.add(RunLogEvent.PlayerDied, `Rescued on B${this.currentFloor}F (${option.label})`, this.currentFloor, this.turnManager.turn);
-
-    // Resume BGM
-    startBgm(this.dungeonDef.id);
-
-    // Update HUD to reflect HP/inventory changes
-    this.updateHUD();
-  }
-
-  /**
-   * Final game over screen — shown when rescue is declined or unavailable.
-   * Contains all the original game over logic (gold salvage, scoring, stats, buttons).
-   */
-  private showGameOverScreen() {
-    this.gameOver = true;
-    stopBgm();
-    sfxGameOver();
-    clearDungeonSave();
-    // Run log: player died
-    this.runLog.add(RunLogEvent.PlayerDied, `Fainted on B${this.currentFloor}F`, this.currentFloor, this.turnManager.turn);
-
-    const goHeldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
-    const ngGoGoldMult = 1 + this.ngPlusBonuses.goldPercent / 100;
-    const goEnchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
-    const goMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
-    const goTalentGoldMult = 1 + (this.talentEffects.goldPercent ?? 0) / 100;
-    const goRelicGoldMult = 1 + (this.relicEffects.goldMult ?? 0);
-    const gold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * goHeldGoldMult * this.difficultyMods.goldMult * ngGoGoldMult * goEnchGoldMult * goMutGoldMult * goTalentGoldMult * goRelicGoldMult);
-
-    // Journal: record dungeon defeat with species encountered
-    {
-      const defeatJournal = loadJournal();
-      recordDungeonDefeat(defeatJournal, this.dungeonDef.id, this.currentFloor, this.enemiesDefeated, gold);
-      for (const sid of this.seenSpecies) {
-        recordSpeciesEncountered(defeatJournal, this.dungeonDef.id, sid);
-      }
-    }
-
-    // Hide DOM HUD and D-pad behind game over overlay
-    if (this.domHud) setDomHudInteractive(this.domHud, false);
-    for (const obj of this.dpadUI) { if ("setVisible" in obj && typeof (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible === "function") (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible(false); }
-
-    // Full-screen opaque overlay
-    this.add.rectangle(
-      GAME_WIDTH / 2, GAME_HEIGHT / 2,
-      GAME_WIDTH, GAME_HEIGHT,
-      0x0a0a1a, 0.95
-    ).setScrollFactor(0).setDepth(200);
-
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, "GAME OVER", {
-      fontSize: "24px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, `Fainted on B${this.currentFloor}F`, {
-      fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 12, `Salvaged ${gold} Gold`, {
-      fontSize: "11px", color: "#fde68a", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 2, `Time: ${this.formatTime(this.runElapsedSeconds)}`, {
-      fontSize: "10px", color: "#6b7280", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-
-    // Daily dungeon: calculate and save score on game over
-    let dailyScoreValue = 0;
-    if (this.dungeonDef.id === "dailyDungeon") {
-      const dailyConfig = getDailyConfig();
-      dailyScoreValue = calculateDailyScore(
-        this.currentFloor, this.enemiesDefeated, this.turnManager.turn, false
-      );
-      saveDailyScore({
-        date: dailyConfig.date,
-        floorsReached: this.currentFloor,
-        enemiesDefeated: this.enemiesDefeated,
-        turnsUsed: this.turnManager.turn,
-        score: dailyScoreValue,
-        cleared: false,
-        starter: this.starterId,
-      });
-    }
-
-    // Leaderboard: calculate and save run score on game over (with chain bonus)
-    const goBaseScore = calculateScore({
-      dungeonId: this.dungeonDef.id,
-      starter: this.starterId,
-      floorsCleared: this.currentFloor,
-      enemiesDefeated: this.enemiesDefeated,
-      turns: this.turnManager.turn,
-      goldEarned: gold,
-      cleared: false,
-      totalFloors: this.dungeonDef.floors,
-      challengeMode: this.challengeMode ?? undefined,
-    });
-    const goChainBonus = this.scoreChain.totalBonusScore;
-    const goRunScore = goBaseScore + goChainBonus;
-    saveRunScore({
-      dungeonId: this.dungeonDef.id,
-      starter: this.starterId,
-      score: goRunScore,
-      floorsCleared: this.currentFloor,
-      enemiesDefeated: this.enemiesDefeated,
-      turns: this.turnManager.turn,
-      goldEarned: gold,
-      cleared: false,
-      date: new Date().toISOString(),
-      challengeMode: this.challengeMode ?? undefined,
-      difficulty: isNonNormalDifficulty(this.difficultyLevel) ? this.difficultyLevel : undefined,
-    });
-
-    // Run counter for this dungeon
-    const goMeta = loadMeta();
-    const goDungeonRunCount = (goMeta.dungeonRunCounts ?? {})[this.dungeonDef.id] ?? 0;
-
-    // Chain bonus display
-    const goMaxTier = getChainTier(this.scoreChain.maxChainReached);
-    const goChainStr = goMaxTier
-      ? `Best Chain: ${goMaxTier} (x${this.scoreChain.maxChainReached.toFixed(1)})  +${goChainBonus} pts`
-      : "";
-
-    // Stats summary
-    const goStats = [
-      `Run #${goDungeonRunCount}`,
-      `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
-      this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
-      this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
-      this.gauntletSys.totalWavesCleared > 0 ? `Gauntlet Waves: ${this.gauntletSys.totalWavesCleared}` : "",
-      goChainStr,
-      `Score: ${goRunScore}`,
-    ].filter(Boolean).join("\n");
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 22, goStats, {
-      fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
-    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
-
-    // Performance grade
-    const goGrade = calculatePerformanceGrade(this.runLog.getSummaryStats(), false, this.dungeonDef.floors, this.turnManager.turn);
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 80, `Grade: ${goGrade}`, {
-      fontSize: "14px", color: gradeColor(goGrade), fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-
-    // ── Styled buttons ──
-    const btnW = 240;
-    const btnH = 36;
-    const btnBaseY = GAME_HEIGHT / 2 + 108;
-    const btnGap = 44;
-
-    // Return to Town
-    const rtBg = this.add.rectangle(GAME_WIDTH / 2, btnBaseY, btnW, btnH, 0x1e3a5f, 0.95)
-      .setStrokeStyle(1, 0x3b82f6).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
-    this.add.text(GAME_WIDTH / 2, btnBaseY, "Return to Town", {
-      fontSize: "13px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-    rtBg.on("pointerover", () => rtBg.setFillStyle(0x2a4a6f, 1));
-    rtBg.on("pointerout", () => rtBg.setFillStyle(0x1e3a5f, 0.95));
-    rtBg.on("pointerdown", () => {
-      this.scene.start("HubScene", {
-        gold,
-        cleared: false,
-        bestFloor: this.currentFloor,
-        enemiesDefeated: this.enemiesDefeated,
-        turns: this.turnManager.turn,
-        dungeonId: this.dungeonDef.id,
-        starter: this.starterId,
-        challengeMode: this.challengeMode ?? undefined,
-        pokemonSeen: Array.from(this.seenSpecies),
-        inventory: serializeInventory(this.inventory),
-        ...this.getQuestTrackingData(),
-      });
-    });
-
-    // Quick Retry
-    const qrBg = this.add.rectangle(GAME_WIDTH / 2, btnBaseY + btnGap, btnW, btnH, 0x3a2a1a, 0.95)
-      .setStrokeStyle(1, 0xf59e0b).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
-    this.add.text(GAME_WIDTH / 2, btnBaseY + btnGap, "Quick Retry", {
-      fontSize: "13px", color: "#f59e0b", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-    qrBg.on("pointerover", () => qrBg.setFillStyle(0x4a3a2a, 1));
-    qrBg.on("pointerout", () => qrBg.setFillStyle(0x3a2a1a, 0.95));
-    qrBg.on("pointerdown", () => {
-      this.quickRetry(gold, false);
-    });
-
-    // Run Summary
-    const rsBg = this.add.rectangle(GAME_WIDTH / 2, btnBaseY + btnGap * 2, btnW, btnH, 0x1a0a2a, 0.95)
-      .setStrokeStyle(1, 0xa855f7).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
-    this.add.text(GAME_WIDTH / 2, btnBaseY + btnGap * 2, "Run Summary", {
-      fontSize: "13px", color: "#a855f7", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
-    rsBg.on("pointerover", () => rsBg.setFillStyle(0x2a1a3a, 1));
-    rsBg.on("pointerout", () => rsBg.setFillStyle(0x1a0a2a, 0.95));
-    rsBg.on("pointerdown", () => {
-      this.showRunSummary(false, this.dungeonDef.floors);
-    });
-  }
-
-  /**
-   * Run Summary overlay — shows detailed stats, notable events, timeline, and performance grade.
-   */
-  private showRunSummary(cleared: boolean, totalFloors: number) {
-    const stats = this.runLog.getSummaryStats();
-    const grade = calculatePerformanceGrade(stats, cleared, totalFloors, this.turnManager.turn);
-    const notable = this.runLog.getNotableEvents();
-    const timeline = this.runLog.getTimeline();
-
-    // Full-screen overlay
-    const bg = this.add.rectangle(
-      GAME_WIDTH / 2, GAME_HEIGHT / 2,
-      GAME_WIDTH, GAME_HEIGHT,
-      0x0a0a1a, 0.95
-    ).setScrollFactor(0).setDepth(300).setInteractive();
-
-    const uiElements: Phaser.GameObjects.GameObject[] = [bg];
-
-    // Title + grade
-    const gradeStr = `Grade: ${grade}`;
-    const titleEl = this.add.text(GAME_WIDTH / 2, 30, "RUN SUMMARY", {
-      fontSize: "16px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
-    uiElements.push(titleEl);
-
-    const gradeEl = this.add.text(GAME_WIDTH / 2, 50, gradeStr, {
-      fontSize: "22px", color: gradeColor(grade), fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
-    uiElements.push(gradeEl);
-
-    // Grade pulse animation
-    this.tweens.add({
-      targets: gradeEl,
-      scaleX: 1.15, scaleY: 1.15,
-      duration: 600, yoyo: true, repeat: -1, ease: "Sine.easeInOut",
-    });
-
-    // Key stats section
-    const statsLines = [
-      `Enemies Defeated: ${stats.totalEnemiesDefeated}`,
-      `Damage Dealt: ${stats.totalDamageDealt}`,
-      `Damage Taken: ${stats.totalDamageTaken}`,
-      `Items Used: ${stats.totalItemsUsed}  Picked Up: ${stats.totalItemsPickedUp}`,
-      `Skills Used: ${stats.totalSkillsUsed}  Unique: ${stats.uniqueSkillsUsed}`,
-      `Level Ups: ${stats.levelUps}`,
-      `Floors: ${stats.floorsExplored}`,
-      stats.bestChainTier ? `Best Chain: ${stats.bestChainTier}` : "",
-    ].filter(Boolean).join("\n");
-
-    const statsEl = this.add.text(GAME_WIDTH / 2, 75, statsLines, {
-      fontSize: "9px", color: "#cbd5e1", fontFamily: "monospace", align: "center",
-      lineSpacing: 2,
-    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(301);
-    uiElements.push(statsEl);
-
-    // Notable events section
-    let notableY = 160;
-    if (stats.bossesDefeated > 0 || stats.legendariesDefeated > 0 || stats.secretRoomsFound > 0 ||
-        stats.puzzlesSolved > 0 || stats.gauntletsCleared > 0 || stats.shopsVisited > 0) {
-      const notableHeader = this.add.text(GAME_WIDTH / 2, notableY, "NOTABLE EVENTS", {
-        fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
-      uiElements.push(notableHeader);
-      notableY += 15;
-
-      const notableLines: string[] = [];
-      if (stats.bossesDefeated > 0) notableLines.push(`Bosses Defeated: ${stats.bossesDefeated}`);
-      if (stats.legendariesDefeated > 0) notableLines.push(`Legendaries Defeated: ${stats.legendariesDefeated}`);
-      if (stats.secretRoomsFound > 0) notableLines.push(`Secret Rooms: ${stats.secretRoomsFound}`);
-      if (stats.puzzlesSolved > 0) notableLines.push(`Puzzles Solved: ${stats.puzzlesSolved}`);
-      if (stats.gauntletsCleared > 0) notableLines.push(`Gauntlets Cleared: ${stats.gauntletsCleared}`);
-      if (stats.shopsVisited > 0) notableLines.push(`Shops Visited: ${stats.shopsVisited}`);
-      if (stats.weatherChanges > 0) notableLines.push(`Weather Changes: ${stats.weatherChanges}`);
-      if (stats.mutationsEncountered > 0) notableLines.push(`Mutations: ${stats.mutationsEncountered}`);
-
-      const notableEl = this.add.text(GAME_WIDTH / 2, notableY, notableLines.join("\n"), {
-        fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
-        lineSpacing: 2,
-      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(301);
-      uiElements.push(notableEl);
-      notableY += notableLines.length * 12 + 10;
-    }
-
-    // Timeline section (scrollable)
-    if (timeline.length > 0) {
-      const timelineHeader = this.add.text(GAME_WIDTH / 2, notableY, "TIMELINE", {
-        fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(301);
-      uiElements.push(timelineHeader);
-      notableY += 16;
-
-      // Build timeline text lines
-      const timelineLines: string[] = [];
-      for (const entry of timeline) {
-        timelineLines.push(`--- B${entry.floor}F ---`);
-        for (const ev of entry.events) {
-          timelineLines.push(`  ${ev}`);
-        }
-      }
-
-      // Clamp viewable area: show timeline in a scrollable mask area
-      const timelineAreaHeight = GAME_HEIGHT - notableY - 50;
-      const maxVisibleLines = Math.floor(timelineAreaHeight / 11);
-      let scrollOffset = 0;
-      const totalLines = timelineLines.length;
-
-      const renderTimeline = () => {
-        // Remove previous timeline text elements
-        const toRemove = uiElements.filter(el => (el as any).__isTimelineLine);
-        for (const el of toRemove) {
-          el.destroy();
-          uiElements.splice(uiElements.indexOf(el), 1);
-        }
-
-        const visibleLines = timelineLines.slice(scrollOffset, scrollOffset + maxVisibleLines);
-        for (let i = 0; i < visibleLines.length; i++) {
-          const line = visibleLines[i];
-          const isFloorHeader = line.startsWith("---");
-          const lineEl = this.add.text(20, notableY + i * 11, line, {
-            fontSize: "8px",
-            color: isFloorHeader ? "#fbbf24" : "#94a3b8",
-            fontFamily: "monospace",
-            fontStyle: isFloorHeader ? "bold" : "normal",
-          }).setScrollFactor(0).setDepth(301);
-          (lineEl as any).__isTimelineLine = true;
-          uiElements.push(lineEl);
-        }
-
-        // Scroll indicator
-        if (totalLines > maxVisibleLines) {
-          const pct = Math.round((scrollOffset / Math.max(1, totalLines - maxVisibleLines)) * 100);
-          const scrollIndicator = this.add.text(GAME_WIDTH - 15, notableY, `${pct}%`, {
-            fontSize: "8px", color: "#6b7280", fontFamily: "monospace",
-          }).setOrigin(1, 0).setScrollFactor(0).setDepth(301);
-          (scrollIndicator as any).__isTimelineLine = true;
-          uiElements.push(scrollIndicator);
-        }
-      };
-
-      renderTimeline();
-
-      // Scroll buttons (if needed)
-      if (totalLines > maxVisibleLines) {
-        const scrollUpBtn = this.add.text(GAME_WIDTH - 20, notableY + 12, "[^]", {
-          fontSize: "10px", color: "#60a5fa", fontFamily: "monospace",
-        }).setOrigin(1, 0).setScrollFactor(0).setDepth(302).setInteractive();
-        scrollUpBtn.on("pointerdown", () => {
-          scrollOffset = Math.max(0, scrollOffset - 5);
-          renderTimeline();
-        });
-        uiElements.push(scrollUpBtn);
-
-        const scrollDownBtn = this.add.text(GAME_WIDTH - 20, GAME_HEIGHT - 55, "[v]", {
-          fontSize: "10px", color: "#60a5fa", fontFamily: "monospace",
-        }).setOrigin(1, 0).setScrollFactor(0).setDepth(302).setInteractive();
-        scrollDownBtn.on("pointerdown", () => {
-          scrollOffset = Math.min(totalLines - maxVisibleLines, scrollOffset + 5);
-          renderTimeline();
-        });
-        uiElements.push(scrollDownBtn);
-      }
-    }
-
-    // Close button
-    const closeBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 30, "[Close]", {
-      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(302).setInteractive();
-    closeBtn.on("pointerdown", () => {
-      for (const el of uiElements) el.destroy();
-    });
-    uiElements.push(closeBtn);
-  }
-
-  /**
-   * Quick Retry / Run Again — saves run results and immediately re-enters the same dungeon.
-   * Mirrors the gold/stats saving logic from HubScene.init + DungeonPreviewScene.launchDungeon.
-   */
-  private quickRetry(gold: number, cleared: boolean) {
-    const meta = loadMeta();
-
-    // 1. Save run results (same as HubScene.init)
-    meta.gold += gold;
-    meta.totalGold += gold;
-    meta.totalRuns++;
-    if (cleared) meta.totalClears++;
-    const bestFloor = cleared ? this.dungeonDef.floors : this.currentFloor;
-    if (bestFloor > meta.bestFloor) meta.bestFloor = bestFloor;
-    meta.totalEnemiesDefeated += this.enemiesDefeated;
-    meta.totalTurns += this.turnManager.turn;
-    if (this.dungeonDef.id === "endlessDungeon" && bestFloor > meta.endlessBestFloor) {
-      meta.endlessBestFloor = bestFloor;
-    }
-    if (cleared && this.challengeMode) {
-      meta.challengeClears++;
-    }
-    if (this.starterId && !meta.startersUsed.includes(this.starterId)) {
-      meta.startersUsed.push(this.starterId);
-    }
-    // Pokedex: merge seen Pokemon from this run
-    const seenSet = new Set(meta.pokemonSeen);
-    for (const id of this.seenSpecies) {
-      seenSet.add(id);
-    }
-    meta.pokemonSeen = Array.from(seenSet);
-    if (this.starterId && !meta.pokemonUsed.includes(this.starterId)) {
-      meta.pokemonUsed.push(this.starterId);
-    }
-    // Auto-store inventory items from dungeon run
-    const invData = serializeInventory(this.inventory);
-    for (const stack of invData) {
-      addToStorage(meta.storage, stack.itemId, stack.count);
-    }
-
-    // Track cleared dungeons
-    if (cleared) {
-      if (!meta.clearedDungeons) meta.clearedDungeons = [];
-      if (!meta.clearedDungeons.includes(this.dungeonDef.id)) {
-        meta.clearedDungeons.push(this.dungeonDef.id);
-      }
-    }
-
-    // Journal: record quick-retry run results
-    {
-      const qrJournal = loadJournal();
-      if (cleared) {
-        recordDungeonClear(qrJournal, this.dungeonDef.id, this.dungeonDef.floors, this.runElapsedSeconds, this.enemiesDefeated, gold);
-      } else {
-        recordDungeonDefeat(qrJournal, this.dungeonDef.id, this.currentFloor, this.enemiesDefeated, gold);
-      }
-      for (const sid of this.seenSpecies) {
-        recordSpeciesEncountered(qrJournal, this.dungeonDef.id, sid);
-      }
-    }
-
-    // 2. Save last dungeon info
-    meta.lastDungeonId = this.dungeonDef.id;
-    meta.lastChallenge = this.challengeMode ?? undefined;
-
-    // 3. Increment per-dungeon run count for the NEW run
-    if (!meta.dungeonRunCounts) meta.dungeonRunCounts = {};
-    meta.dungeonRunCounts[this.dungeonDef.id] = (meta.dungeonRunCounts[this.dungeonDef.id] ?? 0) + 1;
-
-    // 4. Increment totalRuns for the new run (DungeonPreviewScene does this)
-    meta.totalRuns++;
-
-    // 4b. Update quest progress for this run
-    const today = getTodayDateString();
-    if (meta.questLastDate !== today) {
-      meta.activeQuests = generateDailyQuests(new Date(), meta);
-      meta.questLastDate = today;
-    }
-    if (!meta.challengeQuests || meta.challengeQuests.length === 0) {
-      meta.challengeQuests = getChallengeQuests(meta);
-    }
-    const bestChainTier = getChainTier(this.scoreChain.maxChainReached);
-    const qrBossDefeated = this.isBossRush ? this.bossesDefeated > 0 : !!this.dungeonDef.boss;
-    const qrLegendaryDefeated = this.legendaryEncountered && this.legendaryEntity === null && this.legendaryEncounter === null;
-    const runQuestData: RunQuestData = {
-      enemiesDefeated: this.enemiesDefeated,
-      cleared,
-      dungeonId: this.dungeonDef.id,
-      itemsCollected: this.questItemsCollected,
-      floorReached: bestFloor,
-      bestChainTier,
-      bossDefeated: qrBossDefeated,
-      legendaryDefeated: qrLegendaryDefeated,
-      noItemsUsed: !this.questItemsUsed,
-      turnsUsed: this.turnManager.turn,
-    };
-    if (meta.activeQuests && meta.activeQuests.length > 0) {
-      updateQuestProgress(meta.activeQuests, runQuestData);
-    }
-    if (meta.challengeQuests && meta.challengeQuests.length > 0) {
-      updateQuestProgress(meta.challengeQuests, runQuestData);
-    }
-
-    saveMeta(meta);
-    clearDungeonSave();
-
-    // 5. Start new dungeon (same as DungeonPreviewScene.launchDungeon)
-    stopBgm();
-    this.cameras.main.fadeOut(400, 0, 0, 0);
-    this.time.delayedCall(450, () => {
-      const launchData: Record<string, unknown> = {
-        floor: 1,
-        fromHub: true,
-        dungeonId: this.dungeonDef.id,
-        starter: this.starterId,
-      };
-      if (this.challengeMode) {
-        launchData.challengeMode = this.challengeMode;
-      }
-      this.scene.start("DungeonScene", launchData);
-    });
-  }
+  private quickRetry(gold: number, cleared: boolean) { this.deathRescueSys.quickRetry(gold, cleared); }
 
   // ── Turn System ──
 
@@ -5791,7 +3983,7 @@ export class DungeonScene extends Phaser.Scene {
 
     if (targetEnemy) {
       await this.turnManager.executeTurn(
-        () => this.performBasicAttack(this.player, targetEnemy),
+        () => this.combatSys.performBasicAttack(this.player, targetEnemy),
         [...this.getAllyActions(), ...this.getEnemyActions()]
       );
     } else {
@@ -5801,17 +3993,17 @@ export class DungeonScene extends Phaser.Scene {
       );
       if (allyAtTarget) {
         await this.turnManager.executeTurn(
-          () => this.swapWithAlly(this.player, allyAtTarget, dir),
+          () => this.combatSys.swapWithAlly(this.player, allyAtTarget, dir),
           [...this.getAllyActions(), ...this.getEnemyActions()]
         );
       } else {
-        const canMove = this.canEntityMove(this.player, dir);
+        const canMove = this.combatSys.canEntityMove(this.player, dir);
         if (!canMove) {
           // Check for secret wall before giving up
           if (this.secretRoomSys.tryOpenSecretWall(targetX, targetY)) {
             // Secret wall was opened — move player into the revealed tile
             await this.turnManager.executeTurn(
-              () => this.moveEntity(this.player, dir),
+              () => this.combatSys.moveEntity(this.player, dir),
               [...this.getAllyActions(), ...this.getEnemyActions()]
             );
           } else {
@@ -5820,14 +4012,14 @@ export class DungeonScene extends Phaser.Scene {
           }
         } else {
           await this.turnManager.executeTurn(
-            () => this.moveEntity(this.player, dir),
+            () => this.combatSys.moveEntity(this.player, dir),
             [...this.getAllyActions(), ...this.getEnemyActions()]
           );
         }
       }
 
       // PP recovery: 1 PP for a random depleted skill on movement
-      this.recoverPP(this.player);
+      this.combatSys.recoverPP(this.player);
 
       // Check for items on ground
       this.itemSys.checkFloorItem();
@@ -5836,8 +4028,8 @@ export class DungeonScene extends Phaser.Scene {
       this.trapHazardSys.checkPlayerHazard();
       this.trapHazardSys.revealNearbyTraps();
       this.stairsSys.checkStairs();
-      this.checkShop();
-      this.checkMonsterHouse();
+      this.shopSys.checkShop();
+      this.monsterHouseSys.checkMonsterHouse();
       this.eventRoomSys.checkEventRoom();
       this.puzzleSys.checkPuzzleRoom();
       this.secretRoomSys.checkSecretRoom();
@@ -5870,7 +4062,7 @@ export class DungeonScene extends Phaser.Scene {
     skill.currentPp = Math.max(0, skill.currentPp - 1 - extraPpCost);
 
     await this.turnManager.executeTurn(
-      () => this.performSkill(this.player, skill, dir),
+      () => this.combatSys.performSkill(this.player, skill, dir),
       this.getEnemyActions()
     );
 
@@ -5979,9 +4171,9 @@ export class DungeonScene extends Phaser.Scene {
             enemy.stats.hp = Math.max(0, enemy.stats.hp - blastDmg);
             hitCount++;
             if (enemy.sprite) {
-              this.showDamagePopup(enemy.sprite.x, enemy.sprite.y, blastDmg, 1.0);
-              this.showEnemyHpBar(enemy);
-              this.flashEntity(enemy, 1.5);
+              this.combatSys.showDamagePopup(enemy.sprite.x, enemy.sprite.y, blastDmg, 1.0);
+              this.combatSys.showEnemyHpBar(enemy);
+              this.combatSys.flashEntity(enemy, 1.5);
             }
             this.checkDeath(enemy);
           }
@@ -5998,7 +4190,7 @@ export class DungeonScene extends Phaser.Scene {
         this.showLog(`Heal burst restored ${healAmt} HP!`);
         if (this.player.sprite) {
           this.player.sprite.setTint(0x44ff44);
-          this.showHealPopup(this.player.sprite.x, this.player.sprite.y, healAmt);
+          this.combatSys.showHealPopup(this.player.sprite.x, this.player.sprite.y, healAmt);
           this.time.delayedCall(300, () => {
             if (this.player.sprite) this.player.sprite.clearTint();
           });
@@ -6027,9 +4219,9 @@ export class DungeonScene extends Phaser.Scene {
             enemy.stats.hp = Math.max(0, enemy.stats.hp - stormDmg);
             stormHits++;
             if (enemy.sprite) {
-              this.showDamagePopup(enemy.sprite.x, enemy.sprite.y, stormDmg, 2.0);
-              this.showEnemyHpBar(enemy);
-              this.flashEntity(enemy, 2.0);
+              this.combatSys.showDamagePopup(enemy.sprite.x, enemy.sprite.y, stormDmg, 2.0);
+              this.combatSys.showEnemyHpBar(enemy);
+              this.combatSys.flashEntity(enemy, 2.0);
             }
             this.checkDeath(enemy);
           }
@@ -6045,7 +4237,7 @@ export class DungeonScene extends Phaser.Scene {
         const wrathHeal = Math.floor(this.player.stats.maxHp * 0.3);
         this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + wrathHeal);
         if (this.player.sprite) {
-          this.showHealPopup(this.player.sprite.x, this.player.sprite.y, wrathHeal);
+          this.combatSys.showHealPopup(this.player.sprite.x, this.player.sprite.y, wrathHeal);
           this.player.sprite.setTint(0x44ff44);
           this.time.delayedCall(300, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
         }
@@ -6085,7 +4277,7 @@ export class DungeonScene extends Phaser.Scene {
         const fairyHeal = Math.floor(this.player.stats.maxHp * 0.2);
         this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + fairyHeal);
         if (this.player.sprite) {
-          this.showHealPopup(this.player.sprite.x, this.player.sprite.y, fairyHeal);
+          this.combatSys.showHealPopup(this.player.sprite.x, this.player.sprite.y, fairyHeal);
           this.player.sprite.setTint(0xffaaff);
           this.time.delayedCall(300, () => { if (this.player.sprite) this.player.sprite.clearTint(); });
         }
@@ -6158,934 +4350,39 @@ export class DungeonScene extends Phaser.Scene {
     this.updateHUD();
   }
 
-  private canEntityMove(entity: Entity, dir: Direction): boolean {
-    const nx = entity.tileX + DIR_DX[dir];
-    const ny = entity.tileY + DIR_DY[dir];
-    if (!canMoveTo(nx, ny, this.dungeon.terrain, this.dungeon.width, this.dungeon.height, this.allEntities, entity)) {
-      return false;
-    }
-    return canMoveDiagonal(entity.tileX, entity.tileY, dir, this.dungeon.terrain, this.dungeon.width, this.dungeon.height);
+  // ── Combat forwarding (for other systems' host interfaces) ──
+
+  /** @see CombatSystem.canEntityMove */
+  canEntityMove(entity: Entity, dir: Direction): boolean {
+    return this.combatSys.canEntityMove(entity, dir);
   }
-
-  private moveEntity(entity: Entity, dir: Direction): Promise<void> {
-    return new Promise((resolve) => {
-      entity.facing = dir;
-      entity.tileX += DIR_DX[dir];
-      entity.tileY += DIR_DY[dir];
-      entity.sprite!.play(`${entity.spriteKey}-walk-${dir}`);
-
-      this.tweens.add({
-        targets: entity.sprite,
-        x: this.tileToPixelX(entity.tileX),
-        y: this.tileToPixelY(entity.tileY),
-        duration: MOVE_DURATION,
-        ease: "Linear",
-        onComplete: () => {
-          entity.sprite!.play(`${entity.spriteKey}-idle-${dir}`);
-          resolve();
-        },
-      });
-    });
+  /** @see CombatSystem.moveEntity */
+  moveEntity(entity: Entity, dir: Direction): Promise<void> {
+    return this.combatSys.moveEntity(entity, dir);
   }
-
-  /** Swap positions with an ally (player walks into ally's tile) */
-  private swapWithAlly(player: Entity, ally: Entity, dir: Direction): Promise<void> {
-    return new Promise((resolve) => {
-      const oldPx = player.tileX, oldPy = player.tileY;
-      const oldAx = ally.tileX, oldAy = ally.tileY;
-
-      player.facing = dir;
-      player.tileX = oldAx;
-      player.tileY = oldAy;
-      ally.tileX = oldPx;
-      ally.tileY = oldPy;
-
-      player.sprite!.play(`${player.spriteKey}-walk-${dir}`);
-
-      let done = 0;
-      const checkDone = () => { if (++done >= 2) resolve(); };
-
-      this.tweens.add({
-        targets: player.sprite,
-        x: this.tileToPixelX(player.tileX),
-        y: this.tileToPixelY(player.tileY),
-        duration: MOVE_DURATION, ease: "Linear",
-        onComplete: () => {
-          player.sprite!.play(`${player.spriteKey}-idle-${dir}`);
-          checkDone();
-        },
-      });
-
-      this.tweens.add({
-        targets: ally.sprite,
-        x: this.tileToPixelX(ally.tileX),
-        y: this.tileToPixelY(ally.tileY),
-        duration: MOVE_DURATION, ease: "Linear",
-        onComplete: () => {
-          if (ally.sprite) ally.sprite.play(`${ally.spriteKey}-idle-${ally.facing}`);
-          checkDone();
-        },
-      });
-    });
+  /** @see CombatSystem.recoverPP */
+  recoverPP(entity: Entity): void {
+    this.combatSys.recoverPP(entity);
   }
-
-  /** PP recovery: on move, recover 1 PP on a random depleted skill */
-  private recoverPP(entity: Entity) {
-    const depleted = entity.skills.filter(s => s.currentPp < s.pp);
-    if (depleted.length > 0) {
-      const pick = depleted[Math.floor(Math.random() * depleted.length)];
-      pick.currentPp = Math.min(pick.pp, pick.currentPp + 1);
-    }
+  /** @see CombatSystem.showDamagePopup */
+  showDamagePopup(x: number, y: number, dmg: number, alpha: number, label?: string): void {
+    this.combatSys.showDamagePopup(x, y, dmg, alpha, label);
   }
-
-  // ── Combat ──
-
-  /** Basic (non-skill) attack — front 1 tile, uses entity's attackType */
-  private performBasicAttack(attacker: Entity, defender: Entity): Promise<void> {
-    return new Promise((resolve) => {
-      const dir = attacker === this.player
-        ? attacker.facing
-        : directionToPlayer(attacker, this.player);
-      attacker.facing = dir;
-      attacker.sprite!.play(`${attacker.spriteKey}-idle-${dir}`);
-
-      // Shadow Dance combo: 100% dodge for player
-      if (defender === this.player && this.comboShadowDanceTurns > 0) {
-        sfxDodge();
-        this.showLog(`${defender.name} dodged with Shadow Dance!`);
-        if (defender.sprite) {
-          this.showDamagePopup(defender.sprite.x, defender.sprite.y, 0, 1, "Shadow Dance!");
-        }
-        this.updateHUD();
-        this.time.delayedCall(250, resolve);
-        return;
-      }
-
-      // Held item + ability dodge chance (defender is player)
-      let dodgeChance = this.heldItemEffect.dodgeChance ?? 0;
-      // Ability: Run Away / Levitate dodge bonus at higher levels
-      if (defender.ability === AbilityId.RunAway) dodgeChance += getRunAwayDodgeBonus(defender.abilityLevel ?? 1) * 100;
-      if (defender.ability === AbilityId.Levitate) dodgeChance += getLevitateDodgeBonus(defender.abilityLevel ?? 1) * 100;
-      // Blessing: Swift Step dodge chance bonus
-      if (defender === this.player) dodgeChance += getBlessingEffect(this.activeBlessings, "dodgeChance") * 100;
-      if (defender === this.player && dodgeChance > 0 && Math.random() * 100 < dodgeChance) {
-        sfxDodge();
-        this.showLog(`${defender.name} dodged ${attacker.name}'s attack!`);
-        if (defender.sprite) {
-          this.showDamagePopup(defender.sprite.x, defender.sprite.y, 0, 1, "Dodged!");
-        }
-        this.updateHUD();
-        this.time.delayedCall(250, resolve);
-        return;
-      }
-
-      let effectiveness = getEffectiveness(attacker.attackType, defender.types);
-      // InverseFloor: reverse type effectiveness
-      if (this.floorEvent?.type === FloorEventType.InverseFloor) {
-        effectiveness = invertEffectiveness(effectiveness);
-      }
-      const effText = effectivenessText(effectiveness);
-
-      let atk = getEffectiveAtk(attacker);
-      let def = getEffectiveDef(defender);
-      // Relic: ATK/DEF multipliers (player only)
-      if (attacker === this.player) atk = Math.floor(atk * (1 + (this.relicEffects.atkMult ?? 0)));
-      if (defender === this.player) def = Math.floor(def * (1 + (this.relicEffects.defMult ?? 0)));
-      // Blessing: ATK/DEF multipliers (player only)
-      if (attacker === this.player) atk = Math.floor(atk * (1 + getBlessingEffect(this.activeBlessings, "atkMult")));
-      if (defender === this.player) def = Math.floor(def * (1 + getBlessingEffect(this.activeBlessings, "defMult")));
-      const baseDmg = Math.max(1, atk - Math.floor(def / 2));
-      // Ability: Torrent — scaled by ability level
-      let abilityMult = 1.0;
-      if (attacker.ability === AbilityId.Torrent &&
-          attacker.attackType === PokemonType.Water) {
-        const torrent = getTorrentValues(attacker.abilityLevel ?? 1);
-        if (attacker.stats.hp < attacker.stats.maxHp * torrent.threshold) {
-          abilityMult = torrent.multiplier;
-        }
-      }
-      const wMult = weatherDamageMultiplier(this.currentWeather, attacker.attackType);
-      // Weather intensity scales the weather multiplier deviation from 1.0
-      const intensityMult = INTENSITY_MULTIPLIER[this.currentWeatherIntensity];
-      const scaledWMult = wMult === 1.0 ? 1.0 : 1.0 + (wMult - 1.0) * intensityMult;
-      // Weather synergy bonus for matching pokemon type
-      const synergyBonus = (attacker === this.player)
-        ? 1.0 + getWeatherSynergyBonus(this.currentWeather, attacker.attackType)
-        : 1.0;
-      // Held item + Relic: crit chance (attacker is player)
-      const critChance = (this.heldItemEffect.critChance ?? 0) + (attacker === this.player ? (this.relicEffects.critBonus ?? 0) : 0);
-      const isCrit = attacker === this.player && critChance > 0 && Math.random() * 100 < critChance;
-      const critMult = isCrit ? 1.5 : 1.0;
-      // Relic: Wide Glass — type advantage bonus (player attacking with super effective)
-      const relicTypeAdvMult = (attacker === this.player && effectiveness >= 2.0 && (this.relicEffects.typeAdvantageBonus ?? 0) > 0) ? (1 + this.relicEffects.typeAdvantageBonus) : 1.0;
-      // Apply difficulty playerDamageMult when defender is the player
-      const diffDmgMult = defender === this.player ? this.difficultyMods.playerDamageMult : 1.0;
-      // Type Gem boost: +50% if player has active gem matching attack type
-      const basicGemBoost = (attacker === this.player && this.activeTypeGems.has(attacker.attackType))
-        ? 1 + (this.activeTypeGems.get(attacker.attackType)! / 100) : 1.0;
-      const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * abilityMult * scaledWMult * synergyBonus * critMult * relicTypeAdvMult * diffDmgMult * basicGemBoost));
-      defender.stats.hp = Math.max(0, defender.stats.hp - dmg);
-
-      // Fire-type attacks thaw frozen targets
-      if (attacker.attackType === PokemonType.Fire && thawEntity(defender)) {
-        this.showLog(`${defender.name} was thawed by the fire attack!`);
-        this.updateStatusTint(defender);
-      }
-
-      // Sound effects based on effectiveness
-      if (isCrit) sfxCritical();
-      else if (effectiveness >= 2) sfxSuperEffective();
-      else if (effectiveness <= 0.5 && effectiveness > 0) sfxNotEffective();
-      else sfxHit();
-
-      this.flashEntity(defender, effectiveness);
-      if (isCrit) this.showCritFlash(defender);
-      if (defender.sprite) {
-        this.showDamagePopup(defender.sprite.x, defender.sprite.y, dmg, effectiveness, undefined, isCrit, attacker.attackType);
-        if (defender !== this.player) this.showEnemyHpBar(defender);
-      }
-
-      let logMsg = `${attacker.name} attacks ${defender.name}! ${dmg} dmg!`;
-      if (isCrit) logMsg += " Critical hit!";
-      if (effText) logMsg += ` ${effText}`;
-      if (abilityMult > 1) logMsg += " (Torrent!)";
-      if (scaledWMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
-      if (synergyBonus > 1.0) logMsg += " (Weather Synergy!)";
-      if (basicGemBoost > 1.0) logMsg += ` (${attacker.attackType} Gem!)`;
-      this.showLog(logMsg);
-
-      // Run log: damage dealt/taken (basic attack)
-      if (attacker === this.player) {
-        this.runLog.add(RunLogEvent.DamageDealt, `${dmg}`, this.currentFloor, this.turnManager.turn);
-      } else if (defender === this.player) {
-        this.runLog.add(RunLogEvent.DamageTaken, `${dmg}`, this.currentFloor, this.turnManager.turn);
-      }
-
-      // Relic: Shell Bell — heal % of damage dealt (player attacking)
-      if (attacker === this.player && dmg > 0 && (this.relicEffects.lifeStealPercent ?? 0) > 0) {
-        const shellHeal = Math.max(1, Math.floor(dmg * this.relicEffects.lifeStealPercent / 100));
-        if (this.player.stats.hp < this.player.stats.maxHp) {
-          this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + shellHeal);
-          if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, shellHeal);
-        }
-      }
-
-      // Score chain: type-effective basic attack by player
-      if (attacker === this.player && effectiveness >= 2.0) {
-        addChainAction(this.scoreChain, "effective");
-        this.chainActionThisTurn = true;
-        this.updateChainHUD();
-      }
-      // Score chain: player took damage from basic attack → reset chain
-      if (defender === this.player && dmg > 0) {
-        if (this.scoreChain.currentMultiplier > 1.0) {
-          resetChain(this.scoreChain);
-          this.showLog("Chain broken!");
-          this.updateChainHUD();
-        }
-      }
-
-      // Ability: Static — paralyze chance scaled by ability level
-      if (defender.ability === AbilityId.Static && Math.random() < getStaticChance(defender.abilityLevel ?? 1)) {
-        if (!attacker.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
-          attacker.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 2 });
-          this.showLog(`${defender.name}'s Static paralyzed ${attacker.name}!`);
-        }
-      }
-
-      // Ability: Flame Body — burn chance scaled by ability level
-      if (defender.ability === AbilityId.FlameBody && Math.random() < getFlameBodyChance(defender.abilityLevel ?? 1)) {
-        if (!attacker.statusEffects.some(s => s.type === SkillEffect.Burn)) {
-          attacker.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 3 });
-          this.showLog(`${defender.name}'s Flame Body burned ${attacker.name}!`);
-        }
-      }
-
-      // Thorns enchantment: reflect 10% damage back to attacker when player is hit
-      if (this.enchantment?.id === "thorns" && defender === this.player && attacker.alive && dmg > 0) {
-        const thornsDmg = Math.max(1, Math.floor(dmg * 0.1));
-        attacker.stats.hp = Math.max(0, attacker.stats.hp - thornsDmg);
-        if (attacker.sprite) {
-          this.showDamagePopup(attacker.sprite.x, attacker.sprite.y, thornsDmg, 1.0, `${thornsDmg} Thorns`);
-        }
-        this.showLog(`Thorns reflected ${thornsDmg} damage!`);
-        this.checkDeath(attacker);
-      }
-
-      // WindyFloor: knockback defender 1 tile away from attacker
-      if (this.floorEvent?.type === FloorEventType.WindyFloor && defender.alive && defender.sprite) {
-        this.applyWindyKnockback(attacker, defender);
-      }
-
-      this.updateHUD();
-      this.checkDeath(defender);
-      this.time.delayedCall(250, resolve);
-    });
+  /** @see CombatSystem.showHealPopup */
+  showHealPopup(x: number, y: number, amount: number): void {
+    this.combatSys.showHealPopup(x, y, amount);
   }
-
-  /** Skill-based attack — variable range, typed damage, effects */
-  private performSkill(user: Entity, skill: Skill, dir: Direction): Promise<void> {
-    return new Promise((resolve) => {
-      user.facing = dir;
-      user.sprite!.play(`${user.spriteKey}-idle-${dir}`);
-
-      sfxSkill();
-
-      // Run log: skill used (only player skills)
-      if (user === this.player) {
-        this.runLog.add(RunLogEvent.SkillUsed, skill.name, this.currentFloor, this.turnManager.turn);
-      }
-
-      // Self-targeting (buff/heal)
-      if (skill.range === SkillRange.Self) {
-        this.applySkillEffect(user, user, skill);
-        this.showLog(`${user.name} used ${skill.name}!`);
-        this.time.delayedCall(250, resolve);
-        return;
-      }
-
-      // Get target tiles
-      const tiles = getSkillTargetTiles(
-        skill.range, user.tileX, user.tileY, dir,
-        this.dungeon.terrain, this.dungeon.width, this.dungeon.height
-      );
-
-      // Show visual effect on target tiles
-      this.showSkillEffect(tiles, skill);
-
-      // Find entities on those tiles (friendly fire prevention)
-      const isUserFriendly = user === this.player || user.isAlly;
-      const targets = this.allEntities.filter(e => {
-        if (!e.alive || e === user) return false;
-        if (!tiles.some(t => t.x === e.tileX && t.y === e.tileY)) return false;
-        // Friendly = player or ally; don't hit same team
-        const isTargetFriendly = e === this.player || e.isAlly;
-        return isUserFriendly !== isTargetFriendly;
-      });
-
-      if (targets.length === 0) {
-        this.showLog(`${user.name} used ${skill.name}! But it missed!`);
-        this.time.delayedCall(200, resolve);
-        return;
-      }
-
-      // Apply damage to each target
-      let totalHits = 0;
-      for (const target of targets) {
-        // Accuracy check (NoGuard: always hit)
-        const noGuard = user.ability === AbilityId.NoGuard || target.ability === AbilityId.NoGuard;
-        if (!noGuard && Math.random() * 100 > skill.accuracy) {
-          this.showLog(`${user.name}'s ${skill.name} missed ${target.name}!`);
-          continue;
-        }
-
-        if (skill.power > 0) {
-          // Shadow Dance combo: 100% dodge for player against enemy skills
-          if (target === this.player && this.comboShadowDanceTurns > 0) {
-            sfxDodge();
-            this.showLog(`${target.name} dodged ${user.name}'s ${skill.name} with Shadow Dance!`);
-            if (target.sprite) {
-              this.showDamagePopup(target.sprite.x, target.sprite.y, 0, 1, "Shadow Dance!");
-            }
-            continue;
-          }
-          // Held item + ability dodge chance (target is player, attacker is enemy)
-          let skillDodge = this.heldItemEffect.dodgeChance ?? 0;
-          if (target.ability === AbilityId.RunAway) skillDodge += getRunAwayDodgeBonus(target.abilityLevel ?? 1) * 100;
-          if (target.ability === AbilityId.Levitate) skillDodge += getLevitateDodgeBonus(target.abilityLevel ?? 1) * 100;
-          if (target === this.player && !user.isAlly && user !== this.player && skillDodge > 0 && Math.random() * 100 < skillDodge) {
-            sfxDodge();
-            this.showLog(`${target.name} dodged ${user.name}'s ${skill.name}!`);
-            if (target.sprite) {
-              this.showDamagePopup(target.sprite.x, target.sprite.y, 0, 1, "Dodged!");
-            }
-            continue;
-          }
-
-          let effectiveness = getEffectiveness(skill.type, target.types);
-          // InverseFloor: reverse type effectiveness
-          if (this.floorEvent?.type === FloorEventType.InverseFloor) {
-            effectiveness = invertEffectiveness(effectiveness);
-          }
-          const effText = effectivenessText(effectiveness);
-          let skillAtk = getEffectiveAtk(user);
-          let skillDef = getEffectiveDef(target);
-          // Relic: ATK/DEF multipliers (player only)
-          if (user === this.player) skillAtk = Math.floor(skillAtk * (1 + (this.relicEffects.atkMult ?? 0)));
-          if (target === this.player) skillDef = Math.floor(skillDef * (1 + (this.relicEffects.defMult ?? 0)));
-          const baseDmg = Math.max(1, Math.floor(skill.power * skillAtk / 10) - Math.floor(skillDef / 2));
-          const wMult = weatherDamageMultiplier(this.currentWeather, skill.type);
-          // Weather intensity scales the weather multiplier deviation from 1.0
-          const skillIntensityMult = INTENSITY_MULTIPLIER[this.currentWeatherIntensity];
-          const skillScaledWMult = wMult === 1.0 ? 1.0 : 1.0 + (wMult - 1.0) * skillIntensityMult;
-          // Weather synergy bonus for matching pokemon type (player only)
-          const skillSynergyBonus = (user === this.player)
-            ? 1.0 + getWeatherSynergyBonus(this.currentWeather, user.attackType)
-            : 1.0;
-          // Held item + Relic: crit chance (user is player)
-          const skillCritChance = (this.heldItemEffect.critChance ?? 0) + (user === this.player ? (this.relicEffects.critBonus ?? 0) : 0);
-          const skillIsCrit = user === this.player && (this.comboCritGuarantee || (skillCritChance > 0 && Math.random() * 100 < skillCritChance));
-          const skillCritMult = skillIsCrit ? 1.5 : 1.0;
-          // Skill Combo: damage multiplier (Dragon's Rage 3x > DoubleDamage 2x)
-          const comboMult = (user === this.player && this.comboDragonsRage) ? 3.0
-            : (user === this.player && this.comboDoubleDamage) ? 2.0 : 1.0;
-          // Relic: Wide Glass — type advantage bonus
-          const skillRelicTypeAdvMult = (user === this.player && effectiveness >= 2.0 && (this.relicEffects.typeAdvantageBonus ?? 0) > 0) ? (1 + this.relicEffects.typeAdvantageBonus) : 1.0;
-          // Apply difficulty playerDamageMult when target is the player
-          const skillDiffDmgMult = target === this.player ? this.difficultyMods.playerDamageMult : 1.0;
-          // Type Gem boost: +50% if player has active gem matching skill type
-          const typeGemBoost = (user === this.player && this.activeTypeGems.has(skill.type))
-            ? 1 + (this.activeTypeGems.get(skill.type)! / 100) : 1.0;
-          const dmg = Math.max(1, Math.floor(baseDmg * effectiveness * skillScaledWMult * skillSynergyBonus * skillCritMult * comboMult * skillRelicTypeAdvMult * skillDiffDmgMult * typeGemBoost));
-          target.stats.hp = Math.max(0, target.stats.hp - dmg);
-
-          // Fire-type skills thaw frozen targets
-          if (skill.type === PokemonType.Fire && thawEntity(target)) {
-            this.showLog(`${target.name} was thawed by the fire attack!`);
-            this.updateStatusTint(target);
-          }
-
-          this.flashEntity(target, effectiveness);
-          if (skillIsCrit) this.showCritFlash(target);
-          if (target.sprite) {
-            this.showDamagePopup(target.sprite.x, target.sprite.y, dmg, effectiveness, undefined, skillIsCrit, skill.type);
-            if (target !== this.player) this.showEnemyHpBar(target);
-          }
-
-          if (skillIsCrit) sfxCritical();
-
-          let logMsg = `${user.name}'s ${skill.name} hit ${target.name}! ${dmg} dmg!`;
-          if (skillIsCrit) logMsg += " Critical hit!";
-          if (effText) logMsg += ` ${effText}`;
-          if (skillScaledWMult !== 1.0) logMsg += ` (${WEATHERS[this.currentWeather].name}!)`;
-          if (skillSynergyBonus > 1.0) logMsg += " (Weather Synergy!)";
-          if (typeGemBoost > 1.0) logMsg += ` (${skill.type} Gem!)`;
-          this.showLog(logMsg);
-
-          // Run log: damage dealt/taken (skill attack)
-          if (user === this.player) {
-            this.runLog.add(RunLogEvent.DamageDealt, `${dmg}`, this.currentFloor, this.turnManager.turn);
-          } else if (target === this.player) {
-            this.runLog.add(RunLogEvent.DamageTaken, `${dmg}`, this.currentFloor, this.turnManager.turn);
-          }
-
-          // Relic: Shell Bell — heal % of damage dealt (player using skill)
-          if (user === this.player && dmg > 0 && (this.relicEffects.lifeStealPercent ?? 0) > 0) {
-            const skillShellHeal = Math.max(1, Math.floor(dmg * this.relicEffects.lifeStealPercent / 100));
-            if (this.player.stats.hp < this.player.stats.maxHp) {
-              this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + skillShellHeal);
-              if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, skillShellHeal);
-            }
-          }
-
-          // Score chain: type-effective hit by player
-          if (user === this.player && effectiveness >= 2.0) {
-            addChainAction(this.scoreChain, "effective");
-            this.chainActionThisTurn = true;
-            this.updateChainHUD();
-          }
-          // Score chain: player took damage → reset chain
-          if (target === this.player && dmg > 0) {
-            if (this.scoreChain.currentMultiplier > 1.0) {
-              resetChain(this.scoreChain);
-              this.showLog("Chain broken!");
-              this.updateChainHUD();
-            }
-          }
-
-          // Thorns enchantment: reflect 10% damage back when player is hit by skill
-          if (this.enchantment?.id === "thorns" && target === this.player && user.alive && dmg > 0) {
-            const skillThornsDmg = Math.max(1, Math.floor(dmg * 0.1));
-            user.stats.hp = Math.max(0, user.stats.hp - skillThornsDmg);
-            if (user.sprite) {
-              this.showDamagePopup(user.sprite.x, user.sprite.y, skillThornsDmg, 1.0, `${skillThornsDmg} Thorns`);
-            }
-            this.showLog(`Thorns reflected ${skillThornsDmg} damage!`);
-            this.checkDeath(user);
-          }
-
-          totalHits++;
-        }
-
-        // Apply effect
-        this.applySkillEffect(user, target, skill);
-        this.updateHUD();
-        this.checkDeath(target);
-      }
-
-      // Consume combo flags after applying them
-      if (user === this.player) {
-        if (this.comboDoubleDamage) this.comboDoubleDamage = false;
-        if (this.comboCritGuarantee) this.comboCritGuarantee = false;
-        if (this.comboDragonsRage) this.comboDragonsRage = false;
-      }
-
-      if (totalHits === 0 && skill.power > 0) {
-        this.showLog(`${user.name} used ${skill.name}!`);
-      }
-
-      // ── Team Combo Attack ──
-      // Only triggers on player attacks with power, when allies exist
-      if (user === this.player && skill.power > 0 && totalHits > 0 && this.allies.length > 0) {
-        for (const target of targets) {
-          if (!target.alive) continue;
-          // Find allies adjacent to this target (Chebyshev distance = 1)
-          const adjacentAllies = this.allies.filter(ally => {
-            if (!ally.alive) return false;
-            const dx = Math.abs(ally.tileX - target.tileX);
-            const dy = Math.abs(ally.tileY - target.tileY);
-            return dx <= 1 && dy <= 1 && (dx + dy > 0);
-          });
-
-          if (adjacentAllies.length > 0 && Math.random() < 0.25) {
-            const comboAlly = adjacentAllies[Math.floor(Math.random() * adjacentAllies.length)];
-            const comboAtk = getEffectiveAtk(comboAlly);
-            const comboDmg = Math.max(1, Math.floor(comboAtk * 0.5));
-            target.stats.hp = Math.max(0, target.stats.hp - comboDmg);
-
-            // Log
-            this.showLog(`COMBO! ${comboAlly.name} follows up for ${comboDmg} damage!`);
-            sfxCombo();
-
-            // Camera shake
-            this.cameras.main.shake(100, 0.005);
-
-            // Flash the ally sprite
-            if (comboAlly.sprite) {
-              this.tweens.add({
-                targets: comboAlly.sprite,
-                alpha: { from: 1, to: 0.3 },
-                duration: 100,
-                yoyo: true,
-                repeat: 1,
-              });
-            }
-
-            // Damage popup on target
-            if (target.sprite) {
-              this.showDamagePopup(target.sprite.x, target.sprite.y, comboDmg, 1.0);
-              this.showEnemyHpBar(target);
-            }
-
-            // "COMBO!" floating text at target position
-            const comboTextX = target.tileX * TILE_DISPLAY + TILE_DISPLAY / 2;
-            const comboTextY = target.tileY * TILE_DISPLAY - 20;
-            const comboText = this.add.text(comboTextX, comboTextY, "COMBO!", {
-              fontSize: "12px",
-              color: "#fbbf24",
-              fontFamily: "monospace",
-              fontStyle: "bold",
-              stroke: "#000000",
-              strokeThickness: 3,
-            }).setOrigin(0.5).setDepth(300);
-
-            this.tweens.add({
-              targets: comboText,
-              y: comboTextY - 30,
-              alpha: 0,
-              duration: 800,
-              onComplete: () => comboText.destroy(),
-            });
-
-            // Check if enemy defeated by combo
-            this.updateHUD();
-            this.checkDeath(target);
-          }
-        }
-      }
-
-      this.updateHUD();
-      this.time.delayedCall(300, resolve);
-    });
+  /** @see CombatSystem.flashEntity */
+  flashEntity(entity: Entity, effectiveness: number): void {
+    this.combatSys.flashEntity(entity, effectiveness);
   }
-
-  private applySkillEffect(user: Entity, target: Entity, skill: Skill) {
-    if (!skill.effect || skill.effect === SkillEffect.None) return;
-    const chance = skill.effectChance ?? 100;
-    if (Math.random() * 100 > chance) return;
-
-    // ShieldDust: immune to harmful secondary effects from enemy skills
-    const harmfulEffects = [
-      SkillEffect.Paralyze, SkillEffect.Burn, SkillEffect.Frozen,
-      SkillEffect.BadlyPoisoned, SkillEffect.Flinch, SkillEffect.Drowsy, SkillEffect.Cursed,
-    ];
-    if (target.ability === AbilityId.ShieldDust && user !== target &&
-        harmfulEffects.includes(skill.effect)) {
-      this.showLog(`${target.name}'s Shield Dust blocked the effect!`);
-      return;
-    }
-
-    switch (skill.effect) {
-      case SkillEffect.AtkUp:
-        target.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 10 });
-        sfxBuff();
-        this.showLog(`${target.name}'s ATK rose! (10 turns)`);
-        if (target.sprite) target.sprite.setTint(0xff8844);
-        this.time.delayedCall(300, () => { if (target.sprite) target.sprite.clearTint(); });
-        break;
-
-      case SkillEffect.DefUp:
-        target.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
-        sfxBuff();
-        this.showLog(`${target.name}'s DEF rose! (10 turns)`);
-        break;
-
-      case SkillEffect.Heal: {
-        const healAmt = Math.floor(target.stats.maxHp * 0.3);
-        target.stats.hp = Math.min(target.stats.maxHp, target.stats.hp + healAmt);
-        this.showLog(`${target.name} recovered ${healAmt} HP!`);
-        if (target.sprite) {
-          target.sprite.setTint(0x44ff44);
-          this.showHealPopup(target.sprite.x, target.sprite.y, healAmt);
-        }
-        this.time.delayedCall(300, () => { if (target.sprite) target.sprite.clearTint(); });
-        break;
-      }
-
-      case SkillEffect.Paralyze:
-        if (!target.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
-          target.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 3 });
-          this.showLog(`${target.name} was paralyzed! (3 turns)`);
-          if (target.sprite) target.sprite.setTint(0xffff00);
-          this.time.delayedCall(300, () => { if (target.sprite) target.sprite.clearTint(); });
-        }
-        break;
-
-      case SkillEffect.Burn:
-        if (!target.statusEffects.some(s => s.type === SkillEffect.Burn)) {
-          target.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
-          this.showLog(`${target.name} was burned! (5 turns)`);
-        }
-        break;
-
-      case SkillEffect.Frozen: {
-        if (!target.statusEffects.some(s => s.type === SkillEffect.Frozen)) {
-          const frozenTurns = 2 + Math.floor(Math.random() * 2); // 2-3 turns
-          target.statusEffects.push({ type: SkillEffect.Frozen, turnsLeft: frozenTurns });
-          this.showLog(`${target.name} was frozen solid! (${frozenTurns} turns)`);
-          if (target.sprite) target.sprite.setTint(0x88ccff);
-          this.time.delayedCall(300, () => { if (target.sprite) this.updateStatusTint(target); });
-        }
-        break;
-      }
-
-      case SkillEffect.BadlyPoisoned:
-        if (!target.statusEffects.some(s => s.type === SkillEffect.BadlyPoisoned)) {
-          target.statusEffects.push({ type: SkillEffect.BadlyPoisoned, turnsLeft: 8, poisonCounter: 0 });
-          this.showLog(`${target.name} was badly poisoned! (8 turns)`);
-          if (target.sprite) target.sprite.setTint(0x9944cc);
-          this.time.delayedCall(300, () => { if (target.sprite) this.updateStatusTint(target); });
-        }
-        break;
-
-      case SkillEffect.Flinch:
-        if (!target.statusEffects.some(s => s.type === SkillEffect.Flinch)) {
-          target.statusEffects.push({ type: SkillEffect.Flinch, turnsLeft: 1 });
-          this.showLog(`${target.name} flinched!`);
-        }
-        break;
-
-      case SkillEffect.Drowsy:
-        if (!target.statusEffects.some(s => s.type === SkillEffect.Drowsy)) {
-          target.statusEffects.push({ type: SkillEffect.Drowsy, turnsLeft: 3 });
-          this.showLog(`${target.name} became drowsy! (3 turns)`);
-          if (target.sprite) target.sprite.setTint(0xccaadd);
-          this.time.delayedCall(300, () => { if (target.sprite) this.updateStatusTint(target); });
-        }
-        break;
-
-      case SkillEffect.Cursed:
-        if (!target.statusEffects.some(s => s.type === SkillEffect.Cursed)) {
-          target.statusEffects.push({ type: SkillEffect.Cursed, turnsLeft: 8, curseTick: 0 });
-          this.showLog(`${target.name} was cursed! (8 turns)`);
-          if (target.sprite) target.sprite.setTint(0x553366);
-          this.time.delayedCall(300, () => { if (target.sprite) this.updateStatusTint(target); });
-        }
-        break;
-    }
+  /** @see CombatSystem.showStatPopup */
+  showStatPopup(x: number, y: number, text: string, color: string, delay: number): void {
+    this.combatSys.showStatPopup(x, y, text, color, delay);
   }
-
-  private flashEntity(entity: Entity, effectiveness: number) {
-    if (!entity.sprite) return;
-    const tintColor = effectiveness >= 2.0 ? 0xff2222 : effectiveness < 1.0 ? 0x8888ff : 0xff4444;
-    entity.sprite.setTint(tintColor);
-    this.time.delayedCall(200, () => {
-      if (entity.sprite) entity.sprite.clearTint();
-    });
-
-    // Screen shake for super effective
-    if (effectiveness >= 2.0) {
-      this.cameras.main.shake(200, 0.008);
-    }
-  }
-
-  /** Show visual effect on skill target tiles */
-  private showSkillEffect(tiles: { x: number; y: number }[], skill: Skill) {
-    const typeColors: Record<string, { color: number; symbol: string }> = {
-      Water: { color: 0x3b82f6, symbol: "~" },
-      Fire: { color: 0xef4444, symbol: "*" },
-      Electric: { color: 0xfbbf24, symbol: "⚡" },
-      Grass: { color: 0x22c55e, symbol: "♣" },
-      Flying: { color: 0xa78bfa, symbol: ">" },
-      Poison: { color: 0xa855f7, symbol: "☠" },
-      Rock: { color: 0x92400e, symbol: "◆" },
-      Ground: { color: 0xd97706, symbol: "▲" },
-      Bug: { color: 0x84cc16, symbol: "●" },
-      Fighting: { color: 0xdc2626, symbol: "✊" },
-      Steel: { color: 0x94a3b8, symbol: "⬡" },
-      Ghost: { color: 0x7c3aed, symbol: "👻" },
-      Psychic: { color: 0xec4899, symbol: "🔮" },
-      Ice: { color: 0x67e8f9, symbol: "❄" },
-      Dark: { color: 0x6b21a8, symbol: "🌑" },
-      Fairy: { color: 0xf9a8d4, symbol: "✿" },
-      Dragon: { color: 0x7c3aed, symbol: "🐉" },
-      Normal: { color: 0xd1d5db, symbol: "✦" },
-    };
-    const tc = typeColors[skill.type] ?? typeColors.Normal;
-
-    for (const t of tiles) {
-      const px = t.x * TILE_DISPLAY + TILE_DISPLAY / 2;
-      const py = t.y * TILE_DISPLAY + TILE_DISPLAY / 2;
-
-      // Colored tile overlay
-      const gfx = this.add.graphics().setDepth(15);
-      gfx.fillStyle(tc.color, 0.4);
-      gfx.fillRect(t.x * TILE_DISPLAY, t.y * TILE_DISPLAY, TILE_DISPLAY, TILE_DISPLAY);
-
-      // Symbol
-      const sym = this.add.text(px, py, tc.symbol, {
-        fontSize: "16px", color: "#ffffff", fontFamily: "monospace",
-        stroke: "#000000", strokeThickness: 2,
-      }).setOrigin(0.5).setDepth(16);
-
-      // Fade out
-      this.tweens.add({
-        targets: [gfx, sym],
-        alpha: { from: 1, to: 0 },
-        duration: 400,
-        ease: "Quad.easeOut",
-        onComplete: () => { gfx.destroy(); sym.destroy(); },
-      });
-    }
-  }
-
-  /** Floating damage number popup — color-coded by effectiveness, size-scaled by damage */
-  private showDamagePopup(
-    x: number, y: number, dmg: number, effectiveness: number,
-    overrideText?: string, isCrit?: boolean, attackType?: PokemonType
-  ) {
-    // Determine color by effectiveness
-    let color: string;
-    if (effectiveness === 0) color = "#999999";       // Immune — gray
-    else if (effectiveness >= 2.0) color = "#ff3333";  // Super effective — red
-    else if (effectiveness < 1.0) color = "#999999";   // Not very effective — gray
-    else color = "#ffffff";                             // Normal — white
-
-    // Critical hit overrides to gold
-    if (isCrit) color = "#ffd700";
-
-    // Build display text
-    let displayText: string;
-    if (overrideText) {
-      displayText = overrideText;
-    } else if (effectiveness === 0) {
-      displayText = "Immune";
-    } else if (isCrit) {
-      displayText = `CRIT ${dmg}`;
-    } else if (effectiveness >= 2.0) {
-      displayText = `${dmg}!`;
-    } else {
-      displayText = `${dmg}`;
-    }
-
-    // Size scaling by damage amount
-    let fontSize: number;
-    if (effectiveness === 0) {
-      fontSize = 10;
-    } else if (effectiveness < 1.0) {
-      fontSize = 10; // Not very effective — small
-    } else if (dmg >= 31) {
-      fontSize = 16;
-    } else if (dmg >= 16) {
-      fontSize = 14;
-    } else if (dmg >= 6) {
-      fontSize = 12;
-    } else {
-      fontSize = 10;
-    }
-
-    // Super effective always at least 14px
-    if (effectiveness >= 2.0 && fontSize < 14) fontSize = 14;
-    // Crit always at least 14px
-    if (isCrit && fontSize < 14) fontSize = 14;
-
-    // Random horizontal offset for visual variety
-    const xOffset = (Math.random() - 0.5) * 16;
-
-    const popup = this.add.text(x + xOffset, y - 10, displayText, {
-      fontSize: `${fontSize}px`, color, fontFamily: "monospace", fontStyle: "bold",
-      stroke: "#000000", strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(50);
-
-    // Scale bounce: start at 1.5x, settle to 1.0x
-    popup.setScale(1.5);
-    this.tweens.add({
-      targets: popup,
-      scaleX: 1.0,
-      scaleY: 1.0,
-      duration: 200,
-      ease: "Back.easeOut",
-    });
-
-    // Float upward and fade
-    this.tweens.add({
-      targets: popup,
-      y: y - 45,
-      alpha: { from: 1, to: 0 },
-      duration: 900,
-      ease: "Quad.easeOut",
-      onComplete: () => popup.destroy(),
-    });
-
-    // Massive damage (31+) bounce effect — extra vertical wobble
-    if (dmg >= 31 && effectiveness > 0) {
-      this.tweens.add({
-        targets: popup,
-        scaleX: { from: 1.3, to: 1.0 },
-        scaleY: { from: 0.8, to: 1.0 },
-        duration: 150,
-        delay: 200,
-        ease: "Bounce.easeOut",
-      });
-    }
-
-    // Hit spark effect at impact point
-    if (effectiveness > 0 && !overrideText) {
-      this.showHitSpark(x, y, attackType);
-    }
-  }
-
-  /** Hit spark effect — brief colored circle at impact point */
-  private showHitSpark(x: number, y: number, attackType?: PokemonType) {
-    // Type-based spark colors
-    const sparkColors: Partial<Record<PokemonType, number>> = {
-      [PokemonType.Fire]: 0xff8c00,     // orange
-      [PokemonType.Water]: 0x3b82f6,    // blue
-      [PokemonType.Electric]: 0xfbbf24, // yellow
-      [PokemonType.Grass]: 0x22c55e,    // green
-      [PokemonType.Ice]: 0x67e8f9,      // cyan
-      [PokemonType.Poison]: 0xa855f7,   // purple
-      [PokemonType.Fighting]: 0xdc2626, // red
-      [PokemonType.Ghost]: 0x7c3aed,    // violet
-      [PokemonType.Psychic]: 0xec4899,  // pink
-      [PokemonType.Dark]: 0x6b21a8,     // dark purple
-    };
-    const sparkColor = (attackType && sparkColors[attackType]) ? sparkColors[attackType]! : 0xffffff;
-
-    const spark = this.add.graphics().setDepth(49);
-    spark.fillStyle(sparkColor, 0.9);
-    spark.fillCircle(x, y, 8);
-    // Outer glow ring
-    spark.fillStyle(sparkColor, 0.4);
-    spark.fillCircle(x, y, 14);
-
-    this.tweens.add({
-      targets: spark,
-      alpha: { from: 1, to: 0 },
-      scaleX: { from: 1.0, to: 1.8 },
-      scaleY: { from: 1.0, to: 1.8 },
-      duration: 150,
-      ease: "Quad.easeOut",
-      onComplete: () => spark.destroy(),
-    });
-  }
-
-  /** Brief flash effect on target for critical hits */
-  private showCritFlash(entity: Entity) {
-    if (!entity.sprite) return;
-    // Bright gold flash
-    entity.sprite.setTint(0xffd700);
-    this.time.delayedCall(100, () => {
-      if (entity.sprite) entity.sprite.setTint(0xffffff);
-      this.time.delayedCall(80, () => {
-        if (entity.sprite) entity.sprite.setTint(0xffd700);
-        this.time.delayedCall(100, () => {
-          if (entity.sprite) entity.sprite.clearTint();
-        });
-      });
-    });
-  }
-
-  /** Show temporary HP bar above an entity */
-  private showEnemyHpBar(entity: { sprite?: Phaser.GameObjects.Sprite; stats: { hp: number; maxHp: number } }) {
-    if (!entity.sprite || entity.stats.hp <= 0) return;
-    const x = entity.sprite.x;
-    const y = entity.sprite.y - 18;
-    const barW = 24;
-    const barH = 3;
-    const ratio = Math.max(0, entity.stats.hp / entity.stats.maxHp);
-
-    const bar = this.add.graphics().setDepth(51);
-    bar.fillStyle(0x000000, 0.7);
-    bar.fillRect(x - barW / 2 - 1, y - 1, barW + 2, barH + 2);
-    const barColor = ratio > 0.5 ? 0x22cc44 : ratio > 0.25 ? 0xcccc22 : 0xcc2222;
-    bar.fillStyle(barColor, 1);
-    bar.fillRect(x - barW / 2, y, barW * ratio, barH);
-
-    this.tweens.add({
-      targets: bar,
-      alpha: { from: 1, to: 0 },
-      delay: 1200,
-      duration: 600,
-      onComplete: () => bar.destroy(),
-    });
-  }
-
-  /** Heal number popup (green, floats upward with bounce) */
-  private showHealPopup(x: number, y: number, amount: number) {
-    const xOffset = (Math.random() - 0.5) * 12;
-    const popup = this.add.text(x + xOffset, y - 10, `+${amount}`, {
-      fontSize: "12px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
-      stroke: "#000000", strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(50);
-
-    // Scale bounce on appearance
-    popup.setScale(1.5);
-    this.tweens.add({
-      targets: popup,
-      scaleX: 1.0,
-      scaleY: 1.0,
-      duration: 200,
-      ease: "Back.easeOut",
-    });
-
-    // Float upward and fade
-    this.tweens.add({
-      targets: popup,
-      y: y - 45,
-      alpha: { from: 1, to: 0 },
-      duration: 900,
-      ease: "Quad.easeOut",
-      onComplete: () => popup.destroy(),
-    });
-  }
-
-  /** Floating stat gain popup for level-ups */
-  private showStatPopup(x: number, y: number, text: string, color: string, delay: number) {
-    this.time.delayedCall(delay, () => {
-      const popup = this.add.text(x, y, text, {
-        fontSize: "8px", color, fontFamily: "monospace", fontStyle: "bold",
-        stroke: "#000000", strokeThickness: 2,
-      }).setOrigin(0.5).setDepth(52);
-      this.tweens.add({
-        targets: popup,
-        y: y - 30,
-        alpha: { from: 1, to: 0 },
-        duration: 1200,
-        ease: "Quad.easeOut",
-        onComplete: () => popup.destroy(),
-      });
-    });
+  /** @see CombatSystem.showEnemyHpBar */
+  showEnemyHpBar(entity: { sprite?: Phaser.GameObjects.Sprite; stats: { hp: number; maxHp: number } }): void {
+    this.combatSys.showEnemyHpBar(entity);
   }
 
   private checkDeath(entity: Entity) {
@@ -7334,9 +4631,9 @@ export class DungeonScene extends Phaser.Scene {
             // Floating stat popups
             const px = this.player.sprite.x;
             const py = this.player.sprite.y;
-            this.showStatPopup(px - 16, py - 20, `HP+${r.hpGain}`, "#4ade80", 0);
-            this.showStatPopup(px, py - 20, `ATK+${r.atkGain}`, "#f87171", 200);
-            this.showStatPopup(px + 16, py - 20, `DEF+${r.defGain}`, "#60a5fa", 400);
+            this.combatSys.showStatPopup(px - 16, py - 20, `HP+${r.hpGain}`, "#4ade80", 0);
+            this.combatSys.showStatPopup(px, py - 20, `ATK+${r.atkGain}`, "#f87171", 200);
+            this.combatSys.showStatPopup(px + 16, py - 20, `DEF+${r.defGain}`, "#60a5fa", 400);
           }
           this.updateHUD();
 
@@ -7406,9 +4703,9 @@ export class DungeonScene extends Phaser.Scene {
                   duration: 200, yoyo: true, ease: "Quad.easeOut",
                 });
                 this.time.delayedCall(600, () => { if (ally.sprite) ally.sprite.clearTint(); });
-                this.showStatPopup(ally.sprite.x - 16, ally.sprite.y - 20, `HP+${lvl.hpGain}`, "#4ade80", 0);
-                this.showStatPopup(ally.sprite.x, ally.sprite.y - 20, `ATK+${lvl.atkGain}`, "#f87171", 200);
-                this.showStatPopup(ally.sprite.x + 16, ally.sprite.y - 20, `DEF+${lvl.defGain}`, "#60a5fa", 400);
+                this.combatSys.showStatPopup(ally.sprite.x - 16, ally.sprite.y - 20, `HP+${lvl.hpGain}`, "#4ade80", 0);
+                this.combatSys.showStatPopup(ally.sprite.x, ally.sprite.y - 20, `ATK+${lvl.atkGain}`, "#f87171", 200);
+                this.combatSys.showStatPopup(ally.sprite.x + 16, ally.sprite.y - 20, `DEF+${lvl.defGain}`, "#60a5fa", 400);
               }
               this.updateHUD();
             });
@@ -7478,7 +4775,7 @@ export class DungeonScene extends Phaser.Scene {
 
       // ── Monster House clear check ──
       this.time.delayedCall(300, () => {
-        this.checkMonsterHouseCleared();
+        this.monsterHouseSys.checkMonsterHouseCleared();
       });
 
       // ── Gauntlet wave clear check ──
@@ -7617,9 +4914,9 @@ export class DungeonScene extends Phaser.Scene {
             if (usableSkills.length > 0 && Math.random() < 0.4) {
               const skill = usableSkills[Math.floor(Math.random() * usableSkills.length)];
               skill.currentPp--;
-              await this.performSkill(enemy, skill, dir);
+              await this.combatSys.performSkill(enemy, skill, dir);
             } else {
-              await this.performBasicAttack(enemy, target);
+              await this.combatSys.performBasicAttack(enemy, target);
             }
             this.updateHUD();
             return;
@@ -7631,8 +4928,8 @@ export class DungeonScene extends Phaser.Scene {
             this.allEntities
           );
 
-          if (moveDir !== null && this.canEntityMove(enemy, moveDir)) {
-            await this.moveEntity(enemy, moveDir);
+          if (moveDir !== null && this.combatSys.canEntityMove(enemy, moveDir)) {
+            await this.combatSys.moveEntity(enemy, moveDir);
             // Check hazard tiles for enemies after movement
             this.trapHazardSys.checkEntityHazard(enemy, false);
           }
@@ -7646,8 +4943,8 @@ export class DungeonScene extends Phaser.Scene {
                 this.dungeon.terrain, this.dungeon.width, this.dungeon.height,
                 this.allEntities
               );
-              if (bonusDir !== null && this.canEntityMove(enemy, bonusDir)) {
-                await this.moveEntity(enemy, bonusDir);
+              if (bonusDir !== null && this.combatSys.canEntityMove(enemy, bonusDir)) {
+                await this.combatSys.moveEntity(enemy, bonusDir);
                 this.trapHazardSys.checkEntityHazard(enemy, false);
               }
             }
@@ -7757,7 +5054,7 @@ export class DungeonScene extends Phaser.Scene {
             // Self-targeting skill (heal/buff) — can use even without attack target
             selectedSkill.currentPp--;
             this.showAllySkillPopup(ally, selectedSkill);
-            await this.performSkill(ally, selectedSkill, ally.facing);
+            await this.combatSys.performSkill(ally, selectedSkill, ally.facing);
             this.updateHUD();
           } else if (attackTarget) {
             const dir = directionTo(ally, attackTarget);
@@ -7766,14 +5063,14 @@ export class DungeonScene extends Phaser.Scene {
               // Use the intelligently selected skill
               selectedSkill.currentPp--;
               this.showAllySkillPopup(ally, selectedSkill);
-              await this.performSkill(ally, selectedSkill, dir);
+              await this.combatSys.performSkill(ally, selectedSkill, dir);
             } else {
-              await this.performBasicAttack(ally, attackTarget);
+              await this.combatSys.performBasicAttack(ally, attackTarget);
             }
             this.updateHUD();
-          } else if (moveDir !== null && this.canEntityMove(ally, moveDir)) {
-            await this.moveEntity(ally, moveDir);
-            this.recoverPP(ally);
+          } else if (moveDir !== null && this.combatSys.canEntityMove(ally, moveDir)) {
+            await this.combatSys.moveEntity(ally, moveDir);
+            this.combatSys.recoverPP(ally);
             // Check hazard tiles for allies after movement
             this.trapHazardSys.checkEntityHazard(ally, false);
           }
