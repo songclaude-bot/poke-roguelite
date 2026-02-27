@@ -2929,21 +2929,6 @@ export class DungeonScene extends Phaser.Scene {
     });
 
     this.dpadUI.push(waitBtn, waitTxt);
-
-    // Auto-Explore button (above D-Pad, offset to the side)
-    const autoX = isRight ? cx - r - 30 : cx + r + 30;
-    const autoY = cy;
-    const autoBtn = this.add.text(autoX, autoY, "Auto", {
-      fontSize: "10px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
-      backgroundColor: "#1a1a2ecc", padding: { x: 8, y: 3 },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(110).setInteractive();
-
-    autoBtn.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-      pointer.event.stopPropagation();
-      this.startAutoExplore();
-    });
-
-    this.dpadUI.push(autoBtn);
   }
 
   // ── Skill Buttons (opposite side of D-Pad, 2x2 grid) ──

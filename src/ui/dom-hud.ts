@@ -7,9 +7,9 @@
  *   Top band (0-70):   floor label, HP bar, turn info, belly, timer
  *   Middle (70-400):   game viewport (tilemap + sprites)
  *   Log area (~400):   combat log
- *   Pickup row (~505):  pickup / quickslot — aligned above D-pad
- *   Skill grid (~510):  2x2 skill buttons — opposite side of D-pad
- *   D-pad (~510-640):   8-directional pad (bottom)
+ *   Action row (~495):  pickup / quickslot / team — above D-pad with 20px gap
+ *   Skill grid (~545):  2x2 skill buttons — opposite side of D-pad
+ *   D-pad (~515-625):   8-directional pad (bottom)
  */
 
 import { GAME_WIDTH, GAME_HEIGHT } from "../config";
@@ -19,9 +19,15 @@ const FONT = `'Courier New', Courier, monospace`;
 /** Y constants — derived from GAME_HEIGHT=640 */
 const DPAD_CENTER_Y = GAME_HEIGHT - 70;   // 570
 const DPAD_RADIUS = 50;
-const DPAD_BG_R = DPAD_RADIUS + 5;        // 55 — actual visual circle
-// Pickup/quickslot row: at least 16px above D-pad background top edge
-const ACTION_ROW_Y = DPAD_CENTER_Y - DPAD_BG_R - 16 - 28; // 570-55-16-28 = 471
+const DPAD_BG_R = DPAD_RADIUS + 5;        // 55 — actual visual circle radius
+const DPAD_TOP = DPAD_CENTER_Y - DPAD_BG_R; // 515 — top edge of D-pad background
+
+/** Action button dimensions */
+const ACTION_BTN_W = 40;
+const ACTION_BTN_H = 28;
+const ACTION_GAP = 4;
+/** Action row Y: 20px above D-pad top edge, minus button height */
+const ACTION_ROW_Y = DPAD_TOP - 20 - ACTION_BTN_H; // 515-20-28 = 467
 
 export interface DomHudElements {
   container: HTMLDivElement;
@@ -90,7 +96,7 @@ export function createDomHud(): DomHudElements {
   });
   c.appendChild(bellyLabel);
 
-  // ── Log box (above controls area) ──
+  // ── Log box (above action row) ──
   const logBox = document.createElement("div");
   logBox.style.cssText = `
     position: absolute;
@@ -145,35 +151,25 @@ export function createDomHud(): DomHudElements {
     c.appendChild(btn);
   }
 
-  // ── Pickup button ──
+  // ── Pickup button (fixed size) ──
   const pickupBtn = document.createElement("button");
   pickupBtn.textContent = "⬇";
-  pickupBtn.style.cssText = actionBtnCss(ACTION_ROW_Y);
+  pickupBtn.style.cssText = actionBtnCss();
   c.appendChild(pickupBtn);
 
-  // ── Quick-slot button ──
+  // ── Quick-slot button (fixed size) ──
   const quickSlotBtn = document.createElement("button");
   quickSlotBtn.textContent = "—";
-  quickSlotBtn.style.cssText = actionBtnCss(ACTION_ROW_Y);
+  quickSlotBtn.style.cssText = actionBtnCss();
   c.appendChild(quickSlotBtn);
 
-  // ── Team button ──
+  // ── Team button (fixed size) ──
   const teamBtn = document.createElement("button");
   teamBtn.textContent = "Team";
-  teamBtn.style.cssText = `
-    position: absolute;
-    top: ${ACTION_ROW_Y}px;
-    font-size: 10px;
-    font-family: ${FONT};
-    font-weight: bold;
-    color: #60a5fa;
-    background: rgba(26,26,46,0.85);
-    border: 1px solid #333355;
-    border-radius: 4px;
-    padding: 3px 8px;
-    pointer-events: auto;
-    cursor: pointer;
-  `;
+  teamBtn.style.cssText = actionBtnCss();
+  teamBtn.style.color = "#60a5fa";
+  teamBtn.style.fontWeight = "bold";
+  teamBtn.style.fontSize = "10px";
   c.appendChild(teamBtn);
 
   // ── Skill description tooltip (top area, hidden by default) ──
@@ -215,25 +211,36 @@ function el(tag: string, styles: Record<string, string>): HTMLSpanElement {
   return e;
 }
 
-function actionBtnCss(topY: number): string {
+/** Shared CSS for action buttons — fixed width/height, no text-dependent sizing */
+function actionBtnCss(): string {
   return `
     position: absolute;
-    top: ${topY}px;
-    font-size: 16px;
+    width: ${ACTION_BTN_W}px;
+    height: ${ACTION_BTN_H}px;
+    top: ${ACTION_ROW_Y}px;
+    font-size: 14px;
     font-family: ${FONT};
     color: #aab0c8;
     background: rgba(26,26,46,0.85);
     border: 1px solid #333355;
     border-radius: 4px;
-    padding: 3px 8px;
+    padding: 0;
+    text-align: center;
+    line-height: ${ACTION_BTN_H}px;
     pointer-events: auto;
     cursor: pointer;
+    box-sizing: border-box;
+    overflow: hidden;
+    white-space: nowrap;
   `;
 }
 
 /**
  * Position skill buttons (2x2 opposite of D-pad) and
  * action buttons (pickup/quickslot/team above D-pad).
+ *
+ * Action buttons are centered above the D-pad as a group,
+ * clamped so they never overflow the screen edges.
  */
 export function layoutHudButtons(
   hud: DomHudElements,
@@ -254,12 +261,18 @@ export function layoutHudButtons(
     btn.style.top = `${skillBaseY + row * 30}px`;
   }
 
-  // ── Action buttons: above D-pad, aligned with D-pad center ──
-  hud.pickupBtn.style.left = `${dpadCX - 32}px`;
+  // ── Action buttons: centered as a group above D-pad ──
+  const totalW = ACTION_BTN_W * 3 + ACTION_GAP * 2; // 3 buttons + 2 gaps
+  // Start from D-pad center, but clamp to screen
+  let groupLeft = dpadCX - totalW / 2;
+  if (groupLeft < 4) groupLeft = 4;
+  if (groupLeft + totalW > gameWidth - 4) groupLeft = gameWidth - 4 - totalW;
+
+  hud.pickupBtn.style.left = `${groupLeft}px`;
   hud.pickupBtn.style.top = `${ACTION_ROW_Y}px`;
-  hud.quickSlotBtn.style.left = `${dpadCX + 4}px`;
+  hud.quickSlotBtn.style.left = `${groupLeft + ACTION_BTN_W + ACTION_GAP}px`;
   hud.quickSlotBtn.style.top = `${ACTION_ROW_Y}px`;
-  hud.teamBtn.style.left = `${dpadCX + 36}px`;
+  hud.teamBtn.style.left = `${groupLeft + (ACTION_BTN_W + ACTION_GAP) * 2}px`;
   hud.teamBtn.style.top = `${ACTION_ROW_Y}px`;
 }
 
