@@ -193,6 +193,10 @@ export class HubScene extends Phaser.Scene {
   private navIcons: Phaser.GameObjects.Text[] = [];
 
   private createNavBar() {
+    this.navBgs = [];
+    this.navTexts = [];
+    this.navIcons = [];
+    this.tabContent = [];
     const navY = GAME_HEIGHT - NAV_H / 2;
     // Nav background
     this.add.rectangle(GAME_WIDTH / 2, navY, GAME_WIDTH, NAV_H, 0x111827).setDepth(100);
