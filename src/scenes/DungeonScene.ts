@@ -237,6 +237,8 @@ export class DungeonScene extends Phaser.Scene {
 
   // Item System (floor items, bag UI, item usage — delegated)
   private itemSys!: ItemSystem;
+  get floorItems() { return this.itemSys?.floorItems ?? []; }
+  get bagOpen() { return this.itemSys?.bagOpen ?? false; }
 
   // Game state — Death/rescue/clear delegated to DeathRescueSystem
   private deathRescueSys!: DeathRescueSystem;
@@ -250,6 +252,7 @@ export class DungeonScene extends Phaser.Scene {
 
   // Trap & hazard system
   private trapHazardSys!: TrapHazardSystem;
+  get minimapCurrentlyVisible() { return this.minimapSys?.currentlyVisible ?? []; }
 
   // Belly state forwarding (actual state lives in weatherBellySys)
   get belly() { return this.weatherBellySys.belly; }
@@ -277,6 +280,10 @@ export class DungeonScene extends Phaser.Scene {
 
   // Event Room (delegated to EventRoomSystem)
   private eventRoomSys!: EventRoomSystem;
+  // Forwarding getters for cross-system host interface compatibility
+  get eventRoom() { return this.eventRoomSys?.eventRoom ?? null; }
+  get eventTriggered() { return this.eventRoomSys?.eventTriggered ?? false; }
+  get eventOpen() { return this.eventRoomSys?.eventOpen ?? false; }
 
   // Floor Event (floor-wide global effect)
   private floorEvent: FloorEvent | null = null;
@@ -284,6 +291,7 @@ export class DungeonScene extends Phaser.Scene {
 
   // Puzzle Room (delegated to PuzzleSystem)
   private puzzleSys!: PuzzleSystem;
+  get puzzleRoom() { return this.puzzleSys?.puzzleRoom ?? null; }
 
   // NG+ prestige system
   private ngPlusLevel = 0;
@@ -380,6 +388,7 @@ export class DungeonScene extends Phaser.Scene {
 
   // Auto-Explore (delegated to AutoExploreSystem)
   private autoExploreSys!: AutoExploreSystem;
+  get autoExploring() { return this.autoExploreSys?.autoExploring ?? false; }
 
   // Skill Combo state
   private recentSkillIds: string[] = [];  // last 3 skill IDs used by player
@@ -436,6 +445,11 @@ export class DungeonScene extends Phaser.Scene {
 
   // Shrine system (per-floor, extracted)
   private shrineSys!: ShrineSystem;
+  get floorShrine() { return this.shrineSys?.floorShrine ?? null; }
+  get shrineTileX() { return this.shrineSys?.shrineTileX ?? 0; }
+  get shrineTileY() { return this.shrineSys?.shrineTileY ?? 0; }
+  get shrineUsed() { return this.shrineSys?.shrineUsed ?? false; }
+  get shrineOpen() { return this.shrineSys?.shrineOpen ?? false; }
   // Combat system (extracted)
   private combatSys!: CombatSystem;
   // Stairs system (extracted)
