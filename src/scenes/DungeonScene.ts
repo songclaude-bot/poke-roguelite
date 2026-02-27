@@ -66,7 +66,7 @@ import { checkCombo, ComboEffect, SkillCombo } from "../core/skill-combos";
 import {
   initAudio, startBgm, stopBgm, switchToBossTheme,
   sfxHit, sfxSuperEffective, sfxNotEffective, sfxMove, sfxPickup,
-  sfxLevelUp, sfxRecruit, sfxStairs, sfxDeath, sfxBossDefeat,
+  sfxLevelUp, sfxRecruit, sfxDeath, sfxBossDefeat,
   sfxHeal, sfxSkill, sfxMenuOpen, sfxMenuClose,
   sfxEvolution, sfxVictory, sfxGameOver, sfxShop,
   sfxCombo, sfxCritical, sfxDodge, sfxItemPickup, sfxBuff, sfxWeatherChange,
@@ -82,9 +82,9 @@ import {
   tickChainIdle, getChainTier, getChainColor, getChainHexColor,
 } from "../core/score-chain";
 import {
-  BossWave, GauntletConfig, GauntletReward,
-  shouldTriggerGauntlet, generateGauntlet, getGauntletReward,
+  shouldTriggerGauntlet, generateGauntlet,
 } from "../core/boss-gauntlet";
+import { GauntletSystem } from "../systems/gauntlet-system";
 import {
   PuzzleType, shouldSpawnPuzzle, generatePuzzle,
 } from "../core/puzzle-rooms";
@@ -93,6 +93,7 @@ import { SecretRoomSystem } from "../systems/secret-room-system";
 import { AutoExploreSystem } from "../systems/auto-explore-system";
 import { MinimapSystem } from "../systems/minimap-system";
 import { TrapHazardSystem } from "../systems/trap-hazard-system";
+import { ItemSystem, FloorItem } from "../systems/item-system";
 import {
   LegendaryEncounter,
   shouldEncounterLegendary,
@@ -124,11 +125,13 @@ import {
   getVariantHexColor, getVariantName, isSpecialVariant,
 } from "../core/enemy-variants";
 import {
-  ActiveBlessing, Blessing, getBlessingEffect, tickBlessingDurations,
+  ActiveBlessing, Blessing, getBlessingEffect,
   activateBlessing, rollBlessingOrCurse, getRandomBlessing, getRandomCurse,
-  serializeBlessings, deserializeBlessings,
+  deserializeBlessings,
 } from "../core/blessings";
 import { ShrineSystem } from "../systems/shrine-system";
+import { StairsSystem } from "../systems/stairs-system";
+import { WeatherBellySystem } from "../systems/weather-belly-system";
 import { EventRoomSystem } from "../systems/event-room-system";
 import {
   RescueOption, MAX_RESCUES_PER_RUN,
@@ -228,22 +231,18 @@ export class DungeonScene extends Phaser.Scene {
   // Status flash animation timers
   private statusFlashTimers: Phaser.Time.TimerEvent[] = [];
 
-  // Belly Bar graphics
-  private bellyBarBg!: Phaser.GameObjects.Graphics;
-  private bellyBarFill!: Phaser.GameObjects.Graphics;
-  private bellyText!: Phaser.GameObjects.Text;
-  private bellyWarningShown = false; // track if 20% warning was shown this drain cycle
-  private bellyUrgentShown = false;  // track if 10% warning was shown
+  // Weather & Belly system (extracted)
+  private weatherBellySys!: WeatherBellySystem;
 
   // Skill state
   private activeSkillIndex = -1; // -1 = no skill selected
 
   // Item state
   private inventory: ItemStack[] = [];
-  private floorItems: { x: number; y: number; item: ItemDef; sprite: Phaser.GameObjects.Text }[] = [];
   private persistentInventory: ItemStack[] | null = null;
-  private bagOpen = false;
-  private bagUI: Phaser.GameObjects.GameObject[] = [];
+
+  // Item System (floor items, bag UI, item usage — delegated)
+  private itemSys!: ItemSystem;
 
   // Game state
   private gameOver = false;
@@ -257,9 +256,11 @@ export class DungeonScene extends Phaser.Scene {
   // Trap & hazard system
   private trapHazardSys!: TrapHazardSystem;
 
-  // Belly (hunger) state
-  private belly = 100;
-  private maxBelly = 100;
+  // Belly state forwarding (actual state lives in weatherBellySys)
+  get belly() { return this.weatherBellySys.belly; }
+  set belly(v: number) { this.weatherBellySys.belly = v; }
+  get maxBelly() { return this.weatherBellySys.maxBelly; }
+  set maxBelly(v: number) { this.weatherBellySys.maxBelly = v; }
   private persistentBelly: number | null = null;
 
   // Shop state
@@ -302,16 +303,15 @@ export class DungeonScene extends Phaser.Scene {
   private ngPlusBonuses: NGPlusBonusEffects = getNGPlusBonusEffects(0);
   private ngPlusBadgeText: Phaser.GameObjects.Text | null = null;
 
-  // Weather
-  private currentWeather = WeatherType.None;
-  private currentWeatherIntensity = WeatherIntensity.Mild;
-  private weatherText!: Phaser.GameObjects.Text;
-  private weatherIntensityHudText: Phaser.GameObjects.Text | null = null;
-  private weatherForecastHudText: Phaser.GameObjects.Text | null = null;
-  private weatherOverlay: Phaser.GameObjects.Rectangle | null = null;
-  private weatherParticles: Phaser.GameObjects.Graphics | null = null;
-  private weatherTimer: Phaser.Time.TimerEvent | null = null;
-  private floorTurns = 0; // turns taken on the current floor
+  // Weather & floorTurns forwarding (actual state lives in weatherBellySys)
+  get currentWeather() { return this.weatherBellySys.currentWeather; }
+  set currentWeather(v) { this.weatherBellySys.currentWeather = v; }
+  get currentWeatherIntensity() { return this.weatherBellySys.currentWeatherIntensity; }
+  set currentWeatherIntensity(v) { this.weatherBellySys.currentWeatherIntensity = v; }
+  get floorTurns() { return this.weatherBellySys.floorTurns; }
+  set floorTurns(v: number) { this.weatherBellySys.floorTurns = v; }
+  // Turn count forwarding (for StairsSystem host)
+  get turnCount() { return this.turnManager.turn; }
 
   // Boss state
   private bossEntity: Entity | null = null;
@@ -319,17 +319,10 @@ export class DungeonScene extends Phaser.Scene {
   private bossHpBg: Phaser.GameObjects.Graphics | null = null;
   private bossNameText: Phaser.GameObjects.Text | null = null;
 
-  // Boss Gauntlet state
-  private gauntletActive = false;
-  private gauntletConfig: GauntletConfig | null = null;
-  private gauntletCurrentWave = 0;        // 0-indexed current wave
-  private gauntletTotalWavesCleared = 0;   // waves cleared for scoring
-  private gauntletEnemies: Entity[] = [];  // enemies in current gauntlet wave
-  private gauntletStairsLocked = false;
-  // Gauntlet HUD elements
-  private gauntletWaveText: Phaser.GameObjects.Text | null = null;
-  private gauntletVignette: Phaser.GameObjects.Graphics | null = null;
-  private gauntletVignetteTween: Phaser.Tweens.Tween | null = null;
+  // Boss Gauntlet system
+  private gauntletSys!: GauntletSystem;
+  // Gauntlet stairs locked forwarding (for StairsSystem host)
+  get gauntletStairsLocked() { return this.gauntletSys.gauntletStairsLocked; }
 
   // Hamburger dropdown menu state
   private menuOpen = false;
@@ -346,9 +339,6 @@ export class DungeonScene extends Phaser.Scene {
   // D-Pad references for left/right switching
   private dpadUI: Phaser.GameObjects.GameObject[] = [];
   private dpadSide: "right" | "left" = "right"; // default: right (국룰 UX)
-
-  // Quick-slot: last used item
-  private lastUsedItemId: string | null = null;
 
   // DOM-based HUD overlay (always crisp text)
   private domHud: DomHudElements | null = null;
@@ -459,6 +449,8 @@ export class DungeonScene extends Phaser.Scene {
 
   // Shrine system (per-floor, extracted)
   private shrineSys!: ShrineSystem;
+  // Stairs system (extracted)
+  private stairsSys!: StairsSystem;
 
   // Type Gem state (per-floor: active type boosts, cleared on each new floor)
   private activeTypeGems: Map<string, number> = new Map(); // PokemonType -> boostPercent
@@ -587,7 +579,6 @@ export class DungeonScene extends Phaser.Scene {
     this.enemies = [];
     this.allies = [];
     this.allEntities = [];
-    this.floorItems = [];
     this.enemyVariantMap = new Map();
     this.variantAuraGraphics = new Map();
     this.gameOver = false;
@@ -610,20 +601,8 @@ export class DungeonScene extends Phaser.Scene {
     this.miniBossHpBar = null;
     this.miniBossHpBg = null;
     this.miniBossNameText = null;
-    // Reset gauntlet state
-    this.gauntletActive = false;
-    this.gauntletConfig = null;
-    this.gauntletCurrentWave = 0;
-    this.gauntletTotalWavesCleared = 0;
-    this.gauntletEnemies = [];
-    this.gauntletStairsLocked = false;
-    this.gauntletWaveText = null;
-    this.gauntletVignette = null;
-    this.gauntletVignetteTween = null;
     this.activeSkillIndex = -1;
     this.skillButtons = [];
-    this.bagOpen = false;
-    this.bagUI = [];
     this.teamPanelOpen = false;
     this.teamPanelUI = [];
     this.enemiesDefeated = 0;
@@ -656,6 +635,11 @@ export class DungeonScene extends Phaser.Scene {
     // Reset shrine system
     this.shrineSys = new ShrineSystem(this as any);
     this.shrineSys.reset();
+    // Reset stairs system
+    this.stairsSys = new StairsSystem(this as any);
+    // Reset gauntlet system
+    this.gauntletSys = new GauntletSystem(this as any);
+    this.gauntletSys.reset();
     // Reset type gem boosts (per-floor)
     this.activeTypeGems = new Map();
     this.typeGemHudIcons = [];
@@ -675,11 +659,10 @@ export class DungeonScene extends Phaser.Scene {
     this.turnManager = new TurnManager();
     this.persistentAllies = data?.allies ?? null;
     // trapHazardSys reset is handled in create() after system construction
+    // Construct weatherBellySys early so belly/maxBelly getters work
+    this.weatherBellySys = new WeatherBellySystem(this as any);
     const bellyBonus = getUpgradeBonus(meta, "bellyMax") * 20;
-    this.maxBelly = 100 + bellyBonus;
-    this.belly = data?.belly ?? this.maxBelly;
-    this.bellyWarningShown = this.belly <= this.maxBelly * 0.2;
-    this.bellyUrgentShown = this.belly <= this.maxBelly * 0.1;
+    this.weatherBellySys.initBelly(100 + bellyBonus, data?.belly);
     this.starterId = data?.starter ?? "mudkip";
     this.seenSpecies = new Set<string>();
     this.seenSpecies.add(this.starterId); // starter is always "seen"
@@ -710,6 +693,9 @@ export class DungeonScene extends Phaser.Scene {
     // Reset trap & hazard state (delegated to TrapHazardSystem)
     this.trapHazardSys = new TrapHazardSystem(this as any);
     this.trapHazardSys.reset();
+    // Reset item state (delegated to ItemSystem)
+    this.itemSys = new ItemSystem(this as any);
+    this.itemSys.reset();
     // Reset auto-explore state (delegated to AutoExploreSystem)
     this.autoExploreSys = new AutoExploreSystem(this as any);
     // Reset minimap state (delegated to MinimapSystem)
@@ -1156,14 +1142,8 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // Stairs marker
-    const stairsGfx = this.add.graphics();
-    const sx = stairsPos.x * TILE_DISPLAY + TILE_DISPLAY / 2;
-    const sy = stairsPos.y * TILE_DISPLAY + TILE_DISPLAY / 2;
-    stairsGfx.fillStyle(0xfbbf24, 0.9);
-    stairsGfx.fillTriangle(sx, sy - 14, sx + 10, sy, sx - 10, sy);
-    stairsGfx.fillTriangle(sx, sy + 14, sx + 10, sy, sx - 10, sy);
-    stairsGfx.setDepth(5);
+    // Stairs marker (drawn by StairsSystem)
+    this.stairsSys.drawStairsMarker();
 
     // ── Create animations for needed species (wrapped in try/catch to protect UI) ──
     const neededKeys = new Set<string>([this.starterId, ...this.dungeonDef.enemySpeciesIds]);
@@ -1692,53 +1672,16 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Boss Gauntlet check ──
     if (!this.bossEntity && shouldTriggerGauntlet(this.currentFloor, this.dungeonDef.id, this.dungeonDef.floors)) {
-      this.gauntletConfig = generateGauntlet(this.currentFloor, this.dungeonDef.id, this.dungeonDef.difficulty);
-      this.gauntletActive = true;
-      this.gauntletCurrentWave = 0;
-      this.gauntletTotalWavesCleared = 0;
-      this.gauntletStairsLocked = true;
-      this.gauntletEnemies = [];
+      const gauntletCfg = generateGauntlet(this.currentFloor, this.dungeonDef.id, this.dungeonDef.difficulty);
+      this.gauntletSys.activate(gauntletCfg);
     }
 
-    // ── Spawn floor items ──
-    this.inventory = this.persistentInventory ?? [];
-
-    // NG+ bonus: start with a random item on new runs (floor 1, no persisted inventory)
-    if (this.ngPlusBonuses.startWithItem && this.currentFloor === 1 && !this.persistentInventory) {
-      const startItem = rollFloorItem();
-      const existing = this.inventory.find(s => s.item.id === startItem.id && startItem.stackable);
-      if (existing) existing.count++;
-      else this.inventory.push({ item: startItem, count: 1 });
-    }
-    const ngItemDropMult = 1 + this.ngPlusBonuses.itemDropPercent / 100;
-    // Lucky enchantment: +5% item find chance
-    const enchItemMult = this.enchantment?.id === "lucky" ? 1.05 : 1.0;
-    const mutItemMult = hasMutation(this.floorMutations, MutationType.ItemRain) ? getMutationEffect(MutationType.ItemRain, "itemMult") : 1;
-    const talentItemMult = 1 + (this.talentEffects.itemSpawnPercent ?? 0) / 100;
-    const itemCount = Math.max(1, Math.floor(this.dungeonDef.itemsPerFloor * this.difficultyMods.itemDropMult * ngItemDropMult * enchItemMult * mutItemMult * talentItemMult));
-    for (let i = 0; i < itemCount; i++) {
-      const room = rooms[Math.floor(Math.random() * rooms.length)];
-      const ix = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
-      const iy = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
-      if (terrain[iy][ix] !== TerrainType.GROUND) continue;
-      if (ix === stairsPos.x && iy === stairsPos.y) continue;
-      if (ix === playerStart.x && iy === playerStart.y) continue;
-
-      const item = rollFloorItem();
-      const icon = item.category === "berry" ? "●" : item.category === "seed" ? "◆" : item.category === "gem" ? "◇" : "★";
-      const color = item.category === "berry" ? "#ff6b9d" : item.category === "seed" ? "#4ade80" : item.category === "gem" ? "#ddaaff" : "#60a5fa";
-      const sprite = this.add.text(
-        ix * TILE_DISPLAY + TILE_DISPLAY / 2,
-        iy * TILE_DISPLAY + TILE_DISPLAY / 2,
-        icon, { fontSize: "16px", color, fontFamily: "monospace" }
-      ).setOrigin(0.5).setDepth(6);
-
-      this.floorItems.push({ x: ix, y: iy, item, sprite });
-    }
+    // ── Spawn floor items (delegated to ItemSystem) ──
+    this.itemSys.initInventory();
+    this.itemSys.spawnFloorItems(rooms, terrain, playerStart, stairsPos);
 
     // ── Spawn floor traps and hazard tiles (delegated to TrapHazardSystem) ──
-    const occupiedPositions = new Set<string>();
-    for (const fi of this.floorItems) occupiedPositions.add(`${fi.x},${fi.y}`);
+    const occupiedPositions = this.itemSys.getOccupiedPositions();
     for (const e of this.enemies) occupiedPositions.add(`${e.tileX},${e.tileY}`);
     for (const a of this.allies) occupiedPositions.add(`${a.tileX},${a.tileY}`);
     const hazardOccupied = this.trapHazardSys.spawnTraps(occupiedPositions);
@@ -1848,22 +1791,7 @@ export class DungeonScene extends Phaser.Scene {
         if (this.monsterHouseType === MonsterHouseType.Treasure) {
           const mhRoom = this.monsterHouseRoom;
           const treasureCount = 2 + Math.floor(Math.random() * 3); // 2-4 extra items
-          for (let ti = 0; ti < treasureCount; ti++) {
-            const ix = mhRoom.x + 1 + Math.floor(Math.random() * Math.max(1, mhRoom.w - 2));
-            const iy = mhRoom.y + 1 + Math.floor(Math.random() * Math.max(1, mhRoom.h - 2));
-            if (terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
-            if (ix === stairsPos.x && iy === stairsPos.y) continue;
-
-            const item = rollFloorItem();
-            const icon = item.category === "berry" ? "●" : item.category === "seed" ? "◆" : item.category === "gem" ? "◇" : "★";
-            const color = item.category === "berry" ? "#ff6b9d" : item.category === "seed" ? "#4ade80" : item.category === "gem" ? "#ddaaff" : "#60a5fa";
-            const sprite = this.add.text(
-              ix * TILE_DISPLAY + TILE_DISPLAY / 2,
-              iy * TILE_DISPLAY + TILE_DISPLAY / 2,
-              icon, { fontSize: "16px", color, fontFamily: "monospace" }
-            ).setOrigin(0.5).setDepth(6);
-            this.floorItems.push({ x: ix, y: iy, item, sprite });
-          }
+          this.itemSys.spawnMonsterHouseItems(terrain, stairsPos, mhRoom, treasureCount);
         }
       }
     }
@@ -1961,20 +1889,8 @@ export class DungeonScene extends Phaser.Scene {
     // HP Bar fill
     this.hpBarFill = this.add.graphics().setScrollFactor(0).setDepth(101);
 
-    // Belly Bar background (below HP bar)
-    this.bellyBarBg = this.add.graphics().setScrollFactor(0).setDepth(100);
-    this.bellyBarBg.fillStyle(0x1a1a2e, 0.9);
-    this.bellyBarBg.fillRoundedRect(38, 19, 100, 6, 2);
-    this.bellyBarBg.lineStyle(1, 0x333355);
-    this.bellyBarBg.strokeRoundedRect(38, 19, 100, 6, 2);
-
-    // Belly Bar fill
-    this.bellyBarFill = this.add.graphics().setScrollFactor(0).setDepth(101);
-
-    // Belly text label (on the bar)
-    this.bellyText = this.add.text(40, 19, "", {
-      fontSize: "5px", color: "#ffffff", fontFamily: "monospace",
-    }).setScrollFactor(0).setDepth(102);
+    // Belly Bar (delegated to weatherBellySys)
+    this.weatherBellySys.initBellyHUD();
 
     this.floorText = this.add
       .text(8, 6, "", { fontSize: "11px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold" })
@@ -1998,7 +1914,7 @@ export class DungeonScene extends Phaser.Scene {
       callback: () => {
         // Don't count time when game is over or menus/overlays are open
         if (this.gameOver) return;
-        if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventRoomSys.eventOpen || this.teamPanelOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
+        if (this.itemSys.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventRoomSys.eventOpen || this.teamPanelOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
         this.runElapsedSeconds++;
         const timeStr = this.formatTime(this.runElapsedSeconds);
         this.timerText.setText(timeStr);
@@ -2028,56 +1944,9 @@ export class DungeonScene extends Phaser.Scene {
       this.updateChainHUD();
     }
 
-    // ── Weather ──
-    this.currentWeather = rollFloorWeather(this.dungeonDef.id, this.currentFloor);
-    this.currentWeatherIntensity = getWeatherIntensity(this.currentFloor, this.dungeonDef.floors);
-    this.floorTurns = 0;
-    this.weatherText = this.add.text(GAME_WIDTH / 2, 24, "", {
-      fontSize: "9px", color: "#94a3b8", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
-
-    if (this.currentWeather !== WeatherType.None) {
-      const wd = WEATHERS[this.currentWeather];
-      const intLabel = this.currentWeatherIntensity;
-      this.weatherText.setText(`${wd.symbol} ${wd.name} (${intLabel}): ${wd.description}`);
-      this.weatherText.setColor(INTENSITY_COLOR[this.currentWeatherIntensity]);
-      sfxWeatherChange();
-      this.showLog(`The weather is ${wd.name} (${intLabel})!`);
-      // Run log: weather on floor start
-      this.runLog.add(RunLogEvent.WeatherChanged, wd.name, this.currentFloor, this.turnManager.turn);
-    }
-    this.setupWeatherVisuals();
+    // ── Weather (delegated to weatherBellySys) ──
+    this.weatherBellySys.initWeatherHUD();
     this.setupStatusFlashAnimations();
-
-    // ── Weather HUD Indicator ──
-    this.weatherIntensityHudText = null;
-    if (this.currentWeather !== WeatherType.None) {
-      const weatherNames: Record<string, string> = {
-        [WeatherType.Rain]: "Rain",
-        [WeatherType.Sandstorm]: "Sandstorm",
-        [WeatherType.Hail]: "Hail",
-      };
-      const intLabel = this.currentWeatherIntensity;
-      this.weatherIntensityHudText = this.add.text(GAME_WIDTH - 10, 55,
-        `${weatherNames[this.currentWeather]} (${intLabel})`, {
-        fontSize: "8px", color: INTENSITY_COLOR[this.currentWeatherIntensity], fontFamily: "monospace",
-      }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
-    }
-
-    // ── Weather Forecast HUD (next 2 floors) ──
-    this.weatherForecastHudText = null;
-    if (this.dungeonDef.id !== "bossRush") {
-      const forecastStart = this.currentFloor + 1;
-      const forecastCount = Math.min(2, Math.max(0, this.dungeonDef.floors - this.currentFloor));
-      if (forecastCount > 0) {
-        const forecasts = generateForecast(this.dungeonDef.id, forecastStart, forecastCount, this.dungeonDef.floors);
-        const lines = forecasts.map(f => forecastToString(f));
-        this.weatherForecastHudText = this.add.text(GAME_WIDTH - 10, 65,
-          lines.join("  "), {
-          fontSize: "7px", color: "#6b7280", fontFamily: "monospace",
-        }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
-      }
-    }
 
     // ── Challenge Mode Badge ──
     if (this.challengeMode) {
@@ -2159,23 +2028,7 @@ export class DungeonScene extends Phaser.Scene {
     // ── Floor Mutation: TreasureFloor — spawn extra rare items ──
     if (hasMutation(this.floorMutations, MutationType.TreasureFloor)) {
       const extraCount = getMutationEffect(MutationType.TreasureFloor, "extraRareItems");
-      for (let i = 0; i < extraCount; i++) {
-        const room = rooms[Math.floor(Math.random() * rooms.length)];
-        const ix = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
-        const iy = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
-        if (terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
-
-        const item = rollFloorItem();
-        const icon = item.category === "berry" ? "\u25CF" : item.category === "seed" ? "\u25C6" : item.category === "gem" ? "\u25C7" : "\u2605";
-        const color = "#fde68a"; // golden tint for treasure items
-        const sprite = this.add.text(
-          ix * TILE_DISPLAY + TILE_DISPLAY / 2,
-          iy * TILE_DISPLAY + TILE_DISPLAY / 2,
-          icon, { fontSize: "16px", color, fontFamily: "monospace" }
-        ).setOrigin(0.5).setDepth(6);
-
-        this.floorItems.push({ x: ix, y: iy, item, sprite });
-      }
+      this.itemSys.spawnTreasureItems(rooms, terrain, stairsPos, extraCount);
     }
 
     // ── Mutation HUD Badges (left side, below timer text) ──
@@ -2271,31 +2124,13 @@ export class DungeonScene extends Phaser.Scene {
 
       // Apply FamineFloor: destroy all floor items that were just spawned
       if (fe.type === FloorEventType.FamineFloor) {
-        for (const fi of this.floorItems) {
-          if (fi.sprite) fi.sprite.destroy();
-        }
-        this.floorItems = [];
+        this.itemSys.clearFloorItems();
       }
 
       // Apply TreasureFloor: spawn extra items (doubling)
       if (fe.type === FloorEventType.TreasureFloor) {
         const extraCount = Math.max(1, Math.floor(this.dungeonDef.itemsPerFloor));
-        for (let i = 0; i < extraCount; i++) {
-          const room = rooms[Math.floor(Math.random() * rooms.length)];
-          const ix = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
-          const iy = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
-          if (terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
-          if (ix === stairsPos.x && iy === stairsPos.y) continue;
-          const item = rollFloorItem();
-          const icon = item.category === "berry" ? "\u25CF" : item.category === "seed" ? "\u25C6" : item.category === "gem" ? "\u25C7" : "\u2605";
-          const color = "#fde68a"; // golden tint for treasure items
-          const sprite = this.add.text(
-            ix * TILE_DISPLAY + TILE_DISPLAY / 2,
-            iy * TILE_DISPLAY + TILE_DISPLAY / 2,
-            icon, { fontSize: "16px", color, fontFamily: "monospace" }
-          ).setOrigin(0.5).setDepth(6);
-          this.floorItems.push({ x: ix, y: iy, item, sprite });
-        }
+        this.itemSys.spawnTreasureItems(rooms, terrain, stairsPos, extraCount);
       }
     }
 
@@ -2438,10 +2273,10 @@ export class DungeonScene extends Phaser.Scene {
           this.showLog(`◆ A powerful ${this.miniBossEntity.name} lurks on this floor! ◆`);
         }
       });
-    } else if (this.gauntletActive) {
+    } else if (this.gauntletSys.gauntletActive) {
       // Gauntlet announcement (deferred to give scene time to render)
       this.showLog(`${this.dungeonDef.name} B${this.currentFloor}F`);
-      this.time.delayedCall(300, () => this.startGauntlet());
+      this.time.delayedCall(300, () => this.gauntletSys.start());
     } else {
       this.showLog(`${this.dungeonDef.name} B${this.currentFloor}F`);
     }
@@ -2536,7 +2371,7 @@ export class DungeonScene extends Phaser.Scene {
 
       btn.on("pointerdown", () => {
         if (this.autoExploreSys.autoExploring) { this.autoExploreSys.stopAutoExplore("Stopped."); return; }
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.itemSys.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
         txt.setColor("#fbbf24");
         this.time.delayedCall(150, () => txt.setColor("#8899bb"));
         this.handlePlayerAction(d.dir);
@@ -2554,7 +2389,7 @@ export class DungeonScene extends Phaser.Scene {
 
     waitBtn.on("pointerdown", () => {
       if (this.autoExploreSys.autoExploring) { this.autoExploreSys.stopAutoExplore("Stopped."); return; }
-      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.itemSys.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
       waitTxt.setAlpha(0.5);
       this.time.delayedCall(150, () => waitTxt.setAlpha(1));
       this.turnManager.executeTurn(
@@ -2679,14 +2514,8 @@ export class DungeonScene extends Phaser.Scene {
     this.hpBarFill.fillStyle(barColor, 1);
     this.hpBarFill.fillRoundedRect(39, 9, barWidth, 8, 2);
 
-    // Update Belly bar graphics
-    const bellyRatio = this.maxBelly > 0 ? this.belly / this.maxBelly : 0;
-    this.bellyBarFill.clear();
-    const bellyBarColor = bellyRatio > 0.5 ? 0x4ade80 : bellyRatio > 0.2 ? 0xfbbf24 : 0xef4444;
-    const bellyBarWidth = Math.max(0, Math.floor(98 * bellyRatio));
-    this.bellyBarFill.fillStyle(bellyBarColor, 1);
-    this.bellyBarFill.fillRoundedRect(39, 20, bellyBarWidth, 4, 1);
-    this.bellyText.setText(`${Math.floor(this.belly)}/${this.maxBelly}`);
+    // Update Belly bar graphics (delegated to weatherBellySys)
+    this.weatherBellySys.updateBellyHUD();
 
     const ngStr = this.ngPlusLevel > 0 ? ` NG+${this.ngPlusLevel}` : "";
     this.floorText.setText(`${this.dungeonDef.name}  B${this.currentFloor}F${ngStr}`);
@@ -2808,7 +2637,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeMenu();
       return;
     }
-    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
+    if (this.itemSys.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
 
     sfxMenuOpen();
     this.menuOpen = true;
@@ -2876,7 +2705,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeTeamPanel();
       return;
     }
-    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventRoomSys.eventOpen || this.gameOver || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
+    if (this.itemSys.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventRoomSys.eventOpen || this.gameOver || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineSys.shrineOpen) return;
 
     const liveAllies = this.allies.filter(a => a.alive);
     if (liveAllies.length === 0) {
@@ -3443,7 +3272,7 @@ export class DungeonScene extends Phaser.Scene {
     this.hpText.setAlpha(0);
     this.turnText.setAlpha(0);
     this.timerText.setAlpha(0);
-    this.bellyText.setAlpha(0);
+    this.weatherBellySys.bellyText.setAlpha(0);
     this.logText.setAlpha(0);
     if (this.chainHudText) this.chainHudText.setAlpha(0);
     // Phaser skill buttons & action buttons are no longer created — DOM HUD handles them
@@ -3484,7 +3313,7 @@ export class DungeonScene extends Phaser.Scene {
     hud.timerLabel.textContent = this.timerText.text;
 
     // Belly
-    hud.bellyLabel.textContent = this.bellyText.text;
+    hud.bellyLabel.textContent = this.weatherBellySys.bellyText.text;
 
     // Log box
     const logMsg = this.logMessages.join("\n");
@@ -3520,22 +3349,8 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // Quick-slot button sync
-    if (!this.lastUsedItemId) {
-      hud.quickSlotBtn.textContent = "—";
-      hud.quickSlotBtn.style.color = "#555570";
-    } else {
-      const stack = this.inventory.find(s => s.item.id === this.lastUsedItemId);
-      if (!stack) {
-        hud.quickSlotBtn.textContent = "✕";
-        hud.quickSlotBtn.style.color = "#555570";
-      } else {
-        const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : stack.item.category === "gem" ? "◇" : "★";
-        const countStr = stack.count > 1 ? `${stack.count}` : "";
-        hud.quickSlotBtn.textContent = `${icon}${countStr}`;
-        hud.quickSlotBtn.style.color = "#4ade80";
-      }
-    }
+    // Quick-slot button sync (delegated to ItemSystem)
+    this.itemSys.syncQuickSlotHud();
   }
 
   private showLog(msg: string) {
@@ -3572,694 +3387,16 @@ export class DungeonScene extends Phaser.Scene {
     });
   }
 
-  // ── Items ──
+  // ── Items (delegated to ItemSystem) ──
 
-  private pickupItem() {
-    if (this.turnManager.isBusy || !this.player.alive || this.gameOver) return;
+  private pickupItem() { this.itemSys.pickupItem(); }
+  private toggleBag() { this.itemSys.toggleBag(); }
+  private openBag() { this.itemSys.openBag(); }
+  private closeBag() { this.itemSys.closeBag(); }
+  private useQuickSlot() { this.itemSys.useQuickSlot(); }
+  private updateQuickSlotLabel() { this.itemSys.updateQuickSlotLabel(); }
 
-    if (this.challengeMode === "noItems") {
-      this.showLog("Items are forbidden!");
-      return;
-    }
-
-    // Anti-theft: check if player is stepping on a shop tile
-    const shopTile = this.shopTiles.find(st => st.x === this.player.tileX && st.y === this.player.tileY);
-    if (shopTile && !this.shopClosed) {
-      // Player is trying to pick up a shop item without paying — trigger theft!
-      const si = this.shopItems[shopTile.shopIdx];
-      if (si && si.price > 0) {
-        const itemDef = ITEM_DB[si.itemId];
-        if (itemDef) {
-          // Give the item to the player
-          if (this.inventory.length < MAX_INVENTORY) {
-            const existing = this.inventory.find(s => s.item.id === si.itemId && itemDef.stackable);
-            if (existing) existing.count++;
-            else this.inventory.push({ item: itemDef, count: 1 });
-          }
-          // Remove shop tile visual
-          shopTile.sprite.destroy();
-          shopTile.priceTag.destroy();
-          const stIdx = this.shopTiles.indexOf(shopTile);
-          if (stIdx >= 0) this.shopTiles.splice(stIdx, 1);
-          this.shopItems[shopTile.shopIdx] = { itemId: "", price: 0, stock: 0 };
-          // Trigger theft
-          this.triggerShopTheft();
-          this.updateHUD();
-          return;
-        }
-      }
-    }
-
-    const idx = this.floorItems.findIndex(
-      fi => fi.x === this.player.tileX && fi.y === this.player.tileY
-    );
-    if (idx === -1) {
-      this.showLog("Nothing here to pick up.");
-      return;
-    }
-
-    if (this.inventory.length >= MAX_INVENTORY) {
-      this.showLog("Inventory is full!");
-      return;
-    }
-
-    const fi = this.floorItems[idx];
-    // Add to inventory (stack if possible)
-    const existing = this.inventory.find(s => s.item.id === fi.item.id && fi.item.stackable);
-    if (existing) {
-      existing.count++;
-    } else {
-      this.inventory.push({ item: fi.item, count: 1 });
-    }
-
-    sfxItemPickup();
-    fi.sprite.destroy();
-    this.floorItems.splice(idx, 1);
-    this.showLog(`Picked up ${fi.item.name}!`);
-    // Run log: item picked up
-    this.runLog.add(RunLogEvent.ItemPickedUp, fi.item.name, this.currentFloor, this.turnManager.turn);
-    this.updateQuickSlotLabel();
-    this.questItemsCollected++;
-
-    // Score chain: item pickup
-    addChainAction(this.scoreChain, "itemPickup");
-    this.chainActionThisTurn = true;
-    this.updateChainHUD();
-  }
-
-  private toggleBag() {
-    if (this.bagOpen) {
-      this.closeBag();
-    } else {
-      this.openBag();
-    }
-  }
-
-  private openBag() {
-    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventRoomSys.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen) return;
-    sfxMenuOpen();
-    this.bagOpen = true;
-    if (this.domHud) setDomHudInteractive(this.domHud, false);
-
-    // Dark overlay
-    const overlay = this.add.rectangle(
-      GAME_WIDTH / 2, GAME_HEIGHT / 2,
-      GAME_WIDTH, GAME_HEIGHT,
-      0x000000, 0.8
-    ).setScrollFactor(0).setDepth(150).setInteractive();
-    this.bagUI.push(overlay);
-
-    const title = this.add.text(GAME_WIDTH / 2, 30, "── Bag ──", {
-      fontSize: "14px", color: "#fbbf24", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(151);
-    this.bagUI.push(title);
-
-    const inShopForSell = this.playerInShopRoom && !this.shopClosed;
-
-    if (this.inventory.length === 0) {
-      const empty = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, "Empty", {
-        fontSize: "12px", color: "#666680", fontFamily: "monospace",
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(151);
-      this.bagUI.push(empty);
-    } else {
-      this.inventory.forEach((stack, i) => {
-        const y = 60 + i * 32;
-        const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : stack.item.category === "gem" ? "◇" : "★";
-        const countStr = stack.count > 1 ? ` x${stack.count}` : "";
-        // Show sell price next to item name when in shop room
-        const sellStr = inShopForSell ? ` (Sell: ${getItemSellPrice(stack.item.id, this.currentFloor)}G)` : "";
-        const btn = this.add.text(20, y, `${icon} ${stack.item.name}${countStr}${sellStr}`, {
-          fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace",
-          backgroundColor: "#1a1a3e", padding: { x: 4, y: 4 },
-          fixedWidth: inShopForSell ? 250 : 200,
-        }).setScrollFactor(0).setDepth(151).setInteractive();
-
-        const useBtn = this.add.text(inShopForSell ? 280 : 230, y, "[Use]", {
-          fontSize: "11px", color: "#4ade80", fontFamily: "monospace",
-          padding: { x: 4, y: 4 },
-        }).setScrollFactor(0).setDepth(151).setInteractive();
-
-        const desc = this.add.text(20, y + 16, stack.item.description, {
-          fontSize: "9px", color: "#666680", fontFamily: "monospace",
-        }).setScrollFactor(0).setDepth(151);
-
-        useBtn.on("pointerdown", () => {
-          this.useItem(i);
-          this.closeBag();
-        });
-
-        this.bagUI.push(btn, useBtn, desc);
-
-        // Add Sell button when in shop room
-        if (inShopForSell) {
-          const sellBtn = this.add.text(320, y, "[Sell]", {
-            fontSize: "11px", color: "#fbbf24", fontFamily: "monospace",
-            padding: { x: 4, y: 4 },
-          }).setScrollFactor(0).setDepth(151).setInteractive();
-
-          sellBtn.on("pointerdown", () => {
-            this.closeBag();
-            this.showSellPrompt(i);
-          });
-
-          this.bagUI.push(sellBtn);
-        }
-      });
-    }
-
-    // Close button
-    const closeBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 50, "[Close]", {
-      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(151).setInteractive();
-    closeBtn.on("pointerdown", () => this.closeBag());
-    this.bagUI.push(closeBtn);
-
-    overlay.on("pointerdown", () => this.closeBag());
-  }
-
-  private closeBag() {
-    sfxMenuClose();
-    this.bagOpen = false;
-    if (this.domHud) setDomHudInteractive(this.domHud, true);
-    this.bagUI.forEach(obj => obj.destroy());
-    this.bagUI = [];
-  }
-
-  /** Quick-slot: use the last-used item type again */
-  private useQuickSlot() {
-    if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.minimapSys.fullMapOpen) return;
-    if (!this.lastUsedItemId) {
-      this.showLog("No recent item. Use an item from the Bag first.");
-      return;
-    }
-    const idx = this.inventory.findIndex(s => s.item.id === this.lastUsedItemId);
-    if (idx === -1) {
-      this.showLog(`No ${this.lastUsedItemId} left!`);
-      return;
-    }
-    this.useItem(idx);
-    this.closeBag(); // safety: close bag if somehow open
-  }
-
-  /** Update the quick-slot button label to show last used item (DOM HUD) */
-  private updateQuickSlotLabel() {
-    if (!this.domHud) return;
-    const btn = this.domHud.quickSlotBtn;
-    if (!this.lastUsedItemId) {
-      btn.textContent = "—";
-      btn.style.color = "#555570";
-      return;
-    }
-    const stack = this.inventory.find(s => s.item.id === this.lastUsedItemId);
-    if (!stack) {
-      btn.textContent = "✕";
-      btn.style.color = "#555570";
-      return;
-    }
-    const icon = stack.item.category === "berry" ? "●" : stack.item.category === "seed" ? "◆" : stack.item.category === "gem" ? "◇" : "★";
-    const countStr = stack.count > 1 ? `${stack.count}` : "";
-    btn.textContent = `${icon}${countStr}`;
-    btn.style.color = "#4ade80";
-  }
-
-  private useItem(index: number) {
-    if (this.challengeMode === "noItems") {
-      this.showLog("Items are forbidden!");
-      return;
-    }
-
-    const stack = this.inventory[index];
-    if (!stack) return;
-
-    const item = stack.item;
-    this.lastUsedItemId = item.id;
-    // Run log: item used
-    this.runLog.add(RunLogEvent.ItemUsed, item.name, this.currentFloor, this.turnManager.turn);
-    this.questItemsUsed = true;
-    sfxHeal();
-
-    switch (item.id) {
-      case "oranBerry": {
-        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
-        const baseHeal = Math.floor(30 * affinityMult);
-        const heal = Math.min(baseHeal, this.player.stats.maxHp - this.player.stats.hp);
-        this.player.stats.hp += heal;
-        this.showLog(`Used Oran Berry! Restored ${heal} HP.${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
-        if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
-        // Score chain: healing item resets chain
-        if (this.scoreChain.currentMultiplier > 1.0) {
-          resetChain(this.scoreChain);
-          this.showLog("Chain reset (healed).");
-          this.updateChainHUD();
-        }
-        break;
-      }
-      case "sitrusBerry": {
-        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
-        const heal = Math.floor(this.player.stats.maxHp * 0.5 * affinityMult);
-        const actual = Math.min(heal, this.player.stats.maxHp - this.player.stats.hp);
-        this.player.stats.hp += actual;
-        this.showLog(`Used Sitrus Berry! Restored ${actual} HP.${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
-        if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, actual);
-        // Score chain: healing item resets chain
-        if (this.scoreChain.currentMultiplier > 1.0) {
-          resetChain(this.scoreChain);
-          this.showLog("Chain reset (healed).");
-          this.updateChainHUD();
-        }
-        break;
-      }
-      case "pechaberry": {
-        this.player.statusEffects = [];
-        this.showLog("Used Pecha Berry! Status cleared.");
-        break;
-      }
-      case "reviveSeed": {
-        // Auto-use on death — just show message for now
-        this.showLog("Revive Seed will activate if you faint.");
-        // Don't consume here, consumed on death
-        return; // Don't consume
-      }
-      case "blastSeed": {
-        // Damage first enemy in facing direction
-        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
-        const dmg = Math.floor(40 * affinityMult);
-        const dx = DIR_DX[this.player.facing];
-        const dy = DIR_DY[this.player.facing];
-        const tx = this.player.tileX + dx;
-        const ty = this.player.tileY + dy;
-        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
-        if (target) {
-          target.stats.hp = Math.max(0, target.stats.hp - dmg);
-          this.flashEntity(target, 2.0);
-          this.showLog(`Blast Seed hit ${target.name}! ${dmg} dmg!${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
-          this.checkDeath(target);
-        } else {
-          this.showLog("Blast Seed missed! No enemy in front.");
-        }
-        break;
-      }
-      case "sleepSeed": {
-        const dx = DIR_DX[this.player.facing];
-        const dy = DIR_DY[this.player.facing];
-        const tx = this.player.tileX + dx;
-        const ty = this.player.tileY + dy;
-        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
-        if (target) {
-          target.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 5 });
-          this.showLog(`Sleep Seed hit ${target.name}! Paralyzed!`);
-        } else {
-          this.showLog("Sleep Seed missed! No enemy in front.");
-        }
-        break;
-      }
-      case "escapeOrb": {
-        this.showLog("Used Escape Orb! Escaped the dungeon!");
-        this.gameOver = true;
-        clearDungeonSave();
-        const heldGoldMult = 1 + (this.heldItemEffect.goldBonus ?? 0) / 100;
-        const ngEscGoldMult = 1 + this.ngPlusBonuses.goldPercent / 100;
-        const enchGoldMult = this.enchantment?.id === "abundance" ? 1.15 : 1.0;
-        const escMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
-        const escTalentGoldMult = 1 + (this.talentEffects.goldPercent ?? 0) / 100;
-        const escRelicGoldMult = 1 + (this.relicEffects.goldMult ?? 0);
-        const escGold = Math.floor(goldFromRun(this.currentFloor, this.enemiesDefeated, false) * this.modifierEffects.goldMult * heldGoldMult * this.difficultyMods.goldMult * ngEscGoldMult * enchGoldMult * escMutGoldMult * escTalentGoldMult * escRelicGoldMult);
-        this.cameras.main.fadeOut(500);
-        this.time.delayedCall(600, () => {
-          this.scene.start("HubScene", {
-            gold: escGold,
-            cleared: false,
-            bestFloor: this.currentFloor,
-            enemiesDefeated: this.enemiesDefeated,
-            turns: this.turnManager.turn,
-            dungeonId: this.dungeonDef.id,
-            starter: this.starterId,
-            challengeMode: this.challengeMode ?? undefined,
-            pokemonSeen: Array.from(this.seenSpecies),
-            inventory: serializeInventory(this.inventory),
-            ...this.getQuestTrackingData(),
-          });
-        });
-        break;
-      }
-      case "luminousOrb": {
-        // Just show a message — real map reveal would need fog of war
-        this.showLog("Used Luminous Orb! Floor layout revealed!");
-        break;
-      }
-      case "allPowerOrb": {
-        this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 10 });
-        this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
-        sfxBuff();
-        this.showLog("Used All-Power Orb! ATK & DEF boosted!");
-        break;
-      }
-      case "apple": {
-        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
-        const restore = Math.min(Math.floor(50 * affinityMult), this.maxBelly - this.belly);
-        this.belly += restore;
-        this.resetBellyWarnings();
-        this.showLog(`Ate an Apple! Belly +${restore}. (${Math.floor(this.belly)}/${this.maxBelly})${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
-        break;
-      }
-      case "bigApple": {
-        this.belly = this.maxBelly;
-        this.resetBellyWarnings();
-        this.showLog(`Ate a Big Apple! Belly fully restored!`);
-        break;
-      }
-      case "grimyFood": {
-        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
-        const grimyRestore = Math.min(Math.floor(30 * affinityMult), this.maxBelly - this.belly);
-        this.belly += grimyRestore;
-        this.resetBellyWarnings();
-        this.showLog(`Ate Grimy Food... Belly +${grimyRestore}. (${Math.floor(this.belly)}/${this.maxBelly})${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
-        // 50% chance to cause Burn (poison-like DoT)
-        if (Math.random() < 0.5) {
-          if (!this.player.statusEffects.some(s => s.type === SkillEffect.Burn)) {
-            this.player.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
-            this.showLog("Ugh! The food was bad... You got burned!");
-          }
-        } else {
-          // 50% chance: lose some HP directly
-          const grimyDmg = Math.max(1, Math.floor(this.player.stats.maxHp * 0.1));
-          this.player.stats.hp = Math.max(1, this.player.stats.hp - grimyDmg);
-          if (this.player.sprite) this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, grimyDmg, 0.8);
-          this.showLog(`The food was rotten! Lost ${grimyDmg} HP!`);
-        }
-        break;
-      }
-      case "warpOrb": {
-        let warped = 0;
-        for (const e of this.enemies) {
-          if (!e.alive) continue;
-          const pt = this.findWalkableTile();
-          if (pt) {
-            e.tileX = pt.x; e.tileY = pt.y;
-            if (e.sprite) e.sprite.setPosition(this.tileToPixelX(pt.x), this.tileToPixelY(pt.y));
-            warped++;
-          }
-        }
-        this.showLog(`Used Warp Orb! ${warped} enemies warped away!`);
-        break;
-      }
-      case "foeHoldOrb": {
-        let held = 0;
-        for (const e of this.enemies) {
-          if (!e.alive) continue;
-          e.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 5 });
-          held++;
-        }
-        this.showLog(`Used Foe-Hold Orb! ${held} enemies paralyzed!`);
-        break;
-      }
-      case "maxElixir": {
-        for (const sk of this.player.skills) { sk.currentPp = sk.pp; }
-        this.showLog("Used Max Elixir! All PP restored!");
-        break;
-      }
-      case "warpSeed": {
-        const pt = this.findWalkableTile();
-        if (pt) {
-          this.player.tileX = pt.x; this.player.tileY = pt.y;
-          if (this.player.sprite) this.player.sprite.setPosition(this.tileToPixelX(pt.x), this.tileToPixelY(pt.y));
-          this.showLog("Used Warp Seed! Warped to a new location!");
-        } else {
-          this.showLog("Warp Seed fizzled...");
-        }
-        break;
-      }
-      case "stunSeed": {
-        const dx = DIR_DX[this.player.facing];
-        const dy = DIR_DY[this.player.facing];
-        const tx = this.player.tileX + dx;
-        const ty = this.player.tileY + dy;
-        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
-        if (target) {
-          target.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 3 });
-          this.showLog(`Stun Seed hit ${target.name}! Stunned for 3 turns!`);
-        } else {
-          this.showLog("Stun Seed missed! No enemy in front.");
-        }
-        break;
-      }
-      case "healSeed": {
-        this.player.statusEffects = [];
-        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
-        const baseHeal = Math.floor(20 * affinityMult);
-        const heal = Math.min(baseHeal, this.player.stats.maxHp - this.player.stats.hp);
-        this.player.stats.hp += heal;
-        this.showLog(`Used Heal Seed! Status cleared, restored ${heal} HP.${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
-        if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
-        break;
-      }
-      case "vanishOrb": {
-        // Make player invisible for 10 turns — enemies won't target
-        this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
-        if (this.player.sprite) this.player.sprite.setAlpha(0.3);
-        this.showLog("Used Vanish Orb! You became invisible for 10 turns!");
-        break;
-      }
-      case "reviveSeed": {
-        const fainted = this.allies.find(a => !a.alive);
-        if (fainted) {
-          fainted.alive = true;
-          fainted.stats.hp = Math.floor(fainted.stats.maxHp / 2);
-          if (fainted.sprite) fainted.sprite.setAlpha(1);
-          this.showLog(`Used Revive Seed! ${fainted.speciesId} was revived!`);
-        } else {
-          this.showLog("No fainted allies to revive.");
-          return;
-        }
-        break;
-      }
-      case "allPowerOrb": {
-        this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 10 });
-        this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
-        sfxBuff();
-        this.showLog("Used All-Power Orb! ATK and DEF boosted for 10 turns!");
-        break;
-      }
-      case "escapeOrb": {
-        this.showLog("Used Escape Orb! Escaping the dungeon...");
-        this.time.delayedCall(800, () => {
-          this.scene.start("HubScene", {
-            gold: 0,
-            cleared: false,
-            bestFloor: this.currentFloor,
-            enemiesDefeated: this.enemiesDefeated,
-            turns: this.turnManager.turn,
-            dungeonId: this.dungeonDef.id,
-            starter: this.starterId,
-            challengeMode: this.challengeMode ?? undefined,
-            pokemonSeen: Array.from(this.seenSpecies),
-            inventory: serializeInventory(this.inventory),
-            ...this.getQuestTrackingData(),
-          });
-        });
-        break;
-      }
-      // ── Base throwable/stat items ──
-      case "pebble": {
-        const dx = DIR_DX[this.player.facing];
-        const dy = DIR_DY[this.player.facing];
-        const tx = this.player.tileX + dx;
-        const ty = this.player.tileY + dy;
-        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
-        if (target) {
-          target.stats.hp = Math.max(0, target.stats.hp - 15);
-          this.flashEntity(target, 2.0);
-          this.showLog(`Pebble hit ${target.name}! 15 dmg!`);
-          this.checkDeath(target);
-        } else {
-          this.showLog("Pebble missed! No enemy in front.");
-        }
-        break;
-      }
-      case "gravelrock": {
-        const dx = DIR_DX[this.player.facing];
-        const dy = DIR_DY[this.player.facing];
-        const tx = this.player.tileX + dx;
-        const ty = this.player.tileY + dy;
-        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
-        if (target) {
-          target.stats.hp = Math.max(0, target.stats.hp - 25);
-          this.flashEntity(target, 2.0);
-          this.showLog(`Gravelrock hit ${target.name}! 25 dmg!`);
-          this.checkDeath(target);
-        } else {
-          this.showLog("Gravelrock missed! No enemy in front.");
-        }
-        break;
-      }
-      case "xAttack": {
-        this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 10 });
-        sfxBuff();
-        this.showLog("Used X-Attack! ATK boosted for 10 turns!");
-        break;
-      }
-      case "xDefend": {
-        this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 10 });
-        sfxBuff();
-        this.showLog("Used X-Defend! DEF boosted for 10 turns!");
-        break;
-      }
-      // ── Upgraded (Synthesized) Items ──
-      case "megaOranBerry": {
-        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
-        const baseHeal = Math.floor(80 * affinityMult);
-        const heal = Math.min(baseHeal, this.player.stats.maxHp - this.player.stats.hp);
-        this.player.stats.hp += heal;
-        this.showLog(`Used Mega Oran Berry! Restored ${heal} HP.${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
-        if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
-        if (this.scoreChain.currentMultiplier > 1.0) {
-          resetChain(this.scoreChain);
-          this.showLog("Chain reset (healed).");
-          this.updateChainHUD();
-        }
-        break;
-      }
-      case "megaSitrusBerry": {
-        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
-        const baseHeal = Math.floor(150 * affinityMult);
-        const heal = Math.min(baseHeal, this.player.stats.maxHp - this.player.stats.hp);
-        this.player.stats.hp += heal;
-        this.showLog(`Used Mega Sitrus Berry! Restored ${heal} HP.${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
-        if (this.player.sprite) this.showHealPopup(this.player.sprite.x, this.player.sprite.y, heal);
-        if (this.scoreChain.currentMultiplier > 1.0) {
-          resetChain(this.scoreChain);
-          this.showLog("Chain reset (healed).");
-          this.updateChainHUD();
-        }
-        break;
-      }
-      case "goldenApple": {
-        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
-        const restore = Math.min(Math.floor(200 * affinityMult), this.maxBelly - this.belly);
-        this.belly += restore;
-        this.resetBellyWarnings();
-        this.showLog(`Ate a Golden Apple! Belly +${restore}. (${Math.floor(this.belly)}/${this.maxBelly})${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
-        break;
-      }
-      case "crystalPebble": {
-        const dx = DIR_DX[this.player.facing];
-        const dy = DIR_DY[this.player.facing];
-        const tx = this.player.tileX + dx;
-        const ty = this.player.tileY + dy;
-        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
-        if (target) {
-          target.stats.hp = Math.max(0, target.stats.hp - 30);
-          this.flashEntity(target, 2.0);
-          this.showLog(`Crystal Pebble hit ${target.name}! 30 dmg!`);
-          this.checkDeath(target);
-        } else {
-          this.showLog("Crystal Pebble missed! No enemy in front.");
-        }
-        break;
-      }
-      case "meteorRock": {
-        const dx = DIR_DX[this.player.facing];
-        const dy = DIR_DY[this.player.facing];
-        const tx = this.player.tileX + dx;
-        const ty = this.player.tileY + dy;
-        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
-        if (target) {
-          target.stats.hp = Math.max(0, target.stats.hp - 50);
-          this.flashEntity(target, 2.0);
-          this.showLog(`Meteor Rock hit ${target.name}! 50 dmg!`);
-          this.checkDeath(target);
-        } else {
-          this.showLog("Meteor Rock missed! No enemy in front.");
-        }
-        break;
-      }
-      case "autoReviver": {
-        // Auto-use on death — just show message
-        this.showLog("Auto Reviver will activate instantly if you faint.");
-        return; // Don't consume
-      }
-      case "megaElixir": {
-        for (const sk of this.player.skills) {
-          sk.currentPp = sk.pp + 10;
-        }
-        this.showLog("Used Mega Elixir! All PP restored + 10 bonus PP!");
-        break;
-      }
-      case "megaBlastSeed": {
-        const affinityMult = getAffinityMultiplier(this.player.types, item.category, item.id);
-        const dmg = Math.floor(80 * affinityMult);
-        const dx = DIR_DX[this.player.facing];
-        const dy = DIR_DY[this.player.facing];
-        const tx = this.player.tileX + dx;
-        const ty = this.player.tileY + dy;
-        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
-        if (target) {
-          target.stats.hp = Math.max(0, target.stats.hp - dmg);
-          this.flashEntity(target, 2.0);
-          this.showLog(`Mega Blast Seed hit ${target.name}! ${dmg} dmg!${affinityMult > 1 ? " (Affinity Bonus!)" : ""}`);
-          this.checkDeath(target);
-        } else {
-          this.showLog("Mega Blast Seed missed! No enemy in front.");
-        }
-        break;
-      }
-      case "deepSleepSeed": {
-        const dx = DIR_DX[this.player.facing];
-        const dy = DIR_DY[this.player.facing];
-        const tx = this.player.tileX + dx;
-        const ty = this.player.tileY + dy;
-        const target = this.enemies.find(e => e.alive && e.tileX === tx && e.tileY === ty);
-        if (target) {
-          target.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 8 });
-          this.showLog(`Deep Sleep Seed hit ${target.name}! Deep sleep for 8 turns!`);
-        } else {
-          this.showLog("Deep Sleep Seed missed! No enemy in front.");
-        }
-        break;
-      }
-      case "megaXAttack": {
-        this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: 15 });
-        sfxBuff();
-        this.showLog("Used Mega X-Attack! ATK greatly boosted for 15 turns!");
-        break;
-      }
-      case "megaXDefend": {
-        this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: 15 });
-        sfxBuff();
-        this.showLog("Used Mega X-Defend! DEF greatly boosted for 15 turns!");
-        break;
-      }
-      default: {
-        // Type Gem handling
-        if (item.category === ItemCategory.Gem && item.gemId) {
-          const gem = getTypeGem(item.gemId);
-          if (gem) {
-            this.activeTypeGems.set(gem.type, gem.boostPercent);
-            sfxBuff();
-            this.showLog(`Used ${gem.name}! ${gem.type}-type moves boosted by ${gem.boostPercent}% this floor!`);
-            this.updateTypeGemHUD();
-            break;
-          }
-        }
-        // TM handling
-        if (item.tmSkillId) {
-          this.useTM(index, item);
-          return; // Don't consume here — handled inside useTM
-        }
-        this.showLog(`Used ${item.name}.`);
-        break;
-      }
-    }
-
-    // Consume item
-    stack.count--;
-    if (stack.count <= 0) {
-      this.inventory.splice(index, 1);
-    }
-
-    this.updateHUD();
-    this.updateQuickSlotLabel();
-  }
+  private useItem(index: number) { this.itemSys.useItem(index); }
 
   /** Find a random walkable tile (ground, no entity) */
   private findWalkableTile(): { x: number; y: number } | null {
@@ -4272,33 +3409,6 @@ export class DungeonScene extends Phaser.Scene {
       return { x, y };
     }
     return null;
-  }
-
-  /** Use a TM to teach a skill — replaces the first (weakest) skill */
-  private useTM(index: number, item: ItemDef) {
-    if (!item.tmSkillId) return;
-    const newSkill = SKILL_DB[item.tmSkillId];
-    if (!newSkill) { this.showLog("Invalid TM!"); return; }
-
-    // Replace the skill with lowest power (or first non-Tackle)
-    let replaceIdx = 0;
-    let lowestPower = Infinity;
-    for (let i = 0; i < this.player.skills.length; i++) {
-      if (this.player.skills[i].power < lowestPower) {
-        lowestPower = this.player.skills[i].power;
-        replaceIdx = i;
-      }
-    }
-
-    const oldName = this.player.skills[replaceIdx].name;
-    this.player.skills[replaceIdx] = createSkill(SKILL_DB[item.tmSkillId]);
-    this.showLog(`Learned ${newSkill.name}! (replaced ${oldName})`);
-
-    // Consume TM
-    const stack = this.inventory[index];
-    stack.count--;
-    if (stack.count <= 0) this.inventory.splice(index, 1);
-    this.updateHUD();
   }
 
   /** Check for auto reviver, revive seed, or Phoenix enchantment on death */
@@ -4790,8 +3900,6 @@ export class DungeonScene extends Phaser.Scene {
     this.statusFlashTimers.push(curseTimer);
   }
 
-  // ── Stairs ──
-
   // ── Summon Trap Enemy Spawn (callback for TrapHazardSystem) ──
 
   private spawnSummonTrapEnemies(trapX: number, trapY: number) {
@@ -4855,62 +3963,21 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
-  // ── Belly (Hunger) ──
+  // ── Belly & Weather (delegated to weatherBellySys) ──
 
   private tickBelly() {
-    if (this.belly > 0) {
-      // Difficulty-based drain: higher difficulty = faster hunger, NG+ reduces drain
-      const ngBellyMult = 1 - this.ngPlusBonuses.bellyDrainReduction / 100;
-      const talentBellyMult = 1 - (this.talentEffects.bellyDrainReduction ?? 0) / 100;
-      const blessingBellyMult = 1 + getBlessingEffect(this.activeBlessings, "bellyDrainMult");
-      // FamineFloor: belly drains 2x faster
-      const famineFloorMult = this.floorEvent?.type === FloorEventType.FamineFloor ? 2.0 : 1.0;
-      const drainRate = (0.5 + this.dungeonDef.difficulty * 0.1) * this.difficultyMods.bellyDrainMult * ngBellyMult * talentBellyMult * blessingBellyMult * famineFloorMult;
-      const prevBelly = this.belly;
-      this.belly = Math.max(0, this.belly - drainRate);
-
-      if (this.belly <= 0) {
-        // Just hit 0 this tick
-        this.belly = 0;
-        this.showLog("Your belly is empty! HP will drain each turn!");
-        this.bellyWarningShown = true;
-        this.bellyUrgentShown = true;
-      } else if (this.belly <= this.maxBelly * 0.1 && !this.bellyUrgentShown) {
-        // Urgent warning at 10%
-        this.showLog("You're starving! Find food quickly!");
-        this.bellyUrgentShown = true;
-      } else if (this.belly <= this.maxBelly * 0.2 && prevBelly > this.maxBelly * 0.2 && !this.bellyWarningShown) {
-        // Warning at 20%
-        this.showLog("Your belly is getting empty...");
-        this.bellyWarningShown = true;
-      }
-    } else {
-      // Starving: lose HP based on max HP (min 1, ~2% of maxHp)
-      const starveDmg = Math.max(1, Math.floor(this.player.stats.maxHp * 0.02));
-      this.player.stats.hp = Math.max(0, this.player.stats.hp - starveDmg);
-      if (this.player.sprite) this.showDamagePopup(this.player.sprite.x, this.player.sprite.y, starveDmg, 0.5);
-      // Show periodic reminders
-      if (this.turnManager.turn % 5 === 0) {
-        this.showLog(`Starving! Took ${starveDmg} damage!`);
-      }
-      this.checkPlayerDeath();
-    }
+    this.weatherBellySys.tickBelly();
   }
 
-  /** Reset belly warning flags (call when belly is restored by food) */
   private resetBellyWarnings() {
-    if (this.belly > this.maxBelly * 0.2) {
-      this.bellyWarningShown = false;
-      this.bellyUrgentShown = false;
-    } else if (this.belly > this.maxBelly * 0.1) {
-      this.bellyUrgentShown = false;
-    }
+    this.weatherBellySys.resetBellyWarnings();
   }
 
-  // ── Weather Tick ──
+  // ── Per-Turn Tick (chain scoring, mutations, regen, then weather) ──
 
   private tickWeather() {
-    this.floorTurns++;
+    // Weather system increments floorTurns and handles weather transitions + damage
+    this.weatherBellySys.tickWeather();
 
     // Score chain: tick idle counter if no scoring action happened this turn
     if (!this.chainActionThisTurn && this.scoreChain.currentMultiplier > 1.0) {
@@ -4969,88 +4036,6 @@ export class DungeonScene extends Phaser.Scene {
         this.checkPlayerDeath();
       }
     }
-
-    // Check mid-floor weather transition every 10 turns
-    if (this.floorTurns % 10 === 0 && this.currentWeather !== WeatherType.None) {
-      this.checkWeatherTransition();
-    }
-
-    if (this.currentWeather === WeatherType.None || this.currentWeather === WeatherType.Rain) return;
-    const BASE_WEATHER_DMG = 5;
-    const intensityMult = INTENSITY_MULTIPLIER[this.currentWeatherIntensity];
-    const WEATHER_DMG = Math.max(1, Math.floor(BASE_WEATHER_DMG * intensityMult));
-
-    // Apply chip damage to all entities not immune
-    for (const entity of this.allEntities) {
-      if (!entity.alive) continue;
-      if (isWeatherImmune(this.currentWeather, entity.types)) continue;
-
-      entity.stats.hp = Math.max(0, entity.stats.hp - WEATHER_DMG);
-      if (entity.sprite) {
-        this.showDamagePopup(entity.sprite.x, entity.sprite.y, WEATHER_DMG, 0.5);
-      }
-      if (entity === this.player) {
-        this.checkPlayerDeath();
-      } else if (entity.stats.hp <= 0) {
-        this.checkDeath(entity);
-      }
-    }
-  }
-
-  /** Check and perform a mid-floor weather transition */
-  private checkWeatherTransition() {
-    if (!shouldWeatherTransition(this.currentFloor)) return;
-    const newWeather = rollFloorWeather(this.dungeonDef.id, this.currentFloor);
-    if (newWeather === this.currentWeather) return; // no change
-
-    this.currentWeather = newWeather;
-    this.showLog("The weather changed!");
-
-    // Update weather text HUD
-    if (this.currentWeather !== WeatherType.None) {
-      const wd = WEATHERS[this.currentWeather];
-      const intLabel = this.currentWeatherIntensity;
-      this.weatherText.setText(`${wd.symbol} ${wd.name} (${intLabel}): ${wd.description}`);
-      this.weatherText.setColor(INTENSITY_COLOR[this.currentWeatherIntensity]);
-      sfxWeatherChange();
-      this.showLog(`The weather is now ${wd.name} (${intLabel})!`);
-      // Run log: weather changed mid-floor
-      this.runLog.add(RunLogEvent.WeatherChanged, wd.name, this.currentFloor, this.turnManager.turn);
-    } else {
-      this.weatherText.setText("");
-    }
-
-    // Update the compact HUD indicator
-    if (this.weatherIntensityHudText) {
-      this.weatherIntensityHudText.destroy();
-      this.weatherIntensityHudText = null;
-    }
-    if (this.currentWeather !== WeatherType.None) {
-      const weatherNames: Record<string, string> = {
-        [WeatherType.Rain]: "Rain",
-        [WeatherType.Sandstorm]: "Sandstorm",
-        [WeatherType.Hail]: "Hail",
-      };
-      const intLabel = this.currentWeatherIntensity;
-      this.weatherIntensityHudText = this.add.text(GAME_WIDTH - 10, 55,
-        `${weatherNames[this.currentWeather]} (${intLabel})`, {
-        fontSize: "8px", color: INTENSITY_COLOR[this.currentWeatherIntensity], fontFamily: "monospace",
-      }).setOrigin(1, 0).setScrollFactor(0).setDepth(100);
-
-      // Flash effect on weather change
-      this.weatherIntensityHudText.setAlpha(0);
-      this.tweens.add({
-        targets: this.weatherIntensityHudText,
-        alpha: { from: 0, to: 1 },
-        duration: 300,
-        yoyo: true,
-        repeat: 2,
-        onComplete: () => { if (this.weatherIntensityHudText) this.weatherIntensityHudText.setAlpha(1); },
-      });
-    }
-
-    // Rebuild weather visuals
-    this.setupWeatherVisuals();
   }
 
   private checkPlayerDeath() {
@@ -5058,130 +4043,6 @@ export class DungeonScene extends Phaser.Scene {
       if (this.tryRevive()) return;
       this.player.alive = false;
       this.showGameOver();
-    }
-  }
-
-  // ── Weather Visuals ──
-
-  private clearWeatherVisuals() {
-    if (this.weatherOverlay) { this.weatherOverlay.destroy(); this.weatherOverlay = null; }
-    if (this.weatherParticles) { this.weatherParticles.destroy(); this.weatherParticles = null; }
-    if (this.weatherTimer) { this.weatherTimer.destroy(); this.weatherTimer = null; }
-  }
-
-  private setupWeatherVisuals() {
-    this.clearWeatherVisuals();
-    if (this.currentWeather === WeatherType.None) return;
-
-    switch (this.currentWeather) {
-      case WeatherType.Rain: {
-        // Blue-tinted overlay
-        this.weatherOverlay = this.add.rectangle(
-          GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT,
-          0x3b82f6, 0.06
-        ).setScrollFactor(0).setDepth(150);
-
-        // Rain particle effect
-        const gfx = this.add.graphics().setScrollFactor(0).setDepth(150);
-        this.weatherParticles = gfx;
-        this.weatherTimer = this.time.addEvent({
-          delay: 80,
-          loop: true,
-          callback: () => {
-            gfx.clear();
-            gfx.lineStyle(1, 0x6390f0, 0.3);
-            for (let i = 0; i < 40; i++) {
-              const x = Math.random() * GAME_WIDTH;
-              const y = Math.random() * GAME_HEIGHT;
-              gfx.lineBetween(x, y, x - 3, y + 12);
-            }
-          },
-        });
-        break;
-      }
-      case WeatherType.Sandstorm: {
-        // Brown/sepia overlay
-        this.weatherOverlay = this.add.rectangle(
-          GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT,
-          0xd4a574, 0.08
-        ).setScrollFactor(0).setDepth(150);
-
-        // Sand particles blowing horizontally
-        const gfx = this.add.graphics().setScrollFactor(0).setDepth(150);
-        this.weatherParticles = gfx;
-        this.weatherTimer = this.time.addEvent({
-          delay: 100,
-          loop: true,
-          callback: () => {
-            gfx.clear();
-            gfx.fillStyle(0xd4a843, 0.15);
-            for (let i = 0; i < 30; i++) {
-              const x = Math.random() * GAME_WIDTH;
-              const y = Math.random() * GAME_HEIGHT;
-              gfx.fillCircle(x, y, 1 + Math.random() * 2);
-            }
-          },
-        });
-        break;
-      }
-      case WeatherType.Hail: {
-        // White/light blue overlay
-        this.weatherOverlay = this.add.rectangle(
-          GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT,
-          0x93c5fd, 0.06
-        ).setScrollFactor(0).setDepth(150);
-
-        // Hail particles (small white dots)
-        const gfx = this.add.graphics().setScrollFactor(0).setDepth(150);
-        this.weatherParticles = gfx;
-        this.weatherTimer = this.time.addEvent({
-          delay: 120,
-          loop: true,
-          callback: () => {
-            gfx.clear();
-            gfx.fillStyle(0xffffff, 0.25);
-            for (let i = 0; i < 25; i++) {
-              const x = Math.random() * GAME_WIDTH;
-              const y = Math.random() * GAME_HEIGHT;
-              gfx.fillCircle(x, y, 1 + Math.random());
-            }
-          },
-        });
-        break;
-      }
-    }
-  }
-
-  // ── Stairs ──
-
-  private checkStairs() {
-    const { stairsPos } = this.dungeon;
-    if (this.player.tileX === stairsPos.x && this.player.tileY === stairsPos.y) {
-      // Block stairs if boss is alive (but allow flee from legendary encounters)
-      if (this.bossEntity && this.bossEntity.alive) {
-        this.showLog("The stairs are sealed! Defeat the boss first!");
-        return;
-      }
-      // Block stairs during gauntlet
-      if (this.gauntletStairsLocked) {
-        this.showLog("The stairs are sealed! Clear the gauntlet first!");
-        return;
-      }
-      // Legendary encounter: player can flee (use stairs) with no reward
-      if (this.legendaryEntity && this.legendaryEntity.alive) {
-        this.showLog("The legendary Pokemon disappeared...");
-        // Clean up legendary entity visuals
-        if (this.legendaryEntity.sprite) this.legendaryEntity.sprite.destroy();
-        this.legendaryEntity.alive = false;
-        this.legendaryEntity = null;
-        this.legendaryEncounter = null;
-        if (this.legendaryHpBg) { this.legendaryHpBg.setVisible(false); }
-        if (this.legendaryHpBar) { this.legendaryHpBar.setVisible(false); }
-        if (this.legendaryNameText) { this.legendaryNameText.setVisible(false); }
-        if (this.legendaryParticleTimer) { this.legendaryParticleTimer.destroy(); this.legendaryParticleTimer = null; }
-        if (this.legendaryParticleGraphics) { this.legendaryParticleGraphics.destroy(); this.legendaryParticleGraphics = null; }
-      }
-      this.advanceFloor();
     }
   }
 
@@ -5714,32 +4575,7 @@ export class DungeonScene extends Phaser.Scene {
 
   /** Spawn reward items on the floor inside a monster house room */
   private spawnMonsterHouseRewardItems(room: { x: number; y: number; w: number; h: number }, count: number) {
-    for (let i = 0; i < count; i++) {
-      const ix = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
-      const iy = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
-      if (this.dungeon.terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
-
-      const item = rollFloorItem();
-      const icon = item.category === "berry" ? "●" : item.category === "seed" ? "◆" : item.category === "gem" ? "◇" : "★";
-      const color = item.category === "berry" ? "#ff6b9d" : item.category === "seed" ? "#4ade80" : item.category === "gem" ? "#ddaaff" : "#60a5fa";
-      const sprite = this.add.text(
-        ix * TILE_DISPLAY + TILE_DISPLAY / 2,
-        iy * TILE_DISPLAY + TILE_DISPLAY / 2,
-        icon, { fontSize: "16px", color, fontFamily: "monospace" }
-      ).setOrigin(0.5).setDepth(6);
-
-      // Reward items spawn with a pop-in animation
-      sprite.setScale(0);
-      this.tweens.add({
-        targets: sprite,
-        scaleX: 1, scaleY: 1,
-        duration: 400,
-        delay: i * 150,
-        ease: "Back.easeOut",
-      });
-
-      this.floorItems.push({ x: ix, y: iy, item, sprite });
-    }
+    this.itemSys.spawnMonsterHouseRewardItems(room, this.dungeon.terrain, count);
   }
 
   private openShopUI() {
@@ -5965,99 +4801,6 @@ export class DungeonScene extends Phaser.Scene {
     };
   }
 
-  private advanceFloor() {
-    this.autoExploreSys.stopAutoExplore();
-    // Endless dungeon never shows clear screen — always advance
-    // Daily dungeon and other dungeons show clear when floors are completed
-    if (this.dungeonDef.id !== "endlessDungeon" && this.currentFloor >= this.dungeonDef.floors) {
-      this.showDungeonClear();
-      return;
-    }
-
-    // Apply healOnFloor modifier before advancing
-    if (this.modifierEffects.healOnFloor) {
-      this.player.stats.hp = this.player.stats.maxHp;
-    }
-
-    // Held item: heal per floor
-    const healPerFloor = this.heldItemEffect.healPerFloor ?? 0;
-    if (healPerFloor > 0 && this.player.stats.hp < this.player.stats.maxHp) {
-      this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + healPerFloor);
-      this.showLog(`Held item healed ${healPerFloor} HP!`);
-    }
-
-    // Score chain: quick floor bonus if cleared in under 20 turns
-    if (this.floorTurns < 20) {
-      const bonus = addChainAction(this.scoreChain, "quickFloor");
-      if (bonus > 0) this.showLog(`Quick clear! Chain +${bonus} pts!`);
-      this.updateChainHUD();
-    }
-
-    // Auto-save before advancing floor
-    this.autoSave();
-
-    this.gameOver = true;
-    sfxStairs();
-    this.showLog(`Went to B${this.currentFloor + 1}F!`);
-
-    // Run log: floor advance
-    this.runLog.add(RunLogEvent.FloorAdvanced, `Advanced to B${this.currentFloor + 1}F`, this.currentFloor, this.turnManager.turn);
-
-    // Tick blessing/curse durations on floor advance
-    const prevBlessingCount = this.activeBlessings.length;
-    this.activeBlessings = tickBlessingDurations(this.activeBlessings);
-    if (this.activeBlessings.length < prevBlessingCount) {
-      this.showLog("Some blessings/curses have expired.");
-    }
-
-    // Pass modifier IDs through floor transitions
-    const modifierIds = this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined;
-
-    if (this.domHud) setDomHudInteractive(this.domHud, false);
-
-    let restarted = false;
-    const doRestart = () => {
-      if (restarted) return;
-      restarted = true;
-      // Clean up DOM HUD before restart
-      if (this.domHudElement) {
-        this.domHudElement.destroy();
-        this.domHudElement = null as unknown as Phaser.GameObjects.DOMElement;
-        this.domHud = null as unknown as DomHudElements;
-      }
-      this.scene.restart({
-        floor: this.currentFloor + 1,
-        hp: this.player.stats.hp,
-        maxHp: this.player.stats.maxHp,
-        skills: this.player.skills,
-        inventory: this.inventory,
-        level: this.player.stats.level,
-        atk: this.player.stats.atk,
-        def: this.player.stats.def,
-        exp: this.totalExp,
-        dungeonId: this.dungeonDef.id,
-        allies: this.serializeAllies(),
-        belly: this.belly,
-        starter: this.starterId,
-        challengeMode: this.challengeMode ?? undefined,
-        modifiers: modifierIds,
-        runElapsedTime: this.runElapsedSeconds,
-        scoreChain: this.scoreChain,
-        legendaryEncountered: this.legendaryEncountered,
-        questItemsCollected: this.questItemsCollected,
-        questItemsUsed: this.questItemsUsed,
-        relics: this.activeRelics,
-        runLogEntries: this.runLog.serialize(),
-        blessings: serializeBlessings(this.activeBlessings),
-      });
-    };
-
-    this.cameras.main.fadeOut(500, 0, 0, 0);
-    this.cameras.main.once("camerafadeoutcomplete", doRestart);
-    // Safety fallback using native setTimeout (Phaser timers may stall with the scene)
-    setTimeout(doRestart, 1200);
-  }
-
   private showDungeonClear() {
     this.gameOver = true;
     stopBgm();
@@ -6217,7 +4960,7 @@ export class DungeonScene extends Phaser.Scene {
       this.challengeMode === "speedrun" ? "Speed Run Bonus: 2x Gold!" : "",
       this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
       this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
-      this.gauntletTotalWavesCleared > 0 ? `Gauntlet Waves: ${this.gauntletTotalWavesCleared}` : "",
+      this.gauntletSys.totalWavesCleared > 0 ? `Gauntlet Waves: ${this.gauntletSys.totalWavesCleared}` : "",
       clearChainStr,
       `Score: ${clearRunScore}`,
     ].filter(Boolean).join("\n");
@@ -6633,7 +5376,7 @@ export class DungeonScene extends Phaser.Scene {
       `Lv.${this.player.stats.level}  Defeated: ${this.enemiesDefeated}  Turns: ${this.turnManager.turn}`,
       this.dungeonDef.id === "dailyDungeon" ? `Daily Score: ${dailyScoreValue}` : "",
       this.isBossRush ? `Bosses Defeated: ${this.bossesDefeated}/10` : "",
-      this.gauntletTotalWavesCleared > 0 ? `Gauntlet Waves: ${this.gauntletTotalWavesCleared}` : "",
+      this.gauntletSys.totalWavesCleared > 0 ? `Gauntlet Waves: ${this.gauntletSys.totalWavesCleared}` : "",
       goChainStr,
       `Score: ${goRunScore}`,
     ].filter(Boolean).join("\n");
@@ -7087,17 +5830,12 @@ export class DungeonScene extends Phaser.Scene {
       this.recoverPP(this.player);
 
       // Check for items on ground
-      const itemHere = this.floorItems.find(
-        fi => fi.x === this.player.tileX && fi.y === this.player.tileY
-      );
-      if (itemHere) {
-        this.showLog(`There's a ${itemHere.item.name} here. [줍기] to pick up.`);
-      }
+      this.itemSys.checkFloorItem();
 
       this.trapHazardSys.checkTraps();
       this.trapHazardSys.checkPlayerHazard();
       this.trapHazardSys.revealNearbyTraps();
-      this.checkStairs();
+      this.stairsSys.checkStairs();
       this.checkShop();
       this.checkMonsterHouse();
       this.eventRoomSys.checkEventRoom();
@@ -8744,9 +7482,9 @@ export class DungeonScene extends Phaser.Scene {
       });
 
       // ── Gauntlet wave clear check ──
-      if (this.gauntletActive) {
+      if (this.gauntletSys.gauntletActive) {
         this.time.delayedCall(400, () => {
-          this.checkGauntletWaveCleared();
+          this.gauntletSys.checkGauntletWaveCleared();
         });
       }
 
@@ -8759,385 +7497,9 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
-  // ── Boss Gauntlet Methods ──
 
-  /** Start the gauntlet: show announcement, create HUD, spawn first wave */
-  private startGauntlet() {
-    if (!this.gauntletConfig) return;
-
-    // Screen shake on gauntlet start
-    this.cameras.main.shake(500, 0.02);
-    this.cameras.main.flash(400, 255, 50, 50);
-
-    // Big red "BOSS GAUNTLET!" announcement text
-    const gauntletTitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "BOSS GAUNTLET!", {
-      fontSize: "22px", color: "#ff2222", fontFamily: "monospace", fontStyle: "bold",
-      stroke: "#000000", strokeThickness: 5,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(300);
-    this.tweens.add({
-      targets: gauntletTitle,
-      y: GAME_HEIGHT / 2 - 80,
-      alpha: { from: 1, to: 0 },
-      scaleX: { from: 1, to: 1.5 },
-      scaleY: { from: 1, to: 1.5 },
-      duration: 2500,
-      ease: "Quad.easeOut",
-      onComplete: () => gauntletTitle.destroy(),
-    });
-
-    this.showLog("A Boss Gauntlet begins! Defeat all waves!");
-
-    // Create gauntlet wave HUD text (top center, red)
-    this.gauntletWaveText = this.add.text(
-      GAME_WIDTH / 2, 86, `Wave 1/${this.gauntletConfig.waves.length}`,
-      { fontSize: "11px", color: "#ff4444", fontFamily: "monospace", fontStyle: "bold",
-        stroke: "#000000", strokeThickness: 2 }
-    ).setOrigin(0.5).setScrollFactor(0).setDepth(103);
-
-    // Pulsing red vignette border
-    this.gauntletVignette = this.add.graphics().setScrollFactor(0).setDepth(99);
-    this.drawGauntletVignette(0.3);
-    // Pulsing tween for the vignette
-    const vignetteObj = { alpha: 0.3 };
-    this.gauntletVignetteTween = this.tweens.add({
-      targets: vignetteObj,
-      alpha: { from: 0.15, to: 0.4 },
-      duration: 1200,
-      yoyo: true,
-      repeat: -1,
-      onUpdate: () => {
-        this.drawGauntletVignette(vignetteObj.alpha);
-      },
-    });
-
-    // Switch to boss theme for dramatic effect
-    switchToBossTheme();
-
-    // Spawn the first wave after a brief delay
-    this.time.delayedCall(800, () => {
-      this.spawnGauntletWave(0);
-    });
-  }
-
-  /** Draw red vignette border overlay */
-  private drawGauntletVignette(alpha: number) {
-    if (!this.gauntletVignette) return;
-    this.gauntletVignette.clear();
-    // Draw red gradient border (4 edge rectangles)
-    const borderW = 12;
-    this.gauntletVignette.fillStyle(0xff0000, alpha);
-    // top
-    this.gauntletVignette.fillRect(0, 0, GAME_WIDTH, borderW);
-    // bottom
-    this.gauntletVignette.fillRect(0, GAME_HEIGHT - borderW, GAME_WIDTH, borderW);
-    // left
-    this.gauntletVignette.fillRect(0, 0, borderW, GAME_HEIGHT);
-    // right
-    this.gauntletVignette.fillRect(GAME_WIDTH - borderW, 0, borderW, GAME_HEIGHT);
-  }
-
-  /** Spawn a specific gauntlet wave's bosses */
-  private spawnGauntletWave(waveIndex: number) {
-    if (!this.gauntletConfig) return;
-    if (waveIndex >= this.gauntletConfig.waves.length) return;
-
-    this.gauntletCurrentWave = waveIndex;
-    this.gauntletEnemies = [];
-    const wave = this.gauntletConfig.waves[waveIndex];
-    const bossCount = wave.count ?? 1;
-    const rooms = this.dungeon.rooms;
-
-    // Pick the largest room (excluding the player's room) for boss placement
-    const bossRoom = rooms.length > 1
-      ? rooms.slice(1).reduce((best, r) => (r.w * r.h > best.w * best.h) ? r : best, rooms[1])
-      : rooms[0];
-
-    for (let i = 0; i < bossCount; i++) {
-      const speciesId = i === 0 ? wave.bossSpecies : this.gauntletConfig.waves[waveIndex].bossSpecies;
-      const sp = SPECIES[speciesId];
-      if (!sp) continue;
-
-      // Offset placement for multiple bosses
-      const offsetX = i === 0 ? 0 : (i % 2 === 0 ? 1 : -1);
-      const offsetY = i > 1 ? 1 : 0;
-      let bx = bossRoom.x + Math.floor(bossRoom.w / 2) + offsetX;
-      let by = bossRoom.y + Math.floor(bossRoom.h / 2) + offsetY;
-
-      // Clamp to room bounds
-      bx = Math.max(bossRoom.x + 1, Math.min(bossRoom.x + bossRoom.w - 2, bx));
-      by = Math.max(bossRoom.y + 1, Math.min(bossRoom.y + bossRoom.h - 2, by));
-
-      // Make sure tile is ground and not occupied
-      if (this.dungeon.terrain[by]?.[bx] !== TerrainType.GROUND) continue;
-      if (this.allEntities.some(e => e.alive && e.tileX === bx && e.tileY === by)) {
-        // Try adjacent tile
-        bx = Math.min(bossRoom.x + bossRoom.w - 2, bx + 1);
-      }
-
-      const baseStats = getEnemyStats(this.currentFloor, this.dungeonDef.difficulty, sp, this.ngPlusLevel);
-      const bossStats = {
-        hp: Math.floor(baseStats.hp * wave.hpMultiplier * this.difficultyMods.enemyHpMult),
-        maxHp: Math.floor(baseStats.hp * wave.hpMultiplier * this.difficultyMods.enemyHpMult),
-        atk: Math.floor(baseStats.atk * wave.hpMultiplier * this.difficultyMods.enemyAtkMult),
-        def: Math.floor(baseStats.def * wave.hpMultiplier),
-        level: wave.level,
-      };
-
-      const bossName = waveIndex === (this.gauntletConfig.waves.length - 1) && this.gauntletConfig.waves.length >= 3
-        ? `Elite ${sp.name}` : `Gauntlet ${sp.name}`;
-
-      const boss: Entity = {
-        tileX: bx, tileY: by,
-        facing: Direction.Down,
-        stats: bossStats,
-        alive: true,
-        spriteKey: sp.spriteKey,
-        name: bossName,
-        types: sp.types,
-        attackType: sp.attackType,
-        skills: createSpeciesSkills(sp),
-        statusEffects: [],
-        speciesId: sp.spriteKey,
-        isBoss: true,
-        ability: SPECIES_ABILITIES[sp.spriteKey],
-      };
-
-      // Create sprite with boss entrance animation (fade-in + size bounce)
-      const bossTex = `${sp.spriteKey}-idle`;
-      if (this.textures.exists(bossTex)) {
-        boss.sprite = this.add.sprite(
-          this.tileToPixelX(bx), this.tileToPixelY(by), bossTex
-        );
-        boss.sprite.setScale(0).setDepth(11).setAlpha(0);
-        const bossAnim = `${sp.spriteKey}-idle-${Direction.Down}`;
-        if (this.anims.exists(bossAnim)) boss.sprite.play(bossAnim);
-
-        // Boss entrance animation: fade-in + size bounce
-        this.tweens.add({
-          targets: boss.sprite,
-          scaleX: TILE_SCALE * 1.5,
-          scaleY: TILE_SCALE * 1.5,
-          alpha: 1,
-          duration: 500,
-          ease: "Back.easeOut",
-          onComplete: () => {
-            // Settle to normal boss scale
-            if (boss.sprite) {
-              this.tweens.add({
-                targets: boss.sprite,
-                scaleX: TILE_SCALE * 1.4,
-                scaleY: TILE_SCALE * 1.4,
-                duration: 200,
-                ease: "Quad.easeOut",
-              });
-            }
-          },
-        });
-      }
-
-      // Orange-red tint aura for gauntlet bosses
-      if (boss.sprite) boss.sprite.setTint(0xff8833);
-      this.time.delayedCall(800, () => { if (boss.sprite) boss.sprite.clearTint(); });
-
-      // Track as the main boss entity for HP bar display (first boss of wave)
-      if (i === 0) {
-        this.bossEntity = boss;
-      }
-
-      this.gauntletEnemies.push(boss);
-      this.enemies.push(boss);
-      this.allEntities.push(boss);
-      this.seenSpecies.add(sp.id);
-    }
-
-    // Create/update boss HP bar for the first boss of this wave
-    this.createGauntletBossHpBar();
-
-    // Update wave HUD text
-    if (this.gauntletWaveText) {
-      this.gauntletWaveText.setText(`Wave ${waveIndex + 1}/${this.gauntletConfig.waves.length}`);
-    }
-
-    this.updateHUD();
-  }
-
-  /** Create/refresh the boss HP bar for the gauntlet's current primary boss */
-  private createGauntletBossHpBar() {
-    // Clean up existing boss HP bar
-    if (this.bossHpBg) this.bossHpBg.destroy();
-    if (this.bossHpBar) this.bossHpBar.destroy();
-    if (this.bossNameText) this.bossNameText.destroy();
-
-    if (!this.bossEntity) return;
-
-    const barW = 200;
-    const barX = (GAME_WIDTH - barW) / 2;
-    const barY = 56;
-
-    this.bossHpBg = this.add.graphics().setScrollFactor(0).setDepth(100);
-    this.bossHpBg.fillStyle(0x1a1a2e, 0.95);
-    this.bossHpBg.fillRoundedRect(barX - 4, barY - 4, barW + 8, 24, 4);
-    this.bossHpBg.lineStyle(2, 0xff4444);
-    this.bossHpBg.strokeRoundedRect(barX - 4, barY - 4, barW + 8, 24, 4);
-
-    this.bossHpBar = this.add.graphics().setScrollFactor(0).setDepth(101);
-
-    this.bossNameText = this.add.text(GAME_WIDTH / 2, barY - 2, `★ ${this.bossEntity.name} ★`, {
-      fontSize: "10px", color: "#ff6666", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(102);
-  }
-
-  /** Check if all gauntlet enemies in the current wave are defeated */
-  private checkGauntletWaveCleared() {
-    if (!this.gauntletActive || !this.gauntletConfig) return;
-
-    // Check if all gauntlet enemies in the current wave are dead
-    const allDead = this.gauntletEnemies.every(e => !e.alive);
-    if (!allDead) return;
-
-    this.gauntletTotalWavesCleared++;
-    const totalWaves = this.gauntletConfig.waves.length;
-    const currentWaveDisplay = this.gauntletCurrentWave + 1;
-
-    if (currentWaveDisplay < totalWaves) {
-      // More waves remain — show "Wave X/Y Cleared!" and prepare next wave
-      const waveMsg = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20,
-        `Wave ${currentWaveDisplay}/${totalWaves} Cleared!`,
-        { fontSize: "18px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-          stroke: "#000000", strokeThickness: 4 }
-      ).setOrigin(0.5).setScrollFactor(0).setDepth(300);
-      this.tweens.add({
-        targets: waveMsg,
-        y: GAME_HEIGHT / 2 - 50,
-        alpha: { from: 1, to: 0 },
-        duration: 2000,
-        ease: "Quad.easeOut",
-        onComplete: () => waveMsg.destroy(),
-      });
-
-      // Flash between waves
-      this.cameras.main.flash(300, 255, 200, 100);
-
-      this.showLog(`Wave ${currentWaveDisplay}/${totalWaves} cleared!`);
-
-      // Heal player 20% HP between waves if restBetweenWaves
-      if (this.gauntletConfig.restBetweenWaves && this.player.alive) {
-        const healAmount = Math.floor(this.player.stats.maxHp * 0.2);
-        this.player.stats.hp = Math.min(this.player.stats.maxHp, this.player.stats.hp + healAmount);
-        this.showLog(`Resting... Recovered ${healAmount} HP!`);
-        this.updateHUD();
-      }
-
-      // Clean up current boss HP bar
-      this.bossEntity = null;
-
-      // Spawn next wave after a rest period (3 seconds)
-      this.time.delayedCall(3000, () => {
-        this.spawnGauntletWave(this.gauntletCurrentWave + 1);
-      });
-    } else {
-      // All waves cleared — gauntlet complete!
-      this.gauntletActive = false;
-      this.gauntletStairsLocked = false;
-      this.bossEntity = null;
-
-      // Run log: gauntlet cleared
-      this.runLog.add(RunLogEvent.GauntletCleared, `${this.gauntletTotalWavesCleared} waves`, this.currentFloor, this.turnManager.turn);
-
-      // "GAUNTLET COMPLETE!" gold celebration text
-      const completeText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30,
-        "GAUNTLET COMPLETE!",
-        { fontSize: "20px", color: "#ffd700", fontFamily: "monospace", fontStyle: "bold",
-          stroke: "#000000", strokeThickness: 5 }
-      ).setOrigin(0.5).setScrollFactor(0).setDepth(300);
-      this.tweens.add({
-        targets: completeText,
-        y: GAME_HEIGHT / 2 - 70,
-        alpha: { from: 1, to: 0 },
-        scaleX: { from: 1, to: 1.4 },
-        scaleY: { from: 1, to: 1.4 },
-        duration: 3000,
-        ease: "Quad.easeOut",
-        onComplete: () => completeText.destroy(),
-      });
-
-      // Explosion particles on gauntlet completion
-      this.spawnGauntletParticles();
-
-      // Screen shake + gold flash
-      this.cameras.main.shake(600, 0.02);
-      this.cameras.main.flash(500, 255, 215, 0);
-
-      // Award rewards (GoldenAge mutation multiplier)
-      const reward = getGauntletReward(this.gauntletConfig, this.gauntletTotalWavesCleared);
-      const gauntletMutGoldMult = hasMutation(this.floorMutations, MutationType.GoldenAge) ? getMutationEffect(MutationType.GoldenAge, "goldMult") : 1;
-      this.gold += Math.floor(reward.gold * gauntletMutGoldMult);
-      this.totalExp += reward.exp;
-      this.showLog(`Gauntlet complete! +${reward.gold}G +${reward.exp} EXP`);
-
-      if (reward.item) {
-        const itemDef = ITEM_DB[reward.item];
-        if (itemDef && this.inventory.length < MAX_INVENTORY) {
-          const existing = this.inventory.find(s => s.item.id === itemDef.id && itemDef.stackable);
-          if (existing) existing.count++;
-          else this.inventory.push({ item: itemDef, count: 1 });
-          this.showLog(`Bonus: Received ${itemDef.name}!`);
-        }
-      }
-
-      // Remove vignette and wave HUD
-      this.cleanupGauntletHUD();
-
-      // Relic drop: gauntlet clear
-      this.tryRelicDrop("gauntlet");
-
-      this.updateHUD();
-    }
-  }
-
-  /** Spawn explosion particles for gauntlet completion */
-  private spawnGauntletParticles() {
-    const colors = [0xffd700, 0xff6622, 0xff4444, 0xffaa00, 0xffffff];
-    for (let i = 0; i < 20; i++) {
-      const px = GAME_WIDTH / 2 + (Math.random() - 0.5) * 200;
-      const py = GAME_HEIGHT / 2 + (Math.random() - 0.5) * 100;
-      const color = colors[Math.floor(Math.random() * colors.length)];
-      const size = 2 + Math.random() * 4;
-      const particle = this.add.graphics().setScrollFactor(0).setDepth(301);
-      particle.fillStyle(color, 1);
-      particle.fillCircle(px, py, size);
-      this.tweens.add({
-        targets: particle,
-        x: (Math.random() - 0.5) * 120,
-        y: -40 - Math.random() * 80,
-        alpha: { from: 1, to: 0 },
-        scaleX: { from: 1, to: 0.2 },
-        scaleY: { from: 1, to: 0.2 },
-        duration: 800 + Math.random() * 600,
-        ease: "Quad.easeOut",
-        onComplete: () => particle.destroy(),
-      });
-    }
-  }
-
-  /** Clean up gauntlet HUD elements */
-  private cleanupGauntletHUD() {
-    if (this.gauntletWaveText) {
-      this.gauntletWaveText.destroy();
-      this.gauntletWaveText = null;
-    }
-    if (this.gauntletVignetteTween) {
-      this.gauntletVignetteTween.stop();
-      this.gauntletVignetteTween = null;
-    }
-    if (this.gauntletVignette) {
-      this.gauntletVignette.destroy();
-      this.gauntletVignette = null;
-    }
-    // Clean up boss HP bar
-    if (this.bossHpBg) { this.bossHpBg.destroy(); this.bossHpBg = null; }
-    if (this.bossHpBar) { this.bossHpBar.destroy(); this.bossHpBar = null; }
-    if (this.bossNameText) { this.bossNameText.destroy(); this.bossNameText = null; }
+  /** Clean up legendary/mini-boss HP bars (called by GauntletSystem after gauntlet completion) */
+  private cleanupExtraHpBars() {
     // Clean up legendary HP bar and particles
     if (this.legendaryHpBg) { this.legendaryHpBg.destroy(); this.legendaryHpBg = null; }
     if (this.legendaryHpBar) { this.legendaryHpBar.destroy(); this.legendaryHpBar = null; }
