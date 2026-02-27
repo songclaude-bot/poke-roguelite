@@ -906,22 +906,17 @@ export class HubScene extends Phaser.Scene {
       { label: talentPoints > 0 ? `Talents (${talentPoints} pts)` : "Talent Tree", desc: "Invest gold in permanent talents", color: "#fbbf24", bgColor: 0x2a2a1a, scene: "TalentTreeScene" },
     ];
 
-    // Distribute buttons evenly in available vertical space
     const btnH = 42;
-    const topY = 56;
-    const bottomY = CONTENT_BOTTOM - 16;
-    const totalSlots = items.length;
-    const spacing = (bottomY - topY - btnH) / (totalSlots - 1);
-
-    for (let idx = 0; idx < items.length; idx++) {
-      const item = items[idx];
-      const iy = topY + idx * spacing + btnH / 2;
+    const gap = 12;
+    let iy = 60;
+    for (const item of items) {
       const bgColor = item.bgColor;
       const strokeColor = parseInt(item.color.replace("#", ""), 16);
       this.addBtn(GAME_WIDTH / 2, iy, BTN_W, btnH,
         item.label, item.desc,
         bgColor, strokeColor, item.color,
         () => this.scene.start(item.scene));
+      iy += btnH + gap;
     }
   }
 
@@ -947,15 +942,10 @@ export class HubScene extends Phaser.Scene {
       { label: "Dungeon Journal", desc: "Exploration history & bestiary", color: "#f97316", bgColor: 0x2a1a0a, scene: "JournalScene" },
     ];
 
-    // Distribute buttons evenly in available vertical space
     const infoBtnH = 48;
-    const infoTopY = 50;
-    const infoBottomY = CONTENT_BOTTOM - 16;
-    const infoSpacing = (infoBottomY - infoTopY - infoBtnH) / (items.length - 1);
-
-    for (let idx = 0; idx < items.length; idx++) {
-      const item = items[idx];
-      const iy = infoTopY + idx * infoSpacing + infoBtnH / 2;
+    const infoGap = 12;
+    let iy = 50;
+    for (const item of items) {
       const bgColor = item.bgColor;
       const strokeColor = parseInt(item.color.replace("#", ""), 16);
       this.addBtn(GAME_WIDTH / 2, iy, BTN_W, infoBtnH,
@@ -974,6 +964,8 @@ export class HubScene extends Phaser.Scene {
         }).setOrigin(0.5).setDepth(13);
         this.tabContent.push(badgeT);
       }
+
+      iy += infoBtnH + infoGap;
     }
   }
 
