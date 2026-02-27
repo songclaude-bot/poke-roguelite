@@ -9533,14 +9533,6 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // Clear all enemies on the current floor
-    for (const enemy of this.enemies) {
-      if (enemy.sprite) enemy.sprite.destroy();
-    }
-    // Also remove enemies from allEntities to prevent stale references
-    this.allEntities = this.allEntities.filter(e => !this.enemies.includes(e));
-    this.enemies = [];
-
     // Reset turn manager busy state to unblock input after rescue
     this.turnManager.forceIdle();
 
