@@ -80,7 +80,7 @@ import { DungeonEvent, EventChoice, rollDungeonEvent } from "../core/dungeon-eve
 import {
   FloorEvent, FloorEventType, rollFloorEvent, invertEffectiveness, floorEventColorHex,
 } from "../core/floor-events";
-import { FloorTheme, getDepthAdjustedTheme, darkenColor } from "../core/floor-themes";
+import { FloorTheme, getDepthAdjustedTheme } from "../core/floor-themes";
 import { addToStorage } from "../core/crafting";
 import {
   ScoreChain, ChainAction, createScoreChain, addChainAction, resetChain,
@@ -94,6 +94,9 @@ import {
   PuzzleType, shouldSpawnPuzzle, generatePuzzle,
 } from "../core/puzzle-rooms";
 import { PuzzleSystem } from "../systems/puzzle-system";
+import { SecretRoomSystem } from "../systems/secret-room-system";
+import { AutoExploreSystem } from "../systems/auto-explore-system";
+import { MinimapSystem } from "../systems/minimap-system";
 import {
   LegendaryEncounter,
   shouldEncounterLegendary,
@@ -109,7 +112,6 @@ import {
   getTodayDateString, RunQuestData,
 } from "../core/quests";
 import {
-  SecretRoomType, SecretRoom, SecretReward,
   shouldSpawnSecretRoom, generateSecretRoom,
 } from "../core/secret-rooms";
 import { getAggregatedTalentEffects } from "../core/talent-tree";
@@ -138,9 +140,6 @@ import {
   RescueOption, MAX_RESCUES_PER_RUN,
   getRescueOptions,
 } from "../core/rescue-system";
-import {
-  ExplorationTier, EXPLORATION_TIERS, getNewTiers,
-} from "../core/exploration-rewards";
 import {
   MiniBoss, shouldSpawnMiniBoss, rollMiniBoss, getMiniBossReward,
 } from "../core/mini-bosses";
@@ -212,35 +211,17 @@ export class DungeonScene extends Phaser.Scene {
   private logMessages: string[] = [];
   private skillButtons: Phaser.GameObjects.Text[] = [];
 
-  // Minimap + Fog of War
-  private minimapGfx!: Phaser.GameObjects.Graphics;
-  private minimapBg!: Phaser.GameObjects.Graphics;
-  private minimapBorder!: Phaser.GameObjects.Graphics;
-  private minimapVisible = true;
-  private minimapExpanded = false;
-  private minimapHitZone!: Phaser.GameObjects.Zone;
-  private minimapLegendTexts: Phaser.GameObjects.Text[] = [];
-  private visited!: boolean[][];
-  private currentlyVisible!: boolean[][]; // tiles currently in player's sight
-  private readonly MINIMAP_TILE_SMALL = 3; // px per tile (small mode)
-  private readonly MINIMAP_TILE_LARGE = 7; // px per tile (large mode)
-  private readonly MINIMAP_TILE_FULLMAP = 4; // px per tile (full map overlay)
-  private readonly MINIMAP_X_SMALL = GAME_WIDTH - 80; // top-right
-  private readonly MINIMAP_Y_SMALL = 4;
-  // Large mode positions computed dynamically (centered)
+  // Minimap + Fog of War (delegated to MinimapSystem)
+  private minimapSys!: MinimapSystem;
 
-  // Exploration percentage
-  private explorationText!: Phaser.GameObjects.Text;
-
-  // Full map overlay
-  private fullMapOpen = false;
-  private fullMapOverlayBg: Phaser.GameObjects.Graphics | null = null;
-  private fullMapGfx: Phaser.GameObjects.Graphics | null = null;
-  private fullMapCloseZone: Phaser.GameObjects.Zone | null = null;
-  private fullMapUI: Phaser.GameObjects.GameObject[] = [];
-
-  // MAP button (near minimap)
-  private mapButton!: Phaser.GameObjects.Text;
+  // ── Forwarding getters/setters for visited/currentlyVisible/fullMapOpen ──
+  // These are needed because AutoExploreHost and SecretRoomHost access them via `host.visited` etc.
+  get visited(): boolean[][] { return this.minimapSys.visited; }
+  set visited(v: boolean[][]) { this.minimapSys.visited = v; }
+  get currentlyVisible(): boolean[][] { return this.minimapSys.currentlyVisible; }
+  set currentlyVisible(v: boolean[][]) { this.minimapSys.currentlyVisible = v; }
+  get fullMapOpen(): boolean { return this.minimapSys.fullMapOpen; }
+  set fullMapOpen(v: boolean) { this.minimapSys.fullMapOpen = v; }
 
   // HP Bar graphics
   private hpBarBg!: Phaser.GameObjects.Graphics;
@@ -437,15 +418,8 @@ export class DungeonScene extends Phaser.Scene {
   // Talent tree aggregated effects (loaded from meta at init)
   private talentEffects: Record<string, number> = {};
 
-  // Auto-Explore state
-  private autoExploring = false;
-  private autoExploreTimer: Phaser.Time.TimerEvent | null = null;
-  private autoExploreText: Phaser.GameObjects.Text | null = null;
-  private autoExploreTween: Phaser.Tweens.Tween | null = null;
-
-  // Exploration Reward state
-  private lastExplorationPercent = 0;
-  private explorationRewardsGranted = new Set<number>();
+  // Auto-Explore (delegated to AutoExploreSystem)
+  private autoExploreSys!: AutoExploreSystem;
 
   // Skill Combo state
   private recentSkillIds: string[] = [];  // last 3 skill IDs used by player
@@ -477,18 +451,8 @@ export class DungeonScene extends Phaser.Scene {
   private typeShiftType: PokemonType | null = null;         // for TypeShift mutation
   private mirrorApplied = false;                            // track if MirrorWorld already applied
 
-  // Secret Room state
-  private secretRoomData: SecretRoom | null = null;
-  private secretWallPos: { x: number; y: number } | null = null;  // the fake wall tile
-  private secretRoomTiles: { x: number; y: number }[] = [];       // 3x3 ground tiles of the room
-  private secretEffectTile: { x: number; y: number } | null = null; // center tile with effect
-  private secretRoomDiscovered = false;
-  private secretRoomUsed = false;                                    // reward already claimed
-  private secretRoomGraphics: Phaser.GameObjects.Graphics[] = [];
-  private secretWallShimmerTimer: Phaser.Time.TimerEvent | null = null;
-  private secretWallShimmerGfx: Phaser.GameObjects.Graphics | null = null;
-  private secretRoomUI: Phaser.GameObjects.GameObject[] = [];       // WarpHub UI overlay
-  private secretWarpOpen = false;                                    // WarpHub overlay is open
+  // Secret Room state (delegated to SecretRoomSystem)
+  private secretRoomSys!: SecretRoomSystem;
 
   // Relic Artifact state (run-specific, max 3)
   private activeRelics: Relic[] = [];
@@ -778,29 +742,13 @@ export class DungeonScene extends Phaser.Scene {
     this.eventMarker = null;
     // Reset puzzle room state (delegated to PuzzleSystem)
     this.puzzleSys = new PuzzleSystem(this as any);
-    // Reset secret room state
-    this.secretRoomData = null;
-    this.secretWallPos = null;
-    this.secretRoomTiles = [];
-    this.secretEffectTile = null;
-    this.secretRoomDiscovered = false;
-    this.secretRoomUsed = false;
-    this.secretRoomGraphics = [];
-    this.secretWallShimmerTimer = null;
-    this.secretWallShimmerGfx = null;
-    this.secretRoomUI = [];
-    this.secretWarpOpen = false;
-    this.autoExploring = false;
-    this.autoExploreTimer = null;
-    this.autoExploreText = null;
-    this.autoExploreTween = null;
-    this.lastExplorationPercent = 0;
-    this.explorationRewardsGranted = new Set<number>();
-    this.fullMapOpen = false;
-    this.fullMapOverlayBg = null;
-    this.fullMapGfx = null;
-    this.fullMapCloseZone = null;
-    this.fullMapUI = [];
+    // Reset secret room state (delegated to SecretRoomSystem)
+    this.secretRoomSys = new SecretRoomSystem(this as any);
+    // Reset auto-explore state (delegated to AutoExploreSystem)
+    this.autoExploreSys = new AutoExploreSystem(this as any);
+    // Reset minimap state (delegated to MinimapSystem)
+    this.minimapSys = new MinimapSystem(this as any);
+    this.minimapSys.resetExplorationState();
     // Speed run timer: carry over elapsed time from previous floors, or start fresh
     this.runElapsedSeconds = data?.runElapsedTime ?? 0;
     this.timerEvent = null;
@@ -2049,28 +1997,21 @@ export class DungeonScene extends Phaser.Scene {
 
     // ── Secret Room (5% chance on floor 3+, not last floor, not boss floor) ──
     if (!isBossFloor && shouldSpawnSecretRoom(this.currentFloor, this.dungeonDef.floors)) {
-      // Find a wall tile adjacent to a corridor (not inside a room) that can host a secret entrance
-      const secretEntrance = this.findSecretWallPosition(terrain, rooms, width, height, playerStart, stairsPos);
+      const secretEntrance = this.secretRoomSys.findSecretWallPosition(terrain, rooms, width, height, playerStart, stairsPos);
       if (secretEntrance) {
-        this.secretWallPos = secretEntrance.wall;
-        this.secretRoomData = generateSecretRoom(this.currentFloor, this.dungeonDef.difficulty);
+        this.secretRoomSys.secretWallPos = secretEntrance.wall;
+        this.secretRoomSys.secretRoomData = generateSecretRoom(this.currentFloor, this.dungeonDef.difficulty);
 
-        // Carve out a 3x3 secret room behind the wall
-        const roomTiles = this.carveSecretRoom(
+        const roomTiles = this.secretRoomSys.carveSecretRoom(
           secretEntrance.wall, secretEntrance.insideDir,
           terrain, width, height
         );
         if (roomTiles.length > 0) {
-          this.secretRoomTiles = roomTiles;
-          // Center tile of the 3x3 is the effect tile
-          this.secretEffectTile = roomTiles[Math.floor(roomTiles.length / 2)];
-
-          // Start shimmer hint on the secret wall
-          this.startSecretWallShimmer();
+          this.secretRoomSys.secretEffectTile = roomTiles[Math.floor(roomTiles.length / 2)];
+          this.secretRoomSys.startSecretWallShimmer();
         } else {
-          // Could not carve room — cancel
-          this.secretRoomData = null;
-          this.secretWallPos = null;
+          this.secretRoomSys.secretRoomData = null;
+          this.secretRoomSys.secretWallPos = null;
         }
       }
     }
@@ -2107,14 +2048,13 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // ── Fog of War ──
-    this.visited = Array.from({ length: height }, () => new Array(width).fill(false));
-    this.currentlyVisible = Array.from({ length: height }, () => new Array(width).fill(false));
+    // ── Fog of War (delegated to MinimapSystem) ──
+    this.minimapSys.initFogOfWar(width, height);
     const talentSightBonus = this.talentEffects.sightRangeBonus ?? 0;
     const sightRadius = (hasMutation(this.floorMutations, MutationType.DarkFloor)
       ? getMutationEffect(MutationType.DarkFloor, "sightRadius")
       : 4) + talentSightBonus;
-    this.revealArea(playerStart.x, playerStart.y, sightRadius);
+    this.minimapSys.revealArea(playerStart.x, playerStart.y, sightRadius);
 
     // ── Camera ──
     const mapPixelW = width * TILE_DISPLAY;
@@ -2182,7 +2122,7 @@ export class DungeonScene extends Phaser.Scene {
       callback: () => {
         // Don't count time when game is over or menus/overlays are open
         if (this.gameOver) return;
-        if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.teamPanelOpen || this.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
+        if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.teamPanelOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
         this.runElapsedSeconds++;
         const timeStr = this.formatTime(this.runElapsedSeconds);
         this.timerText.setText(timeStr);
@@ -2483,43 +2423,8 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
-    // ── Minimap ──
-    this.minimapBg = this.add.graphics().setScrollFactor(0).setDepth(100);
-    this.minimapBorder = this.add.graphics().setScrollFactor(0).setDepth(100);
-    this.minimapGfx = this.add.graphics().setScrollFactor(0).setDepth(101);
-    this.minimapExpanded = false;
-    this.minimapLegendTexts = [];
-    this.createMinimap();
-
-    // Tap on minimap zone to toggle small ↔ large
-    const smW = width * this.MINIMAP_TILE_SMALL + 4;
-    const smH = height * this.MINIMAP_TILE_SMALL + 4;
-    this.minimapHitZone = this.add.zone(
-      this.MINIMAP_X_SMALL - 2 + smW / 2,
-      this.MINIMAP_Y_SMALL - 2 + smH / 2,
-      smW, smH
-    ).setScrollFactor(0).setDepth(102).setInteractive();
-    this.minimapHitZone.on("pointerdown", () => {
-      this.minimapExpanded = !this.minimapExpanded;
-      this.updateMinimapHitZone();
-      this.updateMinimap();
-    });
-
-    // ── MAP button (top-right, near minimap) ──
-    this.fullMapOpen = false;
-    this.fullMapUI = [];
-    this.mapButton = this.add.text(
-      this.MINIMAP_X_SMALL - 2, this.MINIMAP_Y_SMALL + height * this.MINIMAP_TILE_SMALL + 10,
-      "MAP",
-      {
-        fontSize: "8px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
-        backgroundColor: "#1a1a2ecc", padding: { x: 4, y: 2 },
-      }
-    ).setScrollFactor(0).setDepth(110).setInteractive();
-    this.mapButton.on("pointerdown", () => {
-      if (this.fullMapOpen) return;
-      this.openFullMap();
-    });
+    // ── Minimap (delegated to MinimapSystem) ──
+    this.minimapSys.createMinimapUI();
 
     // ── Virtual D-Pad ──
     this.createDPad();
@@ -2754,8 +2659,8 @@ export class DungeonScene extends Phaser.Scene {
       }).setOrigin(0.5).setScrollFactor(0).setDepth(110);
 
       btn.on("pointerdown", () => {
-        if (this.autoExploring) { this.stopAutoExplore("Stopped."); return; }
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
+        if (this.autoExploreSys.autoExploring) { this.autoExploreSys.stopAutoExplore("Stopped."); return; }
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
         txt.setColor("#fbbf24");
         this.time.delayedCall(150, () => txt.setColor("#8899bb"));
         this.handlePlayerAction(d.dir);
@@ -2772,8 +2677,8 @@ export class DungeonScene extends Phaser.Scene {
     }).setOrigin(0.5).setScrollFactor(0).setDepth(110);
 
     waitBtn.on("pointerdown", () => {
-      if (this.autoExploring) { this.stopAutoExplore("Stopped."); return; }
-      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
+      if (this.autoExploreSys.autoExploring) { this.autoExploreSys.stopAutoExplore("Stopped."); return; }
+      if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.bagOpen || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
       waitTxt.setAlpha(0.5);
       this.time.delayedCall(150, () => waitTxt.setAlpha(1));
       this.turnManager.executeTurn(
@@ -2881,668 +2786,10 @@ export class DungeonScene extends Phaser.Scene {
   private updateSkillButtons() {
     // Phaser skill buttons removed — DOM HUD syncs skill state in syncDomHud()
   }
-  /** Reveal tiles around a point (Chebyshev distance) */
-  private revealArea(cx: number, cy: number, radius: number) {
-    const { width, height } = this.dungeon;
-    // Reset currentlyVisible for fresh computation
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        this.currentlyVisible[y][x] = false;
-      }
-    }
-    for (let dy = -radius; dy <= radius; dy++) {
-      for (let dx = -radius; dx <= radius; dx++) {
-        const nx = cx + dx;
-        const ny = cy + dy;
-        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-          this.visited[ny][nx] = true;
-          this.currentlyVisible[ny][nx] = true;
-        }
-      }
-    }
-    // Also mark tiles around allies as currently visible
-    for (const a of this.allies) {
-      if (!a.alive) continue;
-      for (let dy = -2; dy <= 2; dy++) {
-        for (let dx = -2; dx <= 2; dx++) {
-          const nx = a.tileX + dx;
-          const ny = a.tileY + dy;
-          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-            this.currentlyVisible[ny][nx] = true;
-            this.visited[ny][nx] = true;
-          }
-        }
-      }
-    }
-  }
 
-  /** Get current minimap tile size and origin based on expanded state */
-  private getMinimapParams() {
-    const { width, height } = this.dungeon;
-    if (this.minimapExpanded) {
-      const t = this.MINIMAP_TILE_LARGE;
-      const totalW = width * t;
-      const totalH = height * t;
-      const mx = Math.floor((GAME_WIDTH - totalW) / 2);
-      const my = Math.floor((GAME_HEIGHT - totalH) / 2) - 10;
-      return { t, mx, my, totalW, totalH };
-    }
-    const t = this.MINIMAP_TILE_SMALL;
-    const totalW = width * t;
-    const totalH = height * t;
-    return { t, mx: this.MINIMAP_X_SMALL, my: this.MINIMAP_Y_SMALL, totalW, totalH };
-  }
-
-  /** Update the hit zone position/size to match current minimap mode */
-  private updateMinimapHitZone() {
-    const { mx, my, totalW, totalH } = this.getMinimapParams();
-    const pad = 4;
-    this.minimapHitZone.setPosition(mx - pad / 2 + totalW / 2, my - pad / 2 + totalH / 2);
-    this.minimapHitZone.setSize(totalW + pad, totalH + pad);
-  }
-
-  private createMinimap() {
-    // Initial draw happens through updateMinimap
-    this.updateMinimap();
-  }
-
-  /** Draw minimap terrain and entities onto a graphics object at given position/scale */
-  private drawMinimapContent(
-    gfx: Phaser.GameObjects.Graphics,
-    t: number, mx: number, my: number,
-    expanded: boolean
-  ) {
-    const { width, height, terrain } = this.dungeon;
-    const minimapFloorColor = this.currentTheme.floorColor;
-    const dimFloorColor = darkenColor(minimapFloorColor, 0.35);
-
-    // ── Terrain with fog of war ──
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (terrain[y][x] === TerrainType.GROUND) {
-          if (this.currentlyVisible[y][x]) {
-            // Currently in player's sight — full brightness
-            gfx.fillStyle(minimapFloorColor, 0.9);
-          } else if (this.visited[y][x]) {
-            // Previously explored but out of sight — dim/dark gray
-            gfx.fillStyle(dimFloorColor, 0.6);
-          } else {
-            // Unexplored — completely dark (skip drawing, bg is already black)
-            continue;
-          }
-          gfx.fillRect(mx + x * t, my + y * t, t, t);
-        }
-      }
-    }
-
-    // ── Shop room outline (purple/magenta) ──
-    if (this.shopRoom && !this.shopClosed) {
-      const sr = this.shopRoom;
-      let shopVisible = false;
-      for (let sy = sr.y; sy < sr.y + sr.h && !shopVisible; sy++) {
-        for (let sx = sr.x; sx < sr.x + sr.w && !shopVisible; sx++) {
-          if (this.visited[sy]?.[sx]) shopVisible = true;
-        }
-      }
-      if (shopVisible) {
-        // Fill shop room tiles with purple tint
-        gfx.fillStyle(0xc026d3, 0.2);
-        for (let sy = sr.y; sy < sr.y + sr.h; sy++) {
-          for (let sx = sr.x; sx < sr.x + sr.w; sx++) {
-            if (this.visited[sy]?.[sx] && this.dungeon.terrain[sy]?.[sx] === TerrainType.GROUND) {
-              gfx.fillRect(mx + sx * t, my + sy * t, t, t);
-            }
-          }
-        }
-        // Magenta border
-        gfx.lineStyle(expanded ? 2 : 1, 0xc026d3, 0.8);
-        gfx.strokeRect(
-          mx + sr.x * t - 1, my + sr.y * t - 1,
-          sr.w * t + 2, sr.h * t + 2
-        );
-      }
-    }
-
-    // ── Event room outline (cyan border) ──
-    if (this.eventRoom && !this.eventTriggered) {
-      const er = this.eventRoom;
-      let eventVisible = false;
-      for (let ey = er.y; ey < er.y + er.h && !eventVisible; ey++) {
-        for (let ex = er.x; ex < er.x + er.w && !eventVisible; ex++) {
-          if (this.visited[ey]?.[ex]) eventVisible = true;
-        }
-      }
-      if (eventVisible) {
-        gfx.lineStyle(expanded ? 2 : 1, 0x22d3ee, 0.8);
-        gfx.strokeRect(
-          mx + er.x * t - 1, my + er.y * t - 1,
-          er.w * t + 2, er.h * t + 2
-        );
-      }
-    }
-
-    // ── Puzzle room outline (teal fill + border) ──
-    if (this.puzzleSys.puzzleRoom && !this.puzzleSys.puzzleSolved && !this.puzzleSys.puzzleFailed) {
-      const pr = this.puzzleSys.puzzleRoom;
-      let puzzleVisible = false;
-      for (let py = pr.y; py < pr.y + pr.h && !puzzleVisible; py++) {
-        for (let px = pr.x; px < pr.x + pr.w && !puzzleVisible; px++) {
-          if (this.visited[py]?.[px]) puzzleVisible = true;
-        }
-      }
-      if (puzzleVisible) {
-        // Teal tint on room tiles
-        gfx.fillStyle(0x22d3ee, 0.25);
-        for (let py = pr.y; py < pr.y + pr.h; py++) {
-          for (let px = pr.x; px < pr.x + pr.w; px++) {
-            if (this.visited[py]?.[px] && this.dungeon.terrain[py]?.[px] === TerrainType.GROUND) {
-              gfx.fillRect(mx + px * t, my + py * t, t, t);
-            }
-          }
-        }
-        // Teal border
-        gfx.lineStyle(expanded ? 2 : 1, 0x22d3ee, 0.9);
-        gfx.strokeRect(
-          mx + pr.x * t - 1, my + pr.y * t - 1,
-          pr.w * t + 2, pr.h * t + 2
-        );
-      }
-    }
-
-    // ── Shrine (purple dot, only if visited and not used) ──
-    if (this.floorShrine && !this.shrineUsed && this.shrineTileX >= 0) {
-      if (this.visited[this.shrineTileY]?.[this.shrineTileX]) {
-        const shrineColor = this.floorShrine.color;
-        gfx.fillStyle(shrineColor, 1);
-        const shrp = expanded ? 1 : 0;
-        gfx.fillRect(
-          mx + this.shrineTileX * t - shrp, my + this.shrineTileY * t - shrp,
-          t + shrp * 2, t + shrp * 2
-        );
-      }
-    }
-
-    // ── Secret Room (gold dot, only after discovery) ──
-    if (this.secretRoomDiscovered && this.secretEffectTile) {
-      const srt = this.secretEffectTile;
-      if (this.visited[srt.y]?.[srt.x]) {
-        gfx.fillStyle(0xfbbf24, 1);
-        const srp = expanded ? 1 : 0;
-        gfx.fillRect(
-          mx + srt.x * t - srp, my + srt.y * t - srp,
-          t + srp * 2, t + srp * 2
-        );
-      }
-    }
-
-    // ── Stairs (blue dot, only if visited) ──
-    const { stairsPos } = this.dungeon;
-    if (this.visited[stairsPos.y]?.[stairsPos.x]) {
-      gfx.fillStyle(0x60a5fa, 1);
-      const sp = expanded ? 1 : 0;
-      gfx.fillRect(
-        mx + stairsPos.x * t - sp, my + stairsPos.y * t - sp,
-        t + sp * 2, t + sp * 2
-      );
-    }
-
-    // ── Floor items (yellow dots, only in visited tiles) ──
-    gfx.fillStyle(0xfde047, 1);
-    for (const fi of this.floorItems) {
-      if (this.visited[fi.y]?.[fi.x]) {
-        gfx.fillRect(mx + fi.x * t, my + fi.y * t, t, t);
-      }
-    }
-
-    // ── Revealed traps ──
-    for (const tr of this.floorTraps) {
-      if (tr.revealed) {
-        gfx.fillStyle(tr.trap.hexColor, 1);
-        gfx.fillRect(mx + tr.x * t, my + tr.y * t, t, t);
-      }
-    }
-
-    // ── Hazard tiles (visible in explored areas) ──
-    for (const hz of this.floorHazards) {
-      if (this.visited[hz.y]?.[hz.x]) {
-        gfx.fillStyle(hz.def.color, 0.8);
-        gfx.fillRect(mx + hz.x * t, my + hz.y * t, t, t);
-      }
-    }
-
-    // ── Enemies (red dots, only currently visible) ──
-    for (const e of this.enemies) {
-      if (e.alive && this.currentlyVisible[e.tileY]?.[e.tileX]) {
-        if (e.isBoss) {
-          gfx.fillStyle(0xff2222, 1);
-          gfx.fillRect(mx + e.tileX * t - 1, my + e.tileY * t - 1, t + 2, t + 2);
-        } else {
-          gfx.fillStyle(0xef4444, 1);
-          gfx.fillRect(mx + e.tileX * t, my + e.tileY * t, t, t);
-        }
-      }
-    }
-
-    // ── Allies (green dots) ──
-    gfx.fillStyle(0x4ade80, 1);
-    for (const a of this.allies) {
-      if (a.alive) {
-        gfx.fillRect(mx + a.tileX * t, my + a.tileY * t, t, t);
-      }
-    }
-
-    // ── Player (green dot, slightly larger) ──
-    gfx.fillStyle(0x4ade80, 1);
-    gfx.fillRect(
-      mx + this.player.tileX * t - 1,
-      my + this.player.tileY * t - 1,
-      t + 2, t + 2
-    );
-  }
-
-  /** Calculate exploration percentage */
-  private getExplorationPercent(): number {
-    const { width, height, terrain } = this.dungeon;
-    let totalWalkable = 0;
-    let explored = 0;
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (terrain[y][x] === TerrainType.GROUND) {
-          totalWalkable++;
-          if (this.visited[y][x]) explored++;
-        }
-      }
-    }
-    return totalWalkable > 0 ? Math.floor((explored / totalWalkable) * 100) : 0;
-  }
-
-  private updateMinimap() {
-    if (!this.minimapVisible) return;
-    const { width, height } = this.dungeon;
-    const { t, mx, my, totalW, totalH } = this.getMinimapParams();
-    const expanded = this.minimapExpanded;
-    const pad = 4;
-
-    // Reveal area around player each update (DarkFloor mutation reduces radius, talent increases)
-    // FoggyFloor event: override sight to 2
-    const revealTalentBonus = this.talentEffects.sightRangeBonus ?? 0;
-    const blessingSightReduction = getBlessingEffect(this.activeBlessings, "sightReduction");
-    const baseSight = this.floorEvent?.type === FloorEventType.FoggyFloor
-      ? 2
-      : (hasMutation(this.floorMutations, MutationType.DarkFloor)
-        ? getMutationEffect(MutationType.DarkFloor, "sightRadius")
-        : 4);
-    const revealRadius = Math.max(1, (baseSight + revealTalentBonus) - blessingSightReduction);
-    this.revealArea(this.player.tileX, this.player.tileY, revealRadius);
-
-    // ── Background (themed) ──
-    this.minimapBg.clear();
-    this.minimapBg.fillStyle(0x000000, expanded ? 0.92 : 0.85);
-    this.minimapBg.fillRoundedRect(mx - pad, my - pad, totalW + pad * 2, totalH + pad * 2, 4);
-
-    // ── Border ──
-    this.minimapBorder.clear();
-    this.minimapBorder.lineStyle(1, expanded ? 0x5566aa : 0x334466, expanded ? 0.9 : 0.6);
-    this.minimapBorder.strokeRoundedRect(mx - pad, my - pad, totalW + pad * 2, totalH + pad * 2, 4);
-
-    // ── Draw minimap content ──
-    this.minimapGfx.clear();
-    this.drawMinimapContent(this.minimapGfx, t, mx, my, expanded);
-
-    // ── Legend + Exploration % ──
-    this.updateMinimapLegend(expanded, mx, my, totalW, totalH, pad);
-
-    // ── Exploration percentage text ──
-    this.updateExplorationText(mx, my, totalW, totalH, pad);
-
-    // ── Update full map overlay if open ──
-    if (this.fullMapOpen) {
-      this.drawFullMapOverlay();
-    }
-  }
-
-  /** Update exploration percentage text below minimap */
-  private updateExplorationText(
-    mx: number, my: number,
-    totalW: number, totalH: number, pad: number
-  ) {
-    const pct = this.getExplorationPercent();
-    const expanded = this.minimapExpanded;
-
-    // Position below minimap (or below legend if expanded)
-    let textY = my + totalH + pad + 2;
-    if (expanded) {
-      // Legend takes extra space in expanded mode
-      textY += 30;
-    }
-
-    if (!this.explorationText || !this.explorationText.scene) {
-      this.explorationText = this.add.text(0, 0, "", {
-        fontSize: "7px", fontFamily: "monospace", color: "#aab0c8",
-      }).setScrollFactor(0).setDepth(102);
-    }
-
-    if (pct >= 100) {
-      this.explorationText.setText("\u2605 FULLY EXPLORED");
-      this.explorationText.setColor("#4ade80");
-    } else if (pct >= 75) {
-      this.explorationText.setText(`\u25C9 Explored: ${pct}%`);
-      this.explorationText.setColor("#fbbf24");
-    } else if (pct >= 50) {
-      this.explorationText.setText(`\u25CE Explored: ${pct}%`);
-      this.explorationText.setColor("#60a5fa");
-    } else {
-      this.explorationText.setText(`Explored: ${pct}%`);
-      this.explorationText.setColor("#aab0c8");
-    }
-
-    this.explorationText.setPosition(mx + totalW / 2, textY);
-    this.explorationText.setOrigin(0.5, 0);
-    this.explorationText.setVisible(!expanded); // only show in compact mode; expanded has its own
-  }
-
-  /** Check exploration percentage and grant tier rewards when thresholds are crossed */
+  /** Forwarding method for AutoExploreHost.checkExplorationRewards() */
   private checkExplorationRewards() {
-    const pct = this.getExplorationPercent() / 100; // 0.0–1.0
-    const newTiers = getNewTiers(this.lastExplorationPercent, pct);
-    this.lastExplorationPercent = pct;
-
-    for (const tier of newTiers) {
-      // Guard against duplicate grants on the same floor
-      const key = Math.round(tier.threshold * 100);
-      if (this.explorationRewardsGranted.has(key)) continue;
-      this.explorationRewardsGranted.add(key);
-
-      // Grant gold
-      this.gold += tier.goldBonus;
-
-      // Grant EXP and process level-ups
-      this.totalExp += tier.expBonus;
-      const levelResult = processLevelUp(this.player.stats, tier.expBonus, this.totalExp);
-      this.totalExp = levelResult.totalExp;
-      for (const r of levelResult.results) {
-        this.showLog(`Level up! Lv.${r.newLevel} HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
-        sfxLevelUp();
-      }
-
-      // Play sound
-      sfxBuff();
-
-      // Show brief announcement banner
-      this.showExplorationRewardBanner(tier);
-
-      // Log message
-      this.showLog(`${tier.icon} ${tier.label} Bonus! +${tier.goldBonus}G +${tier.expBonus} EXP`);
-
-      // Add to run log
-      this.runLog.add(
-        RunLogEvent.FloorAdvanced,
-        `${tier.label} bonus (${Math.round(tier.threshold * 100)}% explored): +${tier.goldBonus}G +${tier.expBonus} EXP`,
-        this.currentFloor,
-        this.turnManager.turn,
-      );
-    }
-
-    if (newTiers.length > 0) {
-      this.updateHUD();
-    }
-  }
-
-  /** Show a brief floating banner for an exploration reward */
-  private showExplorationRewardBanner(tier: ExplorationTier) {
-    const label = `${tier.icon} ${tier.label} Bonus!`;
-    const detail = `+${tier.goldBonus}G  +${tier.expBonus} EXP`;
-
-    // Background bar
-    const bannerBg = this.add.rectangle(GAME_WIDTH / 2, 100, 220, 36, 0x000000, 0.75)
-      .setScrollFactor(0).setDepth(250).setOrigin(0.5);
-    bannerBg.setStrokeStyle(1, Phaser.Display.Color.HexStringToColor(tier.color).color, 0.9);
-
-    const labelText = this.add.text(GAME_WIDTH / 2, 93, label, {
-      fontSize: "10px", fontFamily: "monospace", fontStyle: "bold",
-      color: tier.color, stroke: "#000000", strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(251);
-
-    const detailText = this.add.text(GAME_WIDTH / 2, 107, detail, {
-      fontSize: "8px", fontFamily: "monospace",
-      color: "#ffffff", stroke: "#000000", strokeThickness: 1,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(251);
-
-    // Slide in from top and fade out
-    bannerBg.setAlpha(0).setY(80);
-    labelText.setAlpha(0).setY(73);
-    detailText.setAlpha(0).setY(87);
-
-    this.tweens.add({
-      targets: [bannerBg, labelText, detailText],
-      y: "+=20",
-      alpha: 1,
-      duration: 300,
-      ease: "Back.easeOut",
-      onComplete: () => {
-        this.time.delayedCall(1800, () => {
-          this.tweens.add({
-            targets: [bannerBg, labelText, detailText],
-            alpha: 0,
-            y: "-=10",
-            duration: 400,
-            ease: "Sine.easeIn",
-            onComplete: () => {
-              bannerBg.destroy();
-              labelText.destroy();
-              detailText.destroy();
-            },
-          });
-        });
-      },
-    });
-  }
-
-  private updateMinimapLegend(
-    show: boolean, mx: number, my: number,
-    totalW: number, totalH: number, pad: number
-  ) {
-    // Clean up old legend texts
-    for (const lt of this.minimapLegendTexts) lt.destroy();
-    this.minimapLegendTexts = [];
-
-    if (show) {
-      // ── Expanded mode: full legend below the map ──
-      const legendY = my + totalH + pad + 4;
-      const legendStyle: Phaser.Types.GameObjects.Text.TextStyle = {
-        fontSize: "8px", fontFamily: "monospace", color: "#aab0c8",
-      };
-      const entries: { color: string; label: string }[] = [
-        { color: "#4ade80", label: "You" },
-        { color: "#4ade80", label: "Ally" },
-        { color: "#ef4444", label: "Foe" },
-        { color: "#fde047", label: "Item" },
-        { color: "#60a5fa", label: "Stairs" },
-        { color: "#a855f7", label: "Trap" },
-      ];
-
-      const entryWidth = 42;
-      const cols = 3;
-      const rows = Math.ceil(entries.length / cols);
-      const gridW = cols * entryWidth;
-      const startX = mx + Math.floor((totalW - gridW) / 2);
-
-      for (let i = 0; i < entries.length; i++) {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        const ex = startX + col * entryWidth;
-        const ey = legendY + row * 12;
-        const { color, label } = entries[i];
-        const txt = this.add.text(ex, ey, `\u25CF ${label}`, {
-          ...legendStyle, color,
-        }).setScrollFactor(0).setDepth(102);
-        this.minimapLegendTexts.push(txt);
-      }
-
-      // Exploration % in expanded mode (colored by tier)
-      const pct = this.getExplorationPercent();
-      const pctColor = pct >= 100 ? "#4ade80" : pct >= 75 ? "#fbbf24" : pct >= 50 ? "#60a5fa" : "#aab0c8";
-      const pctLabel = pct >= 100 ? "\u2605 FULLY EXPLORED" : pct >= 75 ? `\u25C9 Explored: ${pct}%` : pct >= 50 ? `\u25CE Explored: ${pct}%` : `Explored: ${pct}%`;
-      const pctTxt = this.add.text(
-        mx + totalW / 2, legendY + rows * 12 + 2,
-        pctLabel,
-        { fontSize: "8px", fontFamily: "monospace", color: pctColor, fontStyle: pct >= 100 ? "bold" : "normal" }
-      ).setOrigin(0.5, 0).setScrollFactor(0).setDepth(102);
-      this.minimapLegendTexts.push(pctTxt);
-
-      // "Tap to close" hint
-      const hintTxt = this.add.text(
-        mx + totalW / 2, legendY + rows * 12 + 14,
-        "tap map to close",
-        { fontSize: "7px", fontFamily: "monospace", color: "#555570" }
-      ).setOrigin(0.5, 0).setScrollFactor(0).setDepth(102);
-      this.minimapLegendTexts.push(hintTxt);
-    } else {
-      // ── Compact mode: small colored dots in minimap corner as legend ──
-      const dotEntries: { color: number; }[] = [
-        { color: 0x4ade80 },  // Player/Ally (green)
-        { color: 0xef4444 },  // Enemy (red)
-        { color: 0xfde047 },  // Item (yellow)
-        { color: 0x60a5fa },  // Stairs (blue)
-      ];
-      const dotSize = 3;
-      const dotGap = 5;
-      const dotStartX = mx + totalW - (dotEntries.length * dotGap) + 1;
-      const dotY = my + totalH + pad + 1;
-
-      // Use a small text as container for legend dots
-      for (let i = 0; i < dotEntries.length; i++) {
-        const dx = dotStartX + i * dotGap;
-        const colorHex = "#" + dotEntries[i].color.toString(16).padStart(6, "0");
-        const dot = this.add.text(dx, dotY, "\u25CF", {
-          fontSize: "5px", fontFamily: "monospace", color: colorHex,
-        }).setScrollFactor(0).setDepth(102);
-        this.minimapLegendTexts.push(dot);
-      }
-    }
-  }
-
-  /** Open the full-screen map overlay */
-  private openFullMap() {
-    if (this.fullMapOpen) return;
-    this.fullMapOpen = true;
-    if (this.domHud) setDomHudInteractive(this.domHud, false);
-
-    // Turns are paused via fullMapOpen guard checks on all input handlers
-
-    const overlayDepth = 500;
-
-    // Semi-transparent dark background
-    this.fullMapOverlayBg = this.add.graphics().setScrollFactor(0).setDepth(overlayDepth);
-    this.fullMapOverlayBg.fillStyle(0x000000, 0.85);
-    this.fullMapOverlayBg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-
-    // Full map graphics
-    this.fullMapGfx = this.add.graphics().setScrollFactor(0).setDepth(overlayDepth + 1);
-
-    // Draw the full map
-    this.drawFullMapOverlay();
-
-    // Title
-    const titleTxt = this.add.text(
-      GAME_WIDTH / 2, 12, `${this.dungeonDef.name} B${this.currentFloor}F`,
-      { fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold" }
-    ).setOrigin(0.5).setScrollFactor(0).setDepth(overlayDepth + 2);
-    this.fullMapUI.push(titleTxt);
-
-    // Legend at the bottom
-    const legendY = GAME_HEIGHT - 40;
-    const legendEntries: { color: string; label: string }[] = [
-      { color: "#4ade80", label: "Player" },
-      { color: "#ef4444", label: "Enemy" },
-      { color: "#fde047", label: "Item" },
-      { color: "#60a5fa", label: "Stairs" },
-    ];
-    const legendStartX = GAME_WIDTH / 2 - (legendEntries.length * 45) / 2;
-    for (let i = 0; i < legendEntries.length; i++) {
-      const { color, label } = legendEntries[i];
-      const lt = this.add.text(
-        legendStartX + i * 45, legendY,
-        `\u25CF ${label}`,
-        { fontSize: "8px", fontFamily: "monospace", color }
-      ).setScrollFactor(0).setDepth(overlayDepth + 2);
-      this.fullMapUI.push(lt);
-    }
-
-    // Exploration % (colored by tier)
-    const pct = this.getExplorationPercent();
-    const pctColor = pct >= 100 ? "#4ade80" : pct >= 75 ? "#fbbf24" : pct >= 50 ? "#60a5fa" : "#aab0c8";
-    const pctLabel = pct >= 100 ? "\u2605 FULLY EXPLORED" : pct >= 75 ? `\u25C9 Explored: ${pct}%` : pct >= 50 ? `\u25CE Explored: ${pct}%` : `Explored: ${pct}%`;
-    const pctTxt = this.add.text(
-      GAME_WIDTH / 2, legendY + 14, pctLabel,
-      { fontSize: "8px", fontFamily: "monospace", color: pctColor, fontStyle: pct >= 100 ? "bold" : "normal" }
-    ).setOrigin(0.5, 0).setScrollFactor(0).setDepth(overlayDepth + 2);
-    this.fullMapUI.push(pctTxt);
-
-    // "Tap to close" hint
-    const hintTxt = this.add.text(
-      GAME_WIDTH / 2, GAME_HEIGHT - 10,
-      "tap anywhere to close",
-      { fontSize: "7px", fontFamily: "monospace", color: "#555570" }
-    ).setOrigin(0.5).setScrollFactor(0).setDepth(overlayDepth + 2);
-    this.fullMapUI.push(hintTxt);
-
-    // Close zone (covers full screen)
-    this.fullMapCloseZone = this.add.zone(
-      GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT
-    ).setScrollFactor(0).setDepth(overlayDepth + 3).setInteractive();
-    this.fullMapCloseZone.on("pointerdown", () => {
-      this.closeFullMap();
-    });
-  }
-
-  /** Draw the full map overlay content */
-  private drawFullMapOverlay() {
-    if (!this.fullMapGfx) return;
-    this.fullMapGfx.clear();
-
-    const { width, height } = this.dungeon;
-    const t = this.MINIMAP_TILE_FULLMAP; // 4px per tile
-    const totalW = width * t;
-    const totalH = height * t;
-    const mx = Math.floor((GAME_WIDTH - totalW) / 2);
-    const my = Math.floor((GAME_HEIGHT - totalH) / 2);
-
-    // Dark background for the map area
-    this.fullMapGfx.fillStyle(0x111122, 0.9);
-    this.fullMapGfx.fillRoundedRect(mx - 4, my - 4, totalW + 8, totalH + 8, 4);
-    this.fullMapGfx.lineStyle(1, 0x5566aa, 0.8);
-    this.fullMapGfx.strokeRoundedRect(mx - 4, my - 4, totalW + 8, totalH + 8, 4);
-
-    // Draw content using shared method
-    this.drawMinimapContent(this.fullMapGfx, t, mx, my, true);
-  }
-
-  /** Close the full-screen map overlay */
-  private closeFullMap() {
-    if (!this.fullMapOpen) return;
-    this.fullMapOpen = false;
-    if (this.domHud) setDomHudInteractive(this.domHud, true);
-
-    // Turns resume automatically since fullMapOpen guard is cleared
-
-    // Destroy overlay elements
-    if (this.fullMapOverlayBg) {
-      this.fullMapOverlayBg.destroy();
-      this.fullMapOverlayBg = null;
-    }
-    if (this.fullMapGfx) {
-      this.fullMapGfx.destroy();
-      this.fullMapGfx = null;
-    }
-    if (this.fullMapCloseZone) {
-      this.fullMapCloseZone.destroy();
-      this.fullMapCloseZone = null;
-    }
-    for (const obj of this.fullMapUI) {
-      if (obj && (obj as any).destroy) (obj as any).destroy();
-    }
-    this.fullMapUI = [];
+    this.minimapSys.checkExplorationRewards();
   }
 
   private updateHUD() {
@@ -3674,7 +2921,7 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     this.updateSkillButtons();
-    this.updateMinimap();
+    this.minimapSys.updateMinimap();
 
     // Sync DOM HUD overlay
     this.syncDomHud();
@@ -3685,7 +2932,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeMenu();
       return;
     }
-    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
+    if (this.bagOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
 
     sfxMenuOpen();
     this.menuOpen = true;
@@ -3753,7 +3000,7 @@ export class DungeonScene extends Phaser.Scene {
       this.closeTeamPanel();
       return;
     }
-    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.gameOver || this.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
+    if (this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.eventOpen || this.gameOver || this.minimapSys.fullMapOpen || this.relicOverlayOpen || this.shrineOpen) return;
 
     const liveAllies = this.allies.filter(a => a.alive);
     if (liveAllies.length === 0) {
@@ -4285,7 +3532,7 @@ export class DungeonScene extends Phaser.Scene {
     for (let i = 0; i < 4; i++) {
       hud.skillBtns[i].addEventListener("pointerdown", (e: Event) => {
         e.stopPropagation();
-        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.fullMapOpen || this.relicOverlayOpen) return;
+        if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.minimapSys.fullMapOpen || this.relicOverlayOpen) return;
         const skill = this.player.skills[i];
         if (!skill || skill.currentPp <= 0) {
           this.showLog("No PP left!");
@@ -4533,7 +3780,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private openBag() {
-    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen) return;
+    if (this.turnManager.isBusy || this.gameOver || this.menuOpen || this.settingsOpen || this.teamPanelOpen || this.eventOpen || this.minimapSys.fullMapOpen || this.relicOverlayOpen) return;
     sfxMenuOpen();
     this.bagOpen = true;
     if (this.domHud) setDomHudInteractive(this.domHud, false);
@@ -4624,7 +3871,7 @@ export class DungeonScene extends Phaser.Scene {
 
   /** Quick-slot: use the last-used item type again */
   private useQuickSlot() {
-    if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.fullMapOpen) return;
+    if (this.turnManager.isBusy || !this.player.alive || this.gameOver || this.minimapSys.fullMapOpen) return;
     if (!this.lastUsedItemId) {
       this.showLog("No recent item. Use an item from the Bag first.");
       return;
@@ -6086,7 +5333,7 @@ export class DungeonScene extends Phaser.Scene {
     // Show step message
     if (isPlayer) {
       this.showLog(`Stepped on ${hazard.def.name}!`);
-    } else if (this.currentlyVisible[entity.tileY]?.[entity.tileX]) {
+    } else if (this.minimapSys.currentlyVisible[entity.tileY]?.[entity.tileX]) {
       this.showLog(`${entity.name} stepped on ${hazard.def.name}!`);
     }
 
@@ -6166,7 +5413,7 @@ export class DungeonScene extends Phaser.Scene {
             entity.statusEffects.push({ type: SkillEffect.Burn, turnsLeft: 5 });
             if (isPlayer) {
               this.showLog("Poisoned by toxic swamp!");
-            } else if (this.currentlyVisible[entity.tileY]?.[entity.tileX]) {
+            } else if (this.minimapSys.currentlyVisible[entity.tileY]?.[entity.tileX]) {
               this.showLog(`${entity.name} was poisoned!`);
             }
             if (entity.sprite) {
@@ -6184,7 +5431,7 @@ export class DungeonScene extends Phaser.Scene {
             entity.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 3 });
             if (isPlayer) {
               this.showLog("Paralyzed by electric floor!");
-            } else if (this.currentlyVisible[entity.tileY]?.[entity.tileX]) {
+            } else if (this.minimapSys.currentlyVisible[entity.tileY]?.[entity.tileX]) {
               this.showLog(`${entity.name} was paralyzed!`);
             }
             if (entity.sprite) {
@@ -7353,7 +6600,7 @@ export class DungeonScene extends Phaser.Scene {
     sfxMenuOpen();
     this.shrineOpen = true;
     if (this.domHud) setDomHudInteractive(this.domHud, false);
-    this.stopAutoExplore();
+    this.autoExploreSys.stopAutoExplore();
 
     const shrine = this.floorShrine;
 
@@ -7464,7 +6711,7 @@ export class DungeonScene extends Phaser.Scene {
       overlay.destroy();
       resultText.destroy();
       this.updateHUD();
-      this.updateMinimap();
+      this.minimapSys.updateMinimap();
     });
   }
 
@@ -7647,7 +6894,7 @@ export class DungeonScene extends Phaser.Scene {
     if (this.eventOpen || !this.currentEvent) return;
     sfxMenuOpen();
     this.eventOpen = true;
-    this.stopAutoExplore();
+    this.autoExploreSys.stopAutoExplore();
 
     const event = this.currentEvent;
 
@@ -7742,7 +6989,7 @@ export class DungeonScene extends Phaser.Scene {
       overlay.destroy();
       resultText.destroy();
       this.updateHUD();
-      this.updateMinimap();
+      this.minimapSys.updateMinimap();
     });
   }
 
@@ -7900,16 +7147,16 @@ export class DungeonScene extends Phaser.Scene {
         const { width, height } = this.dungeon;
         for (let fy = 0; fy < height; fy++) {
           for (let fx = 0; fx < width; fx++) {
-            this.visited[fy][fx] = true;
-            this.currentlyVisible[fy][fx] = true;
+            this.minimapSys.visited[fy][fx] = true;
+            this.minimapSys.currentlyVisible[fy][fx] = true;
           }
         }
         // Reveal all traps too
         for (const trap of this.floorTraps) {
           trap.revealed = true;
         }
-        this.updateMinimap();
-        this.checkExplorationRewards();
+        this.minimapSys.updateMinimap();
+        this.minimapSys.checkExplorationRewards();
         sfxBuff();
         this.showEventResult("The orb reveals all secrets!\nFloor map fully revealed!", "#22d3ee");
         this.showLog("Floor layout fully revealed!");
@@ -8084,7 +7331,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private advanceFloor() {
-    this.stopAutoExplore();
+    this.autoExploreSys.stopAutoExplore();
     // Endless dungeon never shows clear screen — always advance
     // Daily dungeon and other dungeons show clear when floors are completed
     if (this.dungeonDef.id !== "endlessDungeon" && this.currentFloor >= this.dungeonDef.floors) {
@@ -8411,7 +7658,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private showGameOver() {
-    this.stopAutoExplore();
+    this.autoExploreSys.stopAutoExplore();
 
     // Check if rescue is available before committing to game over
     const meta = loadMeta();
@@ -9183,7 +8430,7 @@ export class DungeonScene extends Phaser.Scene {
         const canMove = this.canEntityMove(this.player, dir);
         if (!canMove) {
           // Check for secret wall before giving up
-          if (this.tryOpenSecretWall(targetX, targetY)) {
+          if (this.secretRoomSys.tryOpenSecretWall(targetX, targetY)) {
             // Secret wall was opened — move player into the revealed tile
             await this.turnManager.executeTurn(
               () => this.moveEntity(this.player, dir),
@@ -9220,7 +8467,7 @@ export class DungeonScene extends Phaser.Scene {
       this.checkMonsterHouse();
       this.checkEventRoom();
       this.puzzleSys.checkPuzzleRoom();
-      this.checkSecretRoom();
+      this.secretRoomSys.checkSecretRoom();
       this.checkShrine();
     }
 
@@ -9234,7 +8481,7 @@ export class DungeonScene extends Phaser.Scene {
     this.updateHUD();
 
     // Check exploration reward tiers after each action
-    this.checkExplorationRewards();
+    this.minimapSys.checkExplorationRewards();
 
     if (!this.player.alive && !this.gameOver) {
       this.showGameOver();
@@ -11581,1052 +10828,11 @@ export class DungeonScene extends Phaser.Scene {
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   }
 
-  // ══════════════════════════════════════════════════════════
-  // ── Auto-Explore System ──
-  // ══════════════════════════════════════════════════════════
-
-  /**
-   * BFS to find direction toward the nearest unexplored (not-yet-visited) floor tile.
-   * Returns the Direction the player should take as the first step, or null if none reachable.
-   */
-  private autoExploreBFS(): Direction | null {
-    const { width, height, terrain } = this.dungeon;
-    const px = this.player.tileX;
-    const py = this.player.tileY;
-
-    // BFS from player position
-    const dist: number[][] = Array.from({ length: height }, () => new Array(width).fill(-1));
-    const parent: { dx: number; dy: number }[][] = Array.from(
-      { length: height }, () => new Array(width).fill(null)
-    );
-    dist[py][px] = 0;
-
-    // BFS queue: [x, y]
-    const queue: [number, number][] = [[px, py]];
-    let head = 0;
-
-    // 8 directions: prefer cardinal first for more natural corridor movement
-    const bfsDirs: { dx: number; dy: number }[] = [
-      { dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 },
-      { dx: 1, dy: -1 }, { dx: 1, dy: 1 }, { dx: -1, dy: 1 }, { dx: -1, dy: -1 },
-    ];
-
-    while (head < queue.length) {
-      const [cx, cy] = queue[head++];
-
-      for (const d of bfsDirs) {
-        const nx = cx + d.dx;
-        const ny = cy + d.dy;
-        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
-        if (dist[ny][nx] !== -1) continue;
-        if (terrain[ny][nx] !== TerrainType.GROUND) continue;
-
-        // For diagonal moves, check both adjacent cardinals are ground (wall-clip prevention)
-        if (d.dx !== 0 && d.dy !== 0) {
-          if (terrain[cy][cx + d.dx] !== TerrainType.GROUND) continue;
-          if (terrain[cy + d.dy][cx] !== TerrainType.GROUND) continue;
-        }
-
-        dist[ny][nx] = dist[cy][cx] + 1;
-        parent[ny][nx] = { dx: d.dx, dy: d.dy };
-
-        // Found an unexplored tile — trace back to find first step
-        if (!this.visited[ny][nx]) {
-          return this.traceAutoExplorePath(px, py, nx, ny, parent);
-        }
-
-        // Don't BFS through tiles occupied by enemies (but still explore past them)
-        const blocked = this.allEntities.some(
-          e => e !== this.player && e.alive && e.tileX === nx && e.tileY === ny
-        );
-        if (!blocked) {
-          queue.push([nx, ny]);
-        }
-      }
-    }
-
-    return null; // No reachable unexplored tiles
-  }
-
-  /** Trace the BFS parent chain back to get the direction for the first step from player */
-  private traceAutoExplorePath(
-    startX: number, startY: number,
-    goalX: number, goalY: number,
-    parentMap: { dx: number; dy: number }[][]
-  ): Direction | null {
-    let cx = goalX;
-    let cy = goalY;
-
-    // Walk backward from goal to start
-    while (true) {
-      const p = parentMap[cy][cx];
-      if (!p) return null;
-      const prevX = cx - p.dx;
-      const prevY = cy - p.dy;
-      if (prevX === startX && prevY === startY) {
-        // p.dx, p.dy is the step from start → this is our direction
-        return this.dxdyToDirection(p.dx, p.dy);
-      }
-      cx = prevX;
-      cy = prevY;
-    }
-  }
-
-  /** Convert dx,dy offset to Direction enum */
-  private dxdyToDirection(dx: number, dy: number): Direction | null {
-    for (let d = 0; d < 8; d++) {
-      if (DIR_DX[d as Direction] === dx && DIR_DY[d as Direction] === dy) {
-        return d as Direction;
-      }
-    }
-    return null;
-  }
-
-  /** Check if auto-explore should stop (returns reason string or null if should continue) */
-  private checkAutoExploreStop(): string | null {
-    const px = this.player.tileX;
-    const py = this.player.tileY;
-
-    // Player died or game over
-    if (!this.player.alive || this.gameOver) return "danger";
-
-    // Enemy visible (within player's sight range = 4 tiles, same as revealArea radius)
-    for (const e of this.enemies) {
-      if (e.alive && this.visited[e.tileY]?.[e.tileX]) {
-        const dist = chebyshevDist(px, py, e.tileX, e.tileY);
-        if (dist <= 4) return `${e.name} spotted nearby!`;
-      }
-    }
-
-    // Item found nearby (within 2 tiles)
-    for (const fi of this.floorItems) {
-      const dist = chebyshevDist(px, py, fi.x, fi.y);
-      if (dist <= 2 && this.visited[fi.y]?.[fi.x]) return `Found ${fi.item.name} nearby!`;
-    }
-
-    // Stairs found nearby (within 3 tiles)
-    const { stairsPos } = this.dungeon;
-    if (this.visited[stairsPos.y]?.[stairsPos.x]) {
-      const stairDist = chebyshevDist(px, py, stairsPos.x, stairsPos.y);
-      if (stairDist <= 3) return "Stairs nearby!";
-    }
-
-    return null;
-  }
-
-  /** Start auto-explore mode */
-  private startAutoExplore() {
-    if (this.autoExploring) {
-      this.stopAutoExplore("Cancelled.");
-      return;
-    }
-    if (this.turnManager.isBusy || !this.player.alive || this.gameOver ||
-        this.bagOpen || this.menuOpen || this.settingsOpen || this.shopOpen || this.teamPanelOpen || this.eventOpen || this.fullMapOpen || this.relicOverlayOpen) return;
-
-    // Check stop conditions before even starting
-    const preCheck = this.checkAutoExploreStop();
-    if (preCheck) {
-      this.showLog(preCheck);
-      return;
-    }
-
-    this.autoExploring = true;
-    this.showLog("Auto-exploring...");
-
-    // Show pulsing AUTO indicator
-    this.showAutoExploreIndicator();
-
-    // Add global tap-to-cancel listener with a short delay so the current tap doesn't cancel immediately
-    this.time.delayedCall(200, () => {
-      if (this.autoExploring) {
-        this.input.on("pointerdown", this.onAutoExploreInterrupt, this);
-      }
-    });
-
-    // Start the auto-step loop
-    this.autoExploreStep();
-  }
-
-  /** Perform one auto-explore step, then schedule the next */
-  private async autoExploreStep() {
-    if (!this.autoExploring) return;
-    if (this.turnManager.isBusy) {
-      // Wait and retry
-      this.autoExploreTimer = this.time.delayedCall(50, () => this.autoExploreStep());
-      return;
-    }
-
-    // Check stop conditions before moving
-    const stopReason = this.checkAutoExploreStop();
-    if (stopReason) {
-      this.stopAutoExplore(stopReason);
-      return;
-    }
-
-    // Find the next direction via BFS
-    const dir = this.autoExploreBFS();
-    if (dir === null) {
-      this.stopAutoExplore("No more areas to explore.");
-      return;
-    }
-
-    // Check if we can actually move there (entity collision etc.)
-    if (!this.canEntityMove(this.player, dir)) {
-      // Might be temporarily blocked by an entity; try again next tick
-      this.autoExploreTimer = this.time.delayedCall(100, () => this.autoExploreStep());
-      return;
-    }
-
-    // Record HP before the step to detect damage taken
-    const hpBefore = this.player.stats.hp;
-
-    // Perform the turn (same as handlePlayerAction for movement)
-    this.player.facing = dir;
-
-    await this.turnManager.executeTurn(
-      () => this.moveEntity(this.player, dir),
-      [...this.getAllyActions(), ...this.getEnemyActions()]
-    );
-
-    // PP recovery on movement
-    this.recoverPP(this.player);
-
-    // Check for items on ground (but don't stop for it — stop condition handles nearby items)
-    const itemHere = this.floorItems.find(
-      fi => fi.x === this.player.tileX && fi.y === this.player.tileY
-    );
-    if (itemHere) {
-      this.stopAutoExplore(`Found ${itemHere.item.name}!`);
-      this.tickBelly();
-      this.tickWeather();
-      this.tickEntityStatus(this.player);
-      this.updateHUD();
-      return;
-    }
-
-    // Traps, hazards, stairs, shop, monster house checks
-    this.checkTraps();
-    this.checkPlayerHazard();
-    this.revealNearbyTraps();
-    // Don't call checkStairs — that would auto-advance the floor. Let the stop condition handle it.
-    this.checkShop();
-    this.checkMonsterHouse();
-    this.checkEventRoom();
-    this.puzzleSys.checkPuzzleRoom();
-    this.checkShrine();
-
-    // Belly drain, weather, status
-    this.tickBelly();
-    this.tickWeather();
-    this.tickEntityStatus(this.player);
-    this.updateHUD();
-
-    // Check exploration reward tiers during auto-explore
-    this.checkExplorationRewards();
-
-    // Check if player died from belly/status/traps
-    if (!this.player.alive && !this.gameOver) {
-      this.stopAutoExplore();
-      this.showGameOver();
-      return;
-    }
-
-    // Check if player took damage this step (trap, burn, hunger, etc.)
-    if (this.player.stats.hp < hpBefore) {
-      this.stopAutoExplore("Took damage!");
-      return;
-    }
-
-    // Check stop conditions again after the move
-    if (!this.autoExploring) return; // might have been stopped by monster house trigger etc.
-    const postStopReason = this.checkAutoExploreStop();
-    if (postStopReason) {
-      this.stopAutoExplore(postStopReason);
-      return;
-    }
-
-    // Schedule next step (150ms for faster-than-manual movement)
-    this.autoExploreTimer = this.time.delayedCall(150, () => this.autoExploreStep());
-  }
-
-  /** Stop auto-explore and clean up */
-  private stopAutoExplore(reason?: string) {
-    if (!this.autoExploring) return;
-    this.autoExploring = false;
-
-    if (this.autoExploreTimer) {
-      this.autoExploreTimer.destroy();
-      this.autoExploreTimer = null;
-    }
-
-    // Remove the interrupt listener if still active
-    this.input.off("pointerdown", this.onAutoExploreInterrupt, this);
-
-    // Hide AUTO indicator
-    this.hideAutoExploreIndicator();
-
-    if (reason) {
-      this.showLog(reason);
-    }
-  }
-
-  /** Handler for user tap to interrupt auto-explore */
-  private onAutoExploreInterrupt = () => {
-    if (this.autoExploring) {
-      this.stopAutoExplore("Stopped.");
-    }
-  };
-
-  /** Show the pulsing AUTO indicator in top-right corner */
-  private showAutoExploreIndicator() {
-    if (this.autoExploreText) this.autoExploreText.destroy();
-    if (this.autoExploreTween) this.autoExploreTween.destroy();
-
-    this.autoExploreText = this.add.text(GAME_WIDTH - 8, 66, "AUTO", {
-      fontSize: "11px",
-      color: "#4ade80",
-      fontFamily: "monospace",
-      fontStyle: "bold",
-      backgroundColor: "#00000088",
-      padding: { x: 4, y: 2 },
-    }).setOrigin(1, 0).setScrollFactor(0).setDepth(105);
-
-    this.autoExploreTween = this.tweens.add({
-      targets: this.autoExploreText,
-      alpha: { from: 1.0, to: 0.5 },
-      duration: 600,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.easeInOut",
-    });
-  }
-
-  /** Hide the AUTO indicator */
-  private hideAutoExploreIndicator() {
-    if (this.autoExploreTween) {
-      this.autoExploreTween.destroy();
-      this.autoExploreTween = null;
-    }
-    if (this.autoExploreText) {
-      this.autoExploreText.destroy();
-      this.autoExploreText = null;
-    }
-  }
-
-  // ══════════════════════════════════════════════════════════
-  // ── Secret Room System ─────────────────────────────────
-  // ══════════════════════════════════════════════════════════
-
-  /**
-   * Find a suitable wall tile adjacent to a corridor that can host a secret entrance.
-   * The wall must have enough space behind it (3x3 area that is currently all walls).
-   * Returns the wall position and the direction into the wall (for carving the room).
-   */
-  private findSecretWallPosition(
-    terrain: TerrainType[][],
-    rooms: { x: number; y: number; w: number; h: number }[],
-    mapW: number, mapH: number,
-    playerStart: { x: number; y: number },
-    stairsPos: { x: number; y: number },
-  ): { wall: { x: number; y: number }; insideDir: { dx: number; dy: number } } | null {
-    // Build a set of room interior tiles (to avoid placing inside existing rooms)
-    const roomTileSet = new Set<string>();
-    for (const r of rooms) {
-      for (let ry = r.y; ry < r.y + r.h; ry++) {
-        for (let rx = r.x; rx < r.x + r.w; rx++) {
-          roomTileSet.add(`${rx},${ry}`);
-        }
-      }
-    }
-
-    // Candidate walls: wall tiles adjacent to at least one ground tile (corridor or room edge)
-    const candidates: { wall: { x: number; y: number }; insideDir: { dx: number; dy: number } }[] = [];
-    const dirs = [
-      { dx: 0, dy: -1 }, // north
-      { dx: 0, dy: 1 },  // south
-      { dx: -1, dy: 0 }, // west
-      { dx: 1, dy: 0 },  // east
-    ];
-
-    for (let y = 2; y < mapH - 5; y++) {
-      for (let x = 2; x < mapW - 5; x++) {
-        if (terrain[y][x] !== TerrainType.WALL) continue;
-        // Skip if too close to player start or stairs
-        const distPlayer = Math.abs(x - playerStart.x) + Math.abs(y - playerStart.y);
-        const distStairs = Math.abs(x - stairsPos.x) + Math.abs(y - stairsPos.y);
-        if (distPlayer < 4 || distStairs < 4) continue;
-
-        for (const d of dirs) {
-          const adjX = x + d.dx;
-          const adjY = y + d.dy;
-          if (adjX < 0 || adjX >= mapW || adjY < 0 || adjY >= mapH) continue;
-          if (terrain[adjY][adjX] !== TerrainType.GROUND) continue;
-
-          // The "inside" direction is opposite to the corridor side
-          const insideDx = -d.dx;
-          const insideDy = -d.dy;
-
-          // Check if a 3x3 area behind this wall (in insideDir) is all walls
-          const behindX = x + insideDx;
-          const behindY = y + insideDy;
-          let valid = true;
-
-          // Check a 3x3 region centered on behindX,behindY
-          for (let dy2 = -1; dy2 <= 1; dy2++) {
-            for (let dx2 = -1; dx2 <= 1; dx2++) {
-              const cx = behindX + dx2;
-              const cy = behindY + dy2;
-              if (cx < 1 || cx >= mapW - 1 || cy < 1 || cy >= mapH - 1) { valid = false; break; }
-              if (terrain[cy][cx] !== TerrainType.WALL) { valid = false; break; }
-              if (roomTileSet.has(`${cx},${cy}`)) { valid = false; break; }
-            }
-            if (!valid) break;
-          }
-
-          // Also check a 1-tile buffer around the 3x3 to avoid bleeding into corridors
-          if (valid) {
-            for (let dy2 = -2; dy2 <= 2; dy2++) {
-              for (let dx2 = -2; dx2 <= 2; dx2++) {
-                // Skip the inner 3x3, only check the border ring
-                if (Math.abs(dy2) <= 1 && Math.abs(dx2) <= 1) continue;
-                const cx = behindX + dx2;
-                const cy = behindY + dy2;
-                if (cx < 0 || cx >= mapW || cy < 0 || cy >= mapH) { valid = false; break; }
-                // Buffer tiles should be walls (to prevent merging with other rooms)
-                if (terrain[cy][cx] !== TerrainType.WALL) { valid = false; break; }
-              }
-              if (!valid) break;
-            }
-          }
-
-          if (valid) {
-            candidates.push({ wall: { x, y }, insideDir: { dx: insideDx, dy: insideDy } });
-          }
-        }
-      }
-    }
-
-    if (candidates.length === 0) return null;
-    return candidates[Math.floor(Math.random() * candidates.length)];
-  }
-
-  /**
-   * Carve a 3x3 secret room behind the secret wall tile.
-   * Returns the list of ground tiles created (excluding the wall tile itself).
-   */
-  private carveSecretRoom(
-    wallPos: { x: number; y: number },
-    insideDir: { dx: number; dy: number },
-    terrain: TerrainType[][],
-    mapW: number, mapH: number,
-  ): { x: number; y: number }[] {
-    const tiles: { x: number; y: number }[] = [];
-    const behindX = wallPos.x + insideDir.dx;
-    const behindY = wallPos.y + insideDir.dy;
-
-    // Carve a 3x3 room centered on (behindX, behindY)
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const tx = behindX + dx;
-        const ty = behindY + dy;
-        if (tx < 1 || tx >= mapW - 1 || ty < 1 || ty >= mapH - 1) continue;
-        terrain[ty][tx] = TerrainType.GROUND;
-        tiles.push({ x: tx, y: ty });
-      }
-    }
-
-    return tiles;
-  }
-
-  /**
-   * Start a subtle shimmer animation on the secret wall tile (hint for players).
-   * Every 3 seconds, the wall flickers briefly.
-   */
-  private startSecretWallShimmer() {
-    if (!this.secretWallPos) return;
-
-    this.secretWallShimmerGfx = this.add.graphics().setDepth(3);
-
-    this.secretWallShimmerTimer = this.time.addEvent({
-      delay: 3000,
-      loop: true,
-      callback: () => {
-        if (!this.secretWallPos || this.secretRoomDiscovered) {
-          if (this.secretWallShimmerTimer) {
-            this.secretWallShimmerTimer.destroy();
-            this.secretWallShimmerTimer = null;
-          }
-          if (this.secretWallShimmerGfx) {
-            this.secretWallShimmerGfx.destroy();
-            this.secretWallShimmerGfx = null;
-          }
-          return;
-        }
-
-        // Only shimmer if tile is currently visible or visited
-        const wx = this.secretWallPos.x;
-        const wy = this.secretWallPos.y;
-        if (!this.currentlyVisible[wy]?.[wx] && !this.visited[wy]?.[wx]) return;
-
-        // Brief alpha twitch
-        const gfx = this.secretWallShimmerGfx!;
-        gfx.clear();
-        gfx.fillStyle(0xfbbf24, 0.3);
-        gfx.fillRect(
-          wx * TILE_DISPLAY + 2, wy * TILE_DISPLAY + 2,
-          TILE_DISPLAY - 4, TILE_DISPLAY - 4,
-        );
-
-        // Fade out after 200ms
-        this.time.delayedCall(200, () => {
-          if (gfx && gfx.scene) gfx.clear();
-        });
-      },
-    });
-  }
-
-  /**
-   * Check if the player is walking into a secret wall tile and open it.
-   * Returns true if the wall was opened (so player can move there).
-   */
-  private tryOpenSecretWall(targetX: number, targetY: number): boolean {
-    if (!this.secretWallPos || this.secretRoomDiscovered) return false;
-    if (targetX !== this.secretWallPos.x || targetY !== this.secretWallPos.y) return false;
-
-    // Open the secret wall — change it to ground
-    this.dungeon.terrain[targetY][targetX] = TerrainType.GROUND;
-    this.secretRoomDiscovered = true;
-    // Run log: secret room found
-    this.runLog.add(RunLogEvent.SecretRoomFound, this.secretRoomData?.type ?? "Secret Room", this.currentFloor, this.turnManager.turn);
-
-    // Stop shimmer
-    if (this.secretWallShimmerTimer) {
-      this.secretWallShimmerTimer.destroy();
-      this.secretWallShimmerTimer = null;
-    }
-    if (this.secretWallShimmerGfx) {
-      this.secretWallShimmerGfx.destroy();
-      this.secretWallShimmerGfx = null;
-    }
-
-    // Visual: update the theme overlay for newly carved tiles
-    if (this.themeOverlay) {
-      // Draw ground overlay on the wall tile + secret room tiles
-      const allNewTiles = [{ x: targetX, y: targetY }, ...this.secretRoomTiles];
-      for (const tile of allNewTiles) {
-        this.themeOverlay.fillStyle(this.currentTheme.floorColor, 0.18);
-        this.themeOverlay.fillRect(
-          tile.x * TILE_DISPLAY, tile.y * TILE_DISPLAY,
-          TILE_DISPLAY, TILE_DISPLAY,
-        );
-      }
-    }
-
-    // Camera shake for dramatic reveal
-    this.cameras.main.shake(200, 0.005);
-
-    // Sound effect
-    sfxPickup();
-
-    // Show announcement
-    this.showSecretRoomAnnouncement();
-
-    // Draw room effect tile graphics
-    this.drawSecretRoomEffectTile();
-
-    // Mark secret room data as discovered
-    if (this.secretRoomData) {
-      this.secretRoomData.discovered = true;
-    }
-
-    return true;
-  }
-
-  /**
-   * Show a prominent "You found a Secret Room!" announcement with gold sparkle.
-   */
-  private showSecretRoomAnnouncement() {
-    if (!this.secretRoomData) return;
-
-    const typeLabel = this.secretRoomData.name;
-    this.showLog(`You found a Secret Room! (${typeLabel})`);
-
-    // Create a centered gold announcement text
-    const announce = this.add.text(
-      GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40,
-      `Secret Room Found!\n${typeLabel}`,
-      {
-        fontSize: "14px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-        stroke: "#000000", strokeThickness: 3, align: "center",
-        backgroundColor: "#1a1a2ecc", padding: { x: 12, y: 8 },
-      }
-    ).setOrigin(0.5).setScrollFactor(0).setDepth(150);
-
-    // Sparkle particles around announcement
-    const sparkleGfx = this.add.graphics().setScrollFactor(0).setDepth(149);
-    for (let i = 0; i < 8; i++) {
-      const sx = GAME_WIDTH / 2 + (Math.random() - 0.5) * 120;
-      const sy = GAME_HEIGHT / 2 - 40 + (Math.random() - 0.5) * 60;
-      sparkleGfx.fillStyle(0xfbbf24, 0.8);
-      sparkleGfx.fillCircle(sx, sy, 2 + Math.random() * 2);
-    }
-
-    // Fade out after 2 seconds
-    this.tweens.add({
-      targets: announce,
-      alpha: 0,
-      duration: 500,
-      delay: 1800,
-      onComplete: () => {
-        announce.destroy();
-        sparkleGfx.destroy();
-      },
-    });
-
-    this.tweens.add({
-      targets: sparkleGfx,
-      alpha: 0,
-      duration: 500,
-      delay: 1800,
-    });
-  }
-
-  /**
-   * Draw the effect tile graphic in the center of the secret room based on type.
-   */
-  private drawSecretRoomEffectTile() {
-    if (!this.secretEffectTile || !this.secretRoomData) return;
-
-    const tx = this.secretEffectTile.x;
-    const ty = this.secretEffectTile.y;
-    const px = tx * TILE_DISPLAY;
-    const py = ty * TILE_DISPLAY;
-
-    const gfx = this.add.graphics().setDepth(4);
-
-    switch (this.secretRoomData.type) {
-      case SecretRoomType.TreasureVault: {
-        // Gold carpet + item sprites placed as floor items
-        gfx.fillStyle(0xfbbf24, 0.15);
-        for (const tile of this.secretRoomTiles) {
-          gfx.fillRect(tile.x * TILE_DISPLAY, tile.y * TILE_DISPLAY, TILE_DISPLAY, TILE_DISPLAY);
-        }
-        // Place items on the secret room tiles
-        if (this.secretRoomData.reward.items) {
-          const items = this.secretRoomData.reward.items;
-          const placementTiles = this.secretRoomTiles.filter(
-            t => !(t.x === this.secretEffectTile!.x && t.y === this.secretEffectTile!.y)
-          );
-          for (let i = 0; i < items.length && i < placementTiles.length; i++) {
-            const itemId = items[i];
-            const itemDef = ITEM_DB[itemId];
-            if (!itemDef) continue;
-            const pt = placementTiles[i];
-            const sprite = this.add.text(
-              pt.x * TILE_DISPLAY + TILE_DISPLAY / 2,
-              pt.y * TILE_DISPLAY + TILE_DISPLAY / 2,
-              "\u2605", { fontSize: "14px", color: "#fde047" }
-            ).setOrigin(0.5).setDepth(6);
-            this.floorItems.push({ x: pt.x, y: pt.y, item: itemDef, sprite });
-          }
-        }
-        // Gold text at center
-        if (this.secretRoomData.reward.gold) {
-          const goldText = this.add.text(
-            px + TILE_DISPLAY / 2, py + TILE_DISPLAY / 2,
-            `${this.secretRoomData.reward.gold}G`,
-            { fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
-              stroke: "#000000", strokeThickness: 2 }
-          ).setOrigin(0.5).setDepth(7);
-          this.secretRoomGraphics.push(goldText as unknown as Phaser.GameObjects.Graphics);
-        }
-        break;
-      }
-
-      case SecretRoomType.HealingSpring: {
-        // Blue glowing center tile
-        gfx.fillStyle(0x60a5fa, 0.35);
-        gfx.fillRect(px + 4, py + 4, TILE_DISPLAY - 8, TILE_DISPLAY - 8);
-        // Pulsing blue glow
-        this.tweens.add({
-          targets: gfx,
-          alpha: { from: 1, to: 0.5 },
-          duration: 1200,
-          yoyo: true,
-          repeat: -1,
-          ease: "Sine.easeInOut",
-        });
-        // Label
-        const healLabel = this.add.text(
-          px + TILE_DISPLAY / 2, py - 6,
-          "Spring", { fontSize: "7px", color: "#60a5fa", fontFamily: "monospace",
-            stroke: "#000000", strokeThickness: 2 }
-        ).setOrigin(0.5).setDepth(7);
-        this.secretRoomGraphics.push(healLabel as unknown as Phaser.GameObjects.Graphics);
-        break;
-      }
-
-      case SecretRoomType.SkillShrine: {
-        // Purple glowing tile
-        gfx.fillStyle(0xa855f7, 0.35);
-        gfx.fillRect(px + 4, py + 4, TILE_DISPLAY - 8, TILE_DISPLAY - 8);
-        this.tweens.add({
-          targets: gfx,
-          alpha: { from: 1, to: 0.5 },
-          duration: 1200,
-          yoyo: true,
-          repeat: -1,
-          ease: "Sine.easeInOut",
-        });
-        const shrineLabel = this.add.text(
-          px + TILE_DISPLAY / 2, py - 6,
-          "Shrine", { fontSize: "7px", color: "#a855f7", fontFamily: "monospace",
-            stroke: "#000000", strokeThickness: 2 }
-        ).setOrigin(0.5).setDepth(7);
-        this.secretRoomGraphics.push(shrineLabel as unknown as Phaser.GameObjects.Graphics);
-        break;
-      }
-
-      case SecretRoomType.TrainingRoom: {
-        // Orange tile
-        gfx.fillStyle(0xf59e0b, 0.35);
-        gfx.fillRect(px + 4, py + 4, TILE_DISPLAY - 8, TILE_DISPLAY - 8);
-        this.tweens.add({
-          targets: gfx,
-          alpha: { from: 1, to: 0.5 },
-          duration: 1200,
-          yoyo: true,
-          repeat: -1,
-          ease: "Sine.easeInOut",
-        });
-        const trainLabel = this.add.text(
-          px + TILE_DISPLAY / 2, py - 6,
-          "Training", { fontSize: "7px", color: "#f59e0b", fontFamily: "monospace",
-            stroke: "#000000", strokeThickness: 2 }
-        ).setOrigin(0.5).setDepth(7);
-        this.secretRoomGraphics.push(trainLabel as unknown as Phaser.GameObjects.Graphics);
-        break;
-      }
-
-      case SecretRoomType.WarpHub: {
-        // Swirling portal (teal/cyan)
-        gfx.fillStyle(0x22d3ee, 0.4);
-        gfx.fillCircle(px + TILE_DISPLAY / 2, py + TILE_DISPLAY / 2, TILE_DISPLAY / 3);
-        gfx.lineStyle(2, 0x22d3ee, 0.6);
-        gfx.strokeCircle(px + TILE_DISPLAY / 2, py + TILE_DISPLAY / 2, TILE_DISPLAY / 3 + 4);
-        this.tweens.add({
-          targets: gfx,
-          angle: { from: 0, to: 360 },
-          duration: 3000,
-          repeat: -1,
-          ease: "Linear",
-        });
-        const warpLabel = this.add.text(
-          px + TILE_DISPLAY / 2, py - 6,
-          "Warp", { fontSize: "7px", color: "#22d3ee", fontFamily: "monospace",
-            stroke: "#000000", strokeThickness: 2 }
-        ).setOrigin(0.5).setDepth(7);
-        this.secretRoomGraphics.push(warpLabel as unknown as Phaser.GameObjects.Graphics);
-        break;
-      }
-    }
-
-    this.secretRoomGraphics.push(gfx);
-  }
-
-  /**
-   * Check if the player is standing on the secret room effect tile and apply the reward.
-   */
-  private checkSecretRoom() {
-    if (!this.secretRoomData || !this.secretRoomDiscovered || this.secretRoomUsed) return;
-    if (!this.secretEffectTile) return;
-    if (this.secretWarpOpen) return; // warp overlay already open
-
-    const px = this.player.tileX;
-    const py = this.player.tileY;
-    const ex = this.secretEffectTile.x;
-    const ey = this.secretEffectTile.y;
-
-    // For TreasureVault, collect gold when stepping on center tile
-    if (this.secretRoomData.type === SecretRoomType.TreasureVault) {
-      if (px === ex && py === ey) {
-        this.applySecretRewardTreasure();
-      }
-      return;
-    }
-
-    // For other types, stepping on the effect tile triggers the reward
-    if (px !== ex || py !== ey) return;
-
-    switch (this.secretRoomData.type) {
-      case SecretRoomType.HealingSpring:
-        this.applySecretRewardHealing();
-        break;
-      case SecretRoomType.SkillShrine:
-        this.applySecretRewardSkill();
-        break;
-      case SecretRoomType.TrainingRoom:
-        this.applySecretRewardTraining();
-        break;
-      case SecretRoomType.WarpHub:
-        this.showWarpHubOverlay();
-        break;
-    }
-  }
-
-  /** TreasureVault: collect gold from center tile */
-  private applySecretRewardTreasure() {
-    if (!this.secretRoomData?.reward.gold) return;
-    this.secretRoomUsed = true;
-    const goldAmount = this.secretRoomData.reward.gold;
-    this.gold += goldAmount;
-    sfxPickup();
-    this.showLog(`Collected ${goldAmount} Gold from the Treasure Vault!`);
-
-    // Flash gold text popup
-    if (this.player.sprite) {
-      this.showDamagePopup(
-        this.player.sprite.x, this.player.sprite.y - 10,
-        0, 1, `+${goldAmount}G`
-      );
-    }
-    this.updateHUD();
-  }
-
-  /** HealingSpring: full HP/PP restore + AtkUp+DefUp buff for 10 turns */
-  private applySecretRewardHealing() {
-    this.secretRoomUsed = true;
-    sfxHeal();
-
-    // Full HP restore
-    this.player.stats.hp = this.player.stats.maxHp;
-
-    // Full PP restore for all skills
-    for (const sk of this.player.skills) {
-      sk.currentPp = sk.pp;
-    }
-
-    // Temporary AtkUp + DefUp buff
-    const buffTurns = this.secretRoomData?.reward.buffTurns ?? 10;
-    if (!this.player.statusEffects.some(s => s.type === SkillEffect.AtkUp)) {
-      this.player.statusEffects.push({ type: SkillEffect.AtkUp, turnsLeft: buffTurns });
-    }
-    if (!this.player.statusEffects.some(s => s.type === SkillEffect.DefUp)) {
-      this.player.statusEffects.push({ type: SkillEffect.DefUp, turnsLeft: buffTurns });
-    }
-
-    this.showLog("The Healing Spring fully restores your HP and PP!");
-    this.showLog("ATK and DEF boosted for 10 turns!");
-
-    // Heal allies too
-    for (const ally of this.allies) {
-      if (ally.alive) {
-        ally.stats.hp = ally.stats.maxHp;
-        for (const sk of ally.skills) {
-          sk.currentPp = sk.pp;
-        }
-      }
-    }
-
-    this.updateHUD();
-  }
-
-  /** SkillShrine: learn a random rare skill (replace weakest skill if 4 skills already) */
-  private applySecretRewardSkill() {
-    this.secretRoomUsed = true;
-    const skillId = this.secretRoomData?.reward.skillId;
-    if (!skillId || !SKILL_DB[skillId]) {
-      this.showLog("The shrine is empty...");
-      return;
-    }
-
-    sfxSkill();
-    const template = SKILL_DB[skillId];
-    const newSkill = createSkill(template);
-
-    if (this.player.skills.length < 4) {
-      // Has room — just add
-      this.player.skills.push(newSkill);
-      this.showLog(`Learned ${newSkill.name} from the Skill Shrine!`);
-    } else {
-      // Replace the lowest-power skill
-      let weakestIdx = 0;
-      let weakestPower = Infinity;
-      for (let i = 0; i < this.player.skills.length; i++) {
-        if (this.player.skills[i].power < weakestPower) {
-          weakestPower = this.player.skills[i].power;
-          weakestIdx = i;
-        }
-      }
-      const replaced = this.player.skills[weakestIdx];
-      this.player.skills[weakestIdx] = newSkill;
-      this.showLog(`Learned ${newSkill.name}! (Replaced ${replaced.name})`);
-    }
-
-    this.updateHUD();
-  }
-
-  /** TrainingRoom: grant 2 level-ups worth of EXP */
-  private applySecretRewardTraining() {
-    this.secretRoomUsed = true;
-    const expGain = this.secretRoomData?.reward.exp ?? 100;
-    sfxLevelUp();
-
-    this.totalExp += expGain;
-    this.showLog(`Gained ${expGain} EXP from the Training Room!`);
-
-    // Process level ups
-    const { results } = processLevelUp(this.player.stats, 0, this.totalExp);
-    for (const r of results) {
-      this.showLog(`Level Up! Lv${r.newLevel}! HP+${r.hpGain} ATK+${r.atkGain} DEF+${r.defGain}`);
-    }
-
-    if (this.player.sprite) {
-      this.showDamagePopup(
-        this.player.sprite.x, this.player.sprite.y - 10,
-        0, 1, `+${expGain} EXP`
-      );
-    }
-
-    this.updateHUD();
-  }
-
-  /**
-   * Show WarpHub floor selection overlay.
-   * Allows the player to choose any floor from 1 to currentFloor - 1.
-   */
-  private showWarpHubOverlay() {
-    if (this.secretWarpOpen || this.currentFloor <= 1) {
-      this.showLog("The portal flickers but has nowhere to send you...");
-      this.secretRoomUsed = true;
-      return;
-    }
-
-    this.secretWarpOpen = true;
-    this.stopAutoExplore();
-
-    // Dim overlay
-    const overlay = this.add.rectangle(
-      GAME_WIDTH / 2, GAME_HEIGHT / 2,
-      GAME_WIDTH, GAME_HEIGHT,
-      0x000000, 0.75
-    ).setScrollFactor(0).setDepth(200).setInteractive();
-    this.secretRoomUI.push(overlay);
-
-    // Title
-    const title = this.add.text(GAME_WIDTH / 2, 60, "Warp Hub", {
-      fontSize: "16px", color: "#22d3ee", fontFamily: "monospace", fontStyle: "bold",
-      stroke: "#000000", strokeThickness: 2,
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    this.secretRoomUI.push(title);
-
-    const subtitle = this.add.text(GAME_WIDTH / 2, 85, "Choose a floor to warp to:", {
-      fontSize: "10px", color: "#aab0c8", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
-    this.secretRoomUI.push(subtitle);
-
-    // Floor buttons (scrollable list of floors 1 to currentFloor - 1)
-    const maxFloor = this.currentFloor - 1;
-    const buttonsPerRow = 4;
-    const btnW = 60;
-    const btnH = 28;
-    const gap = 6;
-    const startY = 110;
-
-    for (let f = 1; f <= maxFloor; f++) {
-      const row = Math.floor((f - 1) / buttonsPerRow);
-      const col = (f - 1) % buttonsPerRow;
-      const bx = GAME_WIDTH / 2 - ((Math.min(maxFloor, buttonsPerRow) * (btnW + gap) - gap) / 2) + col * (btnW + gap) + btnW / 2;
-      const by = startY + row * (btnH + gap);
-
-      // Only show if it fits on screen
-      if (by > GAME_HEIGHT - 100) continue;
-
-      const btn = this.add.text(bx, by, `B${f}F`, {
-        fontSize: "11px", color: "#e0e0e0", fontFamily: "monospace", fontStyle: "bold",
-        backgroundColor: "#334466", padding: { x: 8, y: 4 },
-      }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
-
-      btn.on("pointerover", () => btn.setColor("#22d3ee"));
-      btn.on("pointerout", () => btn.setColor("#e0e0e0"));
-      btn.on("pointerdown", () => {
-        this.executeWarp(f);
-      });
-
-      this.secretRoomUI.push(btn);
-    }
-
-    // Cancel button
-    const cancelBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 60, "Cancel", {
-      fontSize: "12px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
-      backgroundColor: "#1a1a2ecc", padding: { x: 16, y: 6 },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
-
-    cancelBtn.on("pointerover", () => cancelBtn.setColor("#ff7777"));
-    cancelBtn.on("pointerout", () => cancelBtn.setColor("#ef4444"));
-    cancelBtn.on("pointerdown", () => {
-      this.closeWarpHubOverlay();
-    });
-
-    this.secretRoomUI.push(cancelBtn);
-  }
-
-  /**
-   * Execute the warp to a chosen floor.
-   */
-  private executeWarp(targetFloor: number) {
-    this.closeWarpHubOverlay();
-    this.secretRoomUsed = true;
-
-    sfxStairs();
-    this.showLog(`Warped to B${targetFloor}F!`);
-
-    this.gameOver = true;
-
-    // Pass modifier IDs through floor transitions
-    const modifierIds = this.activeModifiers.length > 0 ? this.activeModifiers.map(m => m.id) : undefined;
-
-    this.cameras.main.fadeOut(500, 0, 0, 0);
-    this.time.delayedCall(600, () => {
-      this.scene.restart({
-        floor: targetFloor,
-        hp: this.player.stats.hp,
-        maxHp: this.player.stats.maxHp,
-        skills: this.player.skills,
-        inventory: this.inventory,
-        level: this.player.stats.level,
-        atk: this.player.stats.atk,
-        def: this.player.stats.def,
-        exp: this.totalExp,
-        dungeonId: this.dungeonDef.id,
-        allies: this.serializeAllies(),
-        belly: this.belly,
-        starter: this.starterId,
-        challengeMode: this.challengeMode ?? undefined,
-        modifiers: modifierIds,
-        runElapsedTime: this.runElapsedSeconds,
-        scoreChain: this.scoreChain,
-        legendaryEncountered: this.legendaryEncountered,
-        questItemsCollected: this.questItemsCollected,
-        questItemsUsed: this.questItemsUsed,
-        relics: this.activeRelics,
-        runLogEntries: this.runLog.serialize(),
-      });
-    });
-  }
-
-  /**
-   * Close the WarpHub overlay.
-   */
-  private closeWarpHubOverlay() {
-    this.secretWarpOpen = false;
-    for (const obj of this.secretRoomUI) {
-      if (obj && (obj as Phaser.GameObjects.GameObject).scene) {
-        obj.destroy();
-      }
-    }
-    this.secretRoomUI = [];
-  }
+  // ── Auto-Explore (delegated to AutoExploreSystem) ──
+
+  /** Forward for PuzzleHost / SecretRoomHost interface compatibility */
+  private stopAutoExplore(reason?: string) { this.autoExploreSys.stopAutoExplore(reason); }
+  private startAutoExplore() { this.autoExploreSys.startAutoExplore(); }
 
   // ── Relic Artifact System ──
   private tryRelicDrop(dropType: "boss" | "gauntlet" | "legendary") {
