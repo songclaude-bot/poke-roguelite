@@ -27,6 +27,10 @@ export class QuestBoardScene extends Phaser.Scene {
   private tabDailyUnderline!: Phaser.GameObjects.Rectangle;
   private tabChallengeUnderline!: Phaser.GameObjects.Rectangle;
 
+  // Badge elements
+  private dailyBadge: Phaser.GameObjects.GameObject[] = [];
+  private challengeBadge: Phaser.GameObjects.GameObject[] = [];
+
   // Scroll state
   private scrollOffset = 0;
   private maxScroll = 0;
@@ -137,21 +141,7 @@ export class QuestBoardScene extends Phaser.Scene {
     this.tabChallengeBtn.on("pointerdown", () => this.switchTab("challenges"));
 
     // Daily quest badge counts
-    const dailyClaimable = (this.meta.activeQuests ?? []).filter(q => q.completed && !q.claimed).length;
-    const challengeClaimable = (this.meta.challengeQuests ?? []).filter(q => q.completed && !q.claimed).length;
-
-    if (dailyClaimable > 0) {
-      this.add.circle(GAME_WIDTH * 0.25 + 50, tabY - 6, 5, 0xef4444).setDepth(5);
-      this.add.text(GAME_WIDTH * 0.25 + 50, tabY - 6, String(dailyClaimable), {
-        fontSize: "7px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
-      }).setOrigin(0.5).setDepth(6);
-    }
-    if (challengeClaimable > 0) {
-      this.add.circle(GAME_WIDTH * 0.75 + 45, tabY - 6, 5, 0xef4444).setDepth(5);
-      this.add.text(GAME_WIDTH * 0.75 + 45, tabY - 6, String(challengeClaimable), {
-        fontSize: "7px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
-      }).setOrigin(0.5).setDepth(6);
-    }
+    this.updateBadges(tabY);
 
     // Timer for daily quests
     const now = new Date();
@@ -334,6 +324,33 @@ export class QuestBoardScene extends Phaser.Scene {
     return parts.join(" + ");
   }
 
+  private updateBadges(tabY?: number) {
+    // Destroy old badges
+    for (const obj of this.dailyBadge) obj.destroy();
+    for (const obj of this.challengeBadge) obj.destroy();
+    this.dailyBadge = [];
+    this.challengeBadge = [];
+
+    const y = tabY ?? 44; // default tabY from createTabs
+    const dailyClaimable = (this.meta.activeQuests ?? []).filter(q => q.completed && !q.claimed).length;
+    const challengeClaimable = (this.meta.challengeQuests ?? []).filter(q => q.completed && !q.claimed).length;
+
+    if (dailyClaimable > 0) {
+      const c = this.add.circle(GAME_WIDTH * 0.25 + 50, y - 6, 5, 0xef4444).setDepth(5);
+      const t = this.add.text(GAME_WIDTH * 0.25 + 50, y - 6, String(dailyClaimable), {
+        fontSize: "7px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(6);
+      this.dailyBadge.push(c, t);
+    }
+    if (challengeClaimable > 0) {
+      const c = this.add.circle(GAME_WIDTH * 0.75 + 45, y - 6, 5, 0xef4444).setDepth(5);
+      const t = this.add.text(GAME_WIDTH * 0.75 + 45, y - 6, String(challengeClaimable), {
+        fontSize: "7px", color: "#ffffff", fontFamily: "monospace", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(6);
+      this.challengeBadge.push(c, t);
+    }
+  }
+
   private claimQuest(quest: Quest) {
     const reward = claimQuestReward(quest);
     if (!reward) return;
@@ -347,10 +364,11 @@ export class QuestBoardScene extends Phaser.Scene {
     // Show claim popup
     this.showClaimPopup(quest.name, reward);
 
-    // Rebuild tabs to reflect updated state
+    // Rebuild tabs and badges to reflect updated state
     this.buildDailyTab();
     this.buildChallengeTab();
     this.getActiveContainer().y = this.scrollOffset;
+    this.updateBadges();
   }
 
   private showClaimPopup(questName: string, reward: QuestReward) {

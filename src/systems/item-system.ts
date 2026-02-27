@@ -36,9 +36,6 @@ export interface FloorItem {
 // ── Host interface: what ItemSystem needs from DungeonScene ──
 
 export interface ItemHost {
-  /** Phaser Scene API */
-  scene: Phaser.Scene;
-
   // ── Read-only game state ──
   readonly player: Entity;
   readonly enemies: Entity[];
@@ -130,6 +127,8 @@ export class ItemSystem {
 
   constructor(private host: ItemHost) {}
 
+  protected get scene(): Phaser.Scene { return this.host as any; }
+
   /** Reset all item state for a new floor */
   reset() {
     this.floorItems = [];
@@ -161,7 +160,7 @@ export class ItemSystem {
   createFloorItemSprite(ix: number, iy: number, item: ItemDef, colorOverride?: string): Phaser.GameObjects.Text {
     const icon = this.itemIcon(item);
     const color = colorOverride ?? this.itemColor(item);
-    return this.host.scene.add.text(
+    return this.scene.add.text(
       ix * TILE_DISPLAY + TILE_DISPLAY / 2,
       iy * TILE_DISPLAY + TILE_DISPLAY / 2,
       icon, { fontSize: "16px", color, fontFamily: "monospace" }
@@ -264,7 +263,7 @@ export class ItemSystem {
 
   /** Spawn reward items on the floor with pop-in animation */
   spawnMonsterHouseRewardItems(room: { x: number; y: number; w: number; h: number }, terrain: TerrainType[][], count: number) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     for (let i = 0; i < count; i++) {
       const ix = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
       const iy = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
@@ -407,7 +406,7 @@ export class ItemSystem {
 
   openBag() {
     const host = this.host;
-    const scene = host.scene;
+    const scene = host as any as Phaser.Scene;
     if (host.turnManager.isBusy || host.gameOver || host.menuOpen || host.settingsOpen || host.teamPanelOpen || host.isEventOpen() || host.isFullMapOpen() || host.relicOverlayOpen) return;
     sfxMenuOpen();
     this.bagOpen = true;
@@ -646,7 +645,7 @@ export class ItemSystem {
         host.showLog("Used Escape Orb! Escaped the dungeon!");
         (host as any).gameOver = true;
         clearDungeonSave();
-        const scene = host.scene;
+        const scene = host as any as Phaser.Scene;
         scene.cameras.main.fadeOut(500);
         scene.time.delayedCall(600, () => {
           scene.scene.start("HubScene", {

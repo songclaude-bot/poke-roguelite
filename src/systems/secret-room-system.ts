@@ -22,9 +22,6 @@ import {
 // ── Host interface: what SecretRoomSystem needs from DungeonScene ──
 
 export interface SecretRoomHost {
-  // Phaser Scene API (for add, tweens, time, cameras)
-  scene: Phaser.Scene;
-
   // Read-only game state
   readonly player: Entity;
   readonly currentFloor: number;
@@ -80,6 +77,8 @@ export class SecretRoomSystem {
   secretWarpOpen = false;
 
   constructor(private host: SecretRoomHost) {}
+
+  protected get scene(): Phaser.Scene { return this.host as any; }
 
   /** Reset all secret room state for a new floor */
   reset() {
@@ -227,7 +226,7 @@ export class SecretRoomSystem {
    */
   startSecretWallShimmer() {
     if (!this.secretWallPos) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     this.secretWallShimmerGfx = scene.add.graphics().setDepth(3);
 
@@ -280,7 +279,7 @@ export class SecretRoomSystem {
     if (targetX !== this.secretWallPos.x || targetY !== this.secretWallPos.y) return false;
 
     const host = this.host;
-    const scene = host.scene;
+    const scene = host as any as Phaser.Scene;
 
     // Open the secret wall -- change it to ground
     host.dungeon.terrain[targetY][targetX] = TerrainType.GROUND;
@@ -338,7 +337,7 @@ export class SecretRoomSystem {
    */
   private showSecretRoomAnnouncement() {
     if (!this.secretRoomData) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     const typeLabel = this.secretRoomData.name;
     this.host.showLog(`You found a Secret Room! (${typeLabel})`);
@@ -390,7 +389,7 @@ export class SecretRoomSystem {
    */
   private drawSecretRoomEffectTile() {
     if (!this.secretEffectTile || !this.secretRoomData) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
     const host = this.host;
 
     const tx = this.secretEffectTile.x;
@@ -702,7 +701,7 @@ export class SecretRoomSystem {
    */
   private showWarpHubOverlay() {
     const host = this.host;
-    const scene = host.scene;
+    const scene = host as any as Phaser.Scene;
 
     if (this.secretWarpOpen || host.currentFloor <= 1) {
       host.showLog("The portal flickers but has nowhere to send you...");
@@ -786,7 +785,7 @@ export class SecretRoomSystem {
     this.closeWarpHubOverlay();
     this.secretRoomUsed = true;
     const host = this.host;
-    const scene = host.scene;
+    const scene = host as any as Phaser.Scene;
 
     sfxStairs();
     host.showLog(`Warped to B${targetFloor}F!`);

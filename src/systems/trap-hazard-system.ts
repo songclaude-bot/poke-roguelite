@@ -22,9 +22,6 @@ import { ItemStack } from "../core/item";
 // ── Host interface: what TrapHazardSystem needs from DungeonScene ──
 
 export interface TrapHazardHost {
-  /** Phaser Scene API (for add, tweens, time, cameras) */
-  scene: Phaser.Scene;
-
   // Read-only game state
   readonly player: Entity;
   readonly dungeon: DungeonData;
@@ -71,6 +68,8 @@ export class TrapHazardSystem {
   private hazardTweens: Phaser.Tweens.Tween[] = [];
 
   constructor(private host: TrapHazardHost) {}
+
+  protected get scene(): Phaser.Scene { return this.host as any; }
 
   /** Reset all trap and hazard state for a new floor */
   reset() {
@@ -165,7 +164,7 @@ export class TrapHazardSystem {
     }
 
     this.host.showLog(`Stepped on a ${ft.trap.name}! ${ft.trap.description}`);
-    this.host.scene.cameras.main.shake(150, 0.008);
+    this.scene.cameras.main.shake(150, 0.008);
 
     switch (ft.trap.type) {
       case TrapType.Spike: {
@@ -187,7 +186,7 @@ export class TrapHazardSystem {
           this.host.showLog("You were burned!");
         }
         if (this.host.player.sprite) this.host.player.sprite.setTint(0xa855f7);
-        this.host.scene.time.delayedCall(300, () => { if (this.host.player.sprite) this.host.player.sprite.clearTint(); });
+        this.scene.time.delayedCall(300, () => { if (this.host.player.sprite) this.host.player.sprite.clearTint(); });
         break;
       case TrapType.Warp: {
         const { terrain, width, height, stairsPos } = this.host.dungeon;
@@ -223,7 +222,7 @@ export class TrapHazardSystem {
         if (this.host.player.sprite) {
           this.host.player.sprite.setPosition(this.host.tileToPixelX(wx!), this.host.tileToPixelY(wy!));
         }
-        this.host.scene.cameras.main.flash(200, 100, 100, 255);
+        this.scene.cameras.main.flash(200, 100, 100, 255);
         break;
       }
       case TrapType.Spin: {
@@ -232,7 +231,7 @@ export class TrapHazardSystem {
         if (!this.host.player.statusEffects.some(s => s.type === SkillEffect.Paralyze)) {
           this.host.player.statusEffects.push({ type: SkillEffect.Paralyze, turnsLeft: 5 });
         }
-        this.host.scene.cameras.main.shake(200, 0.01);
+        this.scene.cameras.main.shake(200, 0.01);
         break;
       }
       case TrapType.Slowdown: {
@@ -240,7 +239,7 @@ export class TrapHazardSystem {
         this.host.player.stats.atk = Math.max(1, this.host.player.stats.atk - reduction);
         this.host.showLog(`ATK reduced by ${reduction} for this floor!`);
         if (this.host.player.sprite) this.host.player.sprite.setTint(0xf97316);
-        this.host.scene.time.delayedCall(400, () => { if (this.host.player.sprite) this.host.player.sprite.clearTint(); });
+        this.scene.time.delayedCall(400, () => { if (this.host.player.sprite) this.host.player.sprite.clearTint(); });
         break;
       }
       case TrapType.Blast: {
@@ -261,7 +260,7 @@ export class TrapHazardSystem {
           }
         }
         // Visual: flash red
-        this.host.scene.cameras.main.flash(200, 255, 50, 50);
+        this.scene.cameras.main.flash(200, 255, 50, 50);
         this.host.checkPlayerDeath();
         break;
       }
@@ -283,7 +282,7 @@ export class TrapHazardSystem {
           skill.currentPp = 0;
           this.host.showLog(`${skill.name} was sealed!`);
           if (this.host.player.sprite) this.host.player.sprite.setTint(0x6366f1);
-          this.host.scene.time.delayedCall(400, () => { if (this.host.player.sprite) this.host.player.sprite.clearTint(); });
+          this.scene.time.delayedCall(400, () => { if (this.host.player.sprite) this.host.player.sprite.clearTint(); });
         } else {
           this.host.showLog("No skills to seal!");
         }
@@ -294,7 +293,7 @@ export class TrapHazardSystem {
         this.host.belly = Math.max(0, this.host.belly - 5);
         this.host.showLog("Sticky goo drains your energy! Belly -5!");
         if (this.host.player.sprite) this.host.player.sprite.setTint(0xf59e0b);
-        this.host.scene.time.delayedCall(400, () => { if (this.host.player.sprite) this.host.player.sprite.clearTint(); });
+        this.scene.time.delayedCall(400, () => { if (this.host.player.sprite) this.host.player.sprite.clearTint(); });
         break;
       }
       case TrapType.Hunger: {
@@ -302,7 +301,7 @@ export class TrapHazardSystem {
         this.host.belly = Math.max(0, this.host.belly - 20);
         this.host.showLog("Extreme hunger strikes! Belly -20!");
         if (this.host.player.sprite) this.host.player.sprite.setTint(0x92400e);
-        this.host.scene.time.delayedCall(400, () => { if (this.host.player.sprite) this.host.player.sprite.clearTint(); });
+        this.scene.time.delayedCall(400, () => { if (this.host.player.sprite) this.host.player.sprite.clearTint(); });
         break;
       }
       case TrapType.Summon: {
@@ -319,7 +318,7 @@ export class TrapHazardSystem {
           this.host.showLog("The curse deepens...");
         }
         if (this.host.player.sprite) this.host.player.sprite.setTint(0x581c87);
-        this.host.scene.time.delayedCall(400, () => { if (this.host.player.sprite) this.host.player.sprite.clearTint(); });
+        this.scene.time.delayedCall(400, () => { if (this.host.player.sprite) this.host.player.sprite.clearTint(); });
         break;
       }
     }
@@ -331,7 +330,7 @@ export class TrapHazardSystem {
   /** Draw a revealed trap marker as a small colored circle on the tile */
   private drawTrap(trap: FloorTrap) {
     if (!trap.revealed) return;
-    const gfx = this.host.scene.add.graphics();
+    const gfx = this.scene.add.graphics();
     const cx = trap.x * TILE_DISPLAY + TILE_DISPLAY / 2;
     const cy = trap.y * TILE_DISPLAY + TILE_DISPLAY / 2;
     gfx.fillStyle(trap.trap.hexColor, 0.6);
@@ -357,7 +356,7 @@ export class TrapHazardSystem {
 
   /** Render all hazard tiles as colored semi-transparent rectangles with visual effects */
   private renderHazardTiles() {
-    const scene = this.host.scene;
+    const scene = this.scene;
     // Clean up any prior hazard graphics/tweens
     for (const gfx of this.hazardGraphics) gfx.destroy();
     for (const tw of this.hazardTweens) tw.destroy();
@@ -508,7 +507,7 @@ export class TrapHazardSystem {
       // Visual flash on the entity
       if (entity.sprite) {
         entity.sprite.setTint(hazard.def.color);
-        this.host.scene.time.delayedCall(300, () => {
+        this.scene.time.delayedCall(300, () => {
           if (entity.sprite) entity.sprite.clearTint();
         });
       }
@@ -556,7 +555,7 @@ export class TrapHazardSystem {
             }
             if (isPlayer) {
               this.host.showLog("Slid on the ice!");
-              this.host.scene.cameras.main.flash(150, 170, 220, 255);
+              this.scene.cameras.main.flash(150, 170, 220, 255);
             }
           }
           break;
@@ -580,7 +579,7 @@ export class TrapHazardSystem {
             }
             if (entity.sprite) {
               entity.sprite.setTint(0xa855f7);
-              this.host.scene.time.delayedCall(300, () => {
+              this.scene.time.delayedCall(300, () => {
                 if (entity.sprite) entity.sprite.clearTint();
               });
             }
@@ -598,7 +597,7 @@ export class TrapHazardSystem {
             }
             if (entity.sprite) {
               entity.sprite.setTint(0xffee44);
-              this.host.scene.time.delayedCall(300, () => {
+              this.scene.time.delayedCall(300, () => {
                 if (entity.sprite) entity.sprite.clearTint();
               });
             }

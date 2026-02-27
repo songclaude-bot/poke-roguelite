@@ -670,8 +670,10 @@ export class DungeonScene extends Phaser.Scene {
     this.eventRoomSys.reset();
     // Reset puzzle room state (delegated to PuzzleSystem)
     this.puzzleSys = new PuzzleSystem(this as any);
+    this.puzzleSys.reset();
     // Reset secret room state (delegated to SecretRoomSystem)
     this.secretRoomSys = new SecretRoomSystem(this as any);
+    this.secretRoomSys.reset();
     // Reset trap & hazard state (delegated to TrapHazardSystem)
     this.trapHazardSys = new TrapHazardSystem(this as any);
     this.trapHazardSys.reset();
@@ -680,6 +682,7 @@ export class DungeonScene extends Phaser.Scene {
     this.itemSys.reset();
     // Reset auto-explore state (delegated to AutoExploreSystem)
     this.autoExploreSys = new AutoExploreSystem(this as any);
+    this.autoExploreSys.reset();
     // Reset minimap state (delegated to MinimapSystem)
     this.minimapSys = new MinimapSystem(this as any);
     this.minimapSys.resetExplorationState();

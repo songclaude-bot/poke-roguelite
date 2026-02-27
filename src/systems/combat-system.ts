@@ -45,9 +45,6 @@ import {
 // ── Host interface: what CombatSystem needs from DungeonScene ──
 
 export interface CombatHost {
-  /** Phaser Scene API (for add, tweens, time, cameras) */
-  scene: Phaser.Scene;
-
   // ── Read-only game state ──
   readonly player: Entity;
   readonly enemies: Entity[];
@@ -105,6 +102,8 @@ const MOVE_DURATION = 150; // ms per tile movement
 export class CombatSystem {
   constructor(private host: CombatHost) {}
 
+  protected get scene(): Phaser.Scene { return this.host as any; }
+
   // ══════════════════════════════════════════════
   //  Movement
   // ══════════════════════════════════════════════
@@ -121,7 +120,7 @@ export class CombatSystem {
 
   /** Move entity one tile in the given direction with walk animation */
   moveEntity(entity: Entity, dir: Direction): Promise<void> {
-    const scene = this.host.scene;
+    const scene = this.scene;
     return new Promise((resolve) => {
       entity.facing = dir;
       entity.tileX += DIR_DX[dir];
@@ -144,7 +143,7 @@ export class CombatSystem {
 
   /** Swap positions with an ally (player walks into ally's tile) */
   swapWithAlly(player: Entity, ally: Entity, dir: Direction): Promise<void> {
-    const scene = this.host.scene;
+    const scene = this.scene;
     return new Promise((resolve) => {
       const oldPx = player.tileX, oldPy = player.tileY;
       const oldAx = ally.tileX, oldAy = ally.tileY;
@@ -200,7 +199,7 @@ export class CombatSystem {
   /** Basic (non-skill) attack -- front 1 tile, uses entity's attackType */
   performBasicAttack(attacker: Entity, defender: Entity): Promise<void> {
     const host = this.host;
-    const scene = host.scene;
+    const scene = host as any as Phaser.Scene;
     return new Promise((resolve) => {
       const dir = attacker === host.player
         ? attacker.facing
@@ -385,7 +384,7 @@ export class CombatSystem {
   /** Skill-based attack -- variable range, typed damage, effects */
   performSkill(user: Entity, skill: Skill, dir: Direction): Promise<void> {
     const host = this.host;
-    const scene = host.scene;
+    const scene = host as any as Phaser.Scene;
     return new Promise((resolve) => {
       user.facing = dir;
       user.sprite!.play(`${user.spriteKey}-idle-${dir}`);
@@ -663,7 +662,7 @@ export class CombatSystem {
   /** Apply status/buff/debuff effects from a skill */
   applySkillEffect(user: Entity, target: Entity, skill: Skill) {
     const host = this.host;
-    const scene = host.scene;
+    const scene = host as any as Phaser.Scene;
     if (!skill.effect || skill.effect === SkillEffect.None) return;
     const chance = skill.effectChance ?? 100;
     if (Math.random() * 100 > chance) return;
@@ -775,7 +774,7 @@ export class CombatSystem {
 
   /** Flash entity sprite with color based on effectiveness */
   flashEntity(entity: Entity, effectiveness: number) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     if (!entity.sprite) return;
     const tintColor = effectiveness >= 2.0 ? 0xff2222 : effectiveness < 1.0 ? 0x8888ff : 0xff4444;
     entity.sprite.setTint(tintColor);
@@ -791,7 +790,7 @@ export class CombatSystem {
 
   /** Show visual effect on skill target tiles */
   showSkillEffect(tiles: { x: number; y: number }[], skill: Skill) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     const typeColors: Record<string, { color: number; symbol: string }> = {
       Water: { color: 0x3b82f6, symbol: "~" },
       Fire: { color: 0xef4444, symbol: "*" },
@@ -845,7 +844,7 @@ export class CombatSystem {
     x: number, y: number, dmg: number, effectiveness: number,
     overrideText?: string, isCrit?: boolean, attackType?: PokemonType
   ) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     // Determine color by effectiveness
     let color: string;
     if (effectiveness === 0) color = "#999999";       // Immune -- gray
@@ -939,7 +938,7 @@ export class CombatSystem {
 
   /** Hit spark effect -- brief colored circle at impact point */
   showHitSpark(x: number, y: number, attackType?: PokemonType) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     // Type-based spark colors
     const sparkColors: Partial<Record<PokemonType, number>> = {
       [PokemonType.Fire]: 0xff8c00,     // orange
@@ -975,7 +974,7 @@ export class CombatSystem {
 
   /** Brief flash effect on target for critical hits */
   showCritFlash(entity: Entity) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     if (!entity.sprite) return;
     // Bright gold flash
     entity.sprite.setTint(0xffd700);
@@ -992,7 +991,7 @@ export class CombatSystem {
 
   /** Show temporary HP bar above an entity */
   showEnemyHpBar(entity: { sprite?: Phaser.GameObjects.Sprite; stats: { hp: number; maxHp: number } }) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     if (!entity.sprite || entity.stats.hp <= 0) return;
     const x = entity.sprite.x;
     const y = entity.sprite.y - 18;
@@ -1018,7 +1017,7 @@ export class CombatSystem {
 
   /** Heal number popup (green, floats upward with bounce) */
   showHealPopup(x: number, y: number, amount: number) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     const xOffset = (Math.random() - 0.5) * 12;
     const popup = scene.add.text(x + xOffset, y - 10, `+${amount}`, {
       fontSize: "12px", color: "#4ade80", fontFamily: "monospace", fontStyle: "bold",
@@ -1048,7 +1047,7 @@ export class CombatSystem {
 
   /** Floating stat gain popup for level-ups */
   showStatPopup(x: number, y: number, text: string, color: string, delay: number) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     scene.time.delayedCall(delay, () => {
       const popup = scene.add.text(x, y, text, {
         fontSize: "8px", color, fontFamily: "monospace", fontStyle: "bold",

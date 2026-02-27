@@ -44,9 +44,6 @@ function tileToPixelY(tileY: number): number {
 // ── Host interface: what GauntletSystem needs from DungeonScene ──
 
 export interface GauntletHost {
-  /** Phaser Scene API (for add, tweens, time, cameras, textures, anims) */
-  scene: Phaser.Scene;
-
   // Read-only game state
   readonly player: Entity;
   readonly currentFloor: number;
@@ -97,6 +94,8 @@ export class GauntletSystem {
 
   constructor(private host: GauntletHost) {}
 
+  protected get scene(): Phaser.Scene { return this.host as any; }
+
   /** Reset all gauntlet state for a new floor */
   reset() {
     this.gauntletActive = false;
@@ -129,7 +128,7 @@ export class GauntletSystem {
   /** Start the gauntlet: show announcement, create HUD, spawn first wave */
   start() {
     if (!this.gauntletConfig) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     // Screen shake on gauntlet start
     scene.cameras.main.shake(500, 0.02);
@@ -206,7 +205,7 @@ export class GauntletSystem {
   private spawnGauntletWave(waveIndex: number) {
     if (!this.gauntletConfig) return;
     if (waveIndex >= this.gauntletConfig.waves.length) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     this.gauntletCurrentWave = waveIndex;
     this.gauntletEnemies = [];
@@ -330,7 +329,7 @@ export class GauntletSystem {
 
   /** Create/refresh the boss HP bar for the gauntlet's current primary boss */
   private createGauntletBossHpBar() {
-    const scene = this.host.scene;
+    const scene = this.scene;
     // Clean up existing boss HP bar
     if (this.host.bossHpBg) this.host.bossHpBg.destroy();
     if (this.host.bossHpBar) this.host.bossHpBar.destroy();
@@ -360,7 +359,7 @@ export class GauntletSystem {
   /** Check if all gauntlet enemies in the current wave are defeated */
   checkGauntletWaveCleared() {
     if (!this.gauntletActive || !this.gauntletConfig) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     // Check if all gauntlet enemies in the current wave are dead
     const allDead = this.gauntletEnemies.every(e => !e.alive);
@@ -468,7 +467,7 @@ export class GauntletSystem {
 
   /** Spawn explosion particles for gauntlet completion */
   private spawnGauntletParticles() {
-    const scene = this.host.scene;
+    const scene = this.scene;
     const colors = [0xffd700, 0xff6622, 0xff4444, 0xffaa00, 0xffffff];
     for (let i = 0; i < 20; i++) {
       const px = GAME_WIDTH / 2 + (Math.random() - 0.5) * 200;

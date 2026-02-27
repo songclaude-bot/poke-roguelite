@@ -24,9 +24,6 @@ import {
 // ── Host interface: what EventRoomSystem needs from DungeonScene ──
 
 export interface EventRoomHost {
-  /** Phaser Scene API (for add, tweens, time, cameras, textures, anims) */
-  scene: Phaser.Scene;
-
   // Read-only game state
   readonly player: Entity;
   readonly currentFloor: number;
@@ -80,6 +77,8 @@ export class EventRoomSystem {
   private eventMarker: Phaser.GameObjects.Text | null = null;
 
   constructor(private host: EventRoomHost) {}
+
+  protected get scene(): Phaser.Scene { return this.host as any; }
 
   /** Reset all event room state for a new floor */
   reset() {
@@ -135,7 +134,7 @@ export class EventRoomSystem {
 
   /** Place the "!" marker at the center of the event room */
   private placeEventMarker(evRoom: { x: number; y: number; w: number; h: number }) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     const markerX = Math.floor(evRoom.x + evRoom.w / 2);
     const markerY = Math.floor(evRoom.y + evRoom.h / 2);
     this.eventMarker = scene.add.text(
@@ -183,7 +182,7 @@ export class EventRoomSystem {
   /** Open the event choice overlay */
   private openEventUI() {
     if (this.eventOpen || !this.currentEvent) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
     sfxMenuOpen();
     this.eventOpen = true;
     this.host.stopAutoExplore();
@@ -267,7 +266,7 @@ export class EventRoomSystem {
   /** Show a brief result message after event choice */
   private showEventResult(message: string, color = "#4ade80") {
     this.closeEventUI();
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     // Brief result overlay
     const overlay = scene.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6)
@@ -485,7 +484,7 @@ export class EventRoomSystem {
   private spawnEventEnemies(count: number) {
     if (!this.eventRoom) return;
     const host = this.host;
-    const scene = host.scene;
+    const scene = host as any as Phaser.Scene;
     const r = this.eventRoom;
     const floorSpeciesIds = (host.dungeonDef.id === "endlessDungeon" || host.dungeonDef.id === "dailyDungeon")
       ? host.getEndlessEnemies(host.currentFloor)
@@ -546,7 +545,7 @@ export class EventRoomSystem {
     const MAX_ALLIES = 4;
     if (!this.eventRoom || this.host.allies.length >= MAX_ALLIES) return;
     const host = this.host;
-    const scene = host.scene;
+    const scene = host as any as Phaser.Scene;
     const r = this.eventRoom;
 
     // Pick a random species from the current floor's enemy pool

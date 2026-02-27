@@ -61,9 +61,6 @@ import { TurnManager } from "../core/turn-manager";
 // ── Host interface: what DeathRescueSystem needs from DungeonScene ──
 
 export interface DeathRescueHost {
-  /** Phaser Scene API (for add, tweens, time, cameras, scene) */
-  scene: Phaser.Scene;
-
   // ── Read-only game state ──
   readonly player: Entity;
   readonly enemies: Entity[];
@@ -136,6 +133,8 @@ export class DeathRescueSystem {
   rescueCount = 0;
 
   constructor(private host: DeathRescueHost) {}
+
+  protected get scene(): Phaser.Scene { return this.host as any; }
 
   /** Reset state for a new run / floor */
   reset() {
@@ -223,7 +222,7 @@ export class DeathRescueSystem {
    * Displays rescue options as buttons and a "Give up" fallback.
    */
   private showRescuePrompt(options: RescueOption[], availableGold: number) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     const rescueUI: Phaser.GameObjects.GameObject[] = [];
     // Disable DOM HUD buttons while rescue prompt is open
     if (this.host.domHud) setDomHudInteractive(this.host.domHud, false);
@@ -317,7 +316,7 @@ export class DeathRescueSystem {
    */
   private executeRescue(option: RescueOption) {
     const h = this.host;
-    const scene = h.scene;
+    const scene = h as any as Phaser.Scene;
     const meta = loadMeta();
     let costRemaining = option.goldCost;
 
@@ -436,7 +435,7 @@ export class DeathRescueSystem {
    */
   private showGameOverScreen() {
     const h = this.host;
-    const scene = h.scene;
+    const scene = h as any as Phaser.Scene;
     this.gameOver = true;
     stopBgm();
     sfxGameOver();
@@ -579,7 +578,7 @@ export class DeathRescueSystem {
     rtBg.on("pointerover", () => rtBg.setFillStyle(0x2a4a6f, 1));
     rtBg.on("pointerout", () => rtBg.setFillStyle(0x1e3a5f, 0.95));
     rtBg.on("pointerdown", () => {
-      (h.scene as any).scene.start("HubScene", {
+      (h as any).scene.start("HubScene", {
         gold,
         cleared: false,
         bestFloor: h.currentFloor,
@@ -623,7 +622,7 @@ export class DeathRescueSystem {
 
   showDungeonClear() {
     const h = this.host;
-    const scene = h.scene;
+    const scene = h as any as Phaser.Scene;
     this.gameOver = true;
     stopBgm();
     sfxVictory();
@@ -812,7 +811,7 @@ export class DeathRescueSystem {
     townBtnBg.on("pointerover", () => townBtnBg.setFillStyle(0x2563eb, 1));
     townBtnBg.on("pointerout", () => townBtnBg.setFillStyle(0x1e40af, 0.9));
     townBtnBg.on("pointerdown", () => {
-      (h.scene as any).scene.start("HubScene", {
+      (h as any).scene.start("HubScene", {
         gold,
         cleared: true,
         bestFloor: h.dungeonDef.floors,
@@ -864,7 +863,7 @@ export class DeathRescueSystem {
    */
   showRunSummary(cleared: boolean, totalFloors: number) {
     const h = this.host;
-    const scene = h.scene;
+    const scene = h as any as Phaser.Scene;
     const stats = h.runLog.getSummaryStats();
     const grade = calculatePerformanceGrade(stats, cleared, totalFloors, h.turnManager.turn);
     const notable = h.runLog.getNotableEvents();
@@ -1042,7 +1041,7 @@ export class DeathRescueSystem {
    */
   quickRetry(gold: number, cleared: boolean) {
     const h = this.host;
-    const scene = h.scene;
+    const scene = h as any as Phaser.Scene;
     const meta = loadMeta();
 
     // 1. Save run results (same as HubScene.init)
@@ -1157,7 +1156,7 @@ export class DeathRescueSystem {
       if (h.challengeMode) {
         launchData.challengeMode = h.challengeMode;
       }
-      (h.scene as any).scene.start("DungeonScene", launchData);
+      (h as any).scene.start("DungeonScene", launchData);
     });
   }
 }

@@ -24,9 +24,6 @@ import { DomHudElements, setDomHudInteractive } from "../ui/dom-hud";
 // ── Host interface: what StairsSystem needs from DungeonScene ──
 
 export interface StairsHost {
-  /** Phaser Scene API (for cameras, time, add, tweens) */
-  scene: Phaser.Scene;
-
   // Dungeon layout
   readonly dungeon: DungeonData;
   readonly dungeonDef: DungeonDef;
@@ -92,11 +89,13 @@ export interface StairsHost {
 export class StairsSystem {
   constructor(private host: StairsHost) {}
 
+  protected get scene(): Phaser.Scene { return this.host as any; }
+
   // ── Stairs Visual ──
 
   /** Draw the stairs marker on the dungeon floor (called during create()) */
   drawStairsMarker(): Phaser.GameObjects.Graphics {
-    const scene = this.host.scene;
+    const scene = this.scene;
     const { stairsPos } = this.host.dungeon;
     const stairsGfx = scene.add.graphics();
     const sx = stairsPos.x * TILE_DISPLAY + TILE_DISPLAY / 2;
@@ -205,7 +204,7 @@ export class StairsSystem {
         this.host.domHudElement = null;
         this.host.domHud = null;
       }
-      (this.host.scene as any).scene.restart({
+      (this.scene as any).scene.restart({
         floor: this.host.currentFloor + 1,
         hp: this.host.player.stats.hp,
         maxHp: this.host.player.stats.maxHp,
@@ -232,8 +231,8 @@ export class StairsSystem {
       });
     };
 
-    this.host.scene.cameras.main.fadeOut(500, 0, 0, 0);
-    this.host.scene.cameras.main.once("camerafadeoutcomplete", doRestart);
+    this.scene.cameras.main.fadeOut(500, 0, 0, 0);
+    this.scene.cameras.main.once("camerafadeoutcomplete", doRestart);
     // Safety fallback using native setTimeout (Phaser timers may stall with the scene)
     setTimeout(doRestart, 1200);
   }

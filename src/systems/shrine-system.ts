@@ -20,9 +20,6 @@ import { sfxHeal, sfxMenuOpen } from "../core/sound-manager";
 // ── Host interface: what ShrineSystem needs from DungeonScene ──
 
 export interface ShrineHost {
-  /** Phaser Scene API (for add, tweens, time, cameras) */
-  scene: Phaser.Scene;
-
   // Read-only game state
   readonly player: Entity;
   readonly currentFloor: number;
@@ -56,6 +53,8 @@ export class ShrineSystem {
   private shrineMarker: Phaser.GameObjects.Text | null = null;
 
   constructor(private host: ShrineHost) {}
+
+  protected get scene(): Phaser.Scene { return this.host as any; }
 
   /** Reset all shrine state for a new floor */
   reset() {
@@ -122,7 +121,7 @@ export class ShrineSystem {
   /** Draw the shrine visual on the dungeon floor */
   private drawShrine() {
     if (this.shrineTileX < 0 || !this.floorShrine) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
     const shrine = this.floorShrine;
 
     // Diamond glow graphic at the shrine tile
@@ -182,7 +181,7 @@ export class ShrineSystem {
   /** Open the shrine choice overlay */
   private openShrineUI() {
     if (this.shrineOpen || !this.floorShrine || this.shrineUsed) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
     sfxMenuOpen();
     this.shrineOpen = true;
     this.host.setDomHudInteractive(false);
@@ -271,7 +270,7 @@ export class ShrineSystem {
   private showShrineResult(message: string, color = "#4ade80") {
     this.closeShrineUI();
     this.shrineUsed = true;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     // Remove shrine visuals
     if (this.shrineGraphic) {

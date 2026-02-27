@@ -29,9 +29,6 @@ import { DomHudElements, setDomHudInteractive } from "../ui/dom-hud";
 // ── Host interface: what MinimapSystem needs from DungeonScene ──
 
 export interface MinimapHost {
-  // Phaser Scene API (for add, tweens, time, cameras)
-  scene: Phaser.Scene;
-
   // Dungeon data
   readonly dungeon: DungeonData;
 
@@ -124,6 +121,8 @@ export class MinimapSystem {
 
   constructor(private host: MinimapHost) {}
 
+  protected get scene(): Phaser.Scene { return this.host as any; }
+
   // ── Initialization ──
 
   /** Initialize fog-of-war arrays for a new floor */
@@ -145,7 +144,7 @@ export class MinimapSystem {
 
   /** Create and set up the minimap UI elements */
   createMinimapUI() {
-    const scene = this.host.scene;
+    const scene = this.scene;
     const { width, height } = this.host.dungeon;
 
     this.minimapBg = scene.add.graphics().setScrollFactor(0).setDepth(100);
@@ -519,7 +518,7 @@ export class MinimapSystem {
     mx: number, my: number,
     totalW: number, totalH: number, pad: number
   ) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     const pct = this.getExplorationPercent();
     const expanded = this.minimapExpanded;
 
@@ -606,7 +605,7 @@ export class MinimapSystem {
 
   /** Show a brief floating banner for an exploration reward */
   private showExplorationRewardBanner(tier: ExplorationTier) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     const label = `${tier.icon} ${tier.label} Bonus!`;
     const detail = `+${tier.goldBonus}G  +${tier.expBonus} EXP`;
 
@@ -661,7 +660,7 @@ export class MinimapSystem {
     show: boolean, mx: number, my: number,
     totalW: number, totalH: number, pad: number
   ) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     // Clean up old legend texts
     for (const lt of this.minimapLegendTexts) lt.destroy();
     this.minimapLegendTexts = [];
@@ -746,7 +745,7 @@ export class MinimapSystem {
 
   /** Open the full-screen map overlay */
   openFullMap() {
-    const scene = this.host.scene;
+    const scene = this.scene;
     if (this.fullMapOpen) return;
     this.fullMapOpen = true;
     if (this.host.domHud) setDomHudInteractive(this.host.domHud, false);
@@ -843,7 +842,7 @@ export class MinimapSystem {
 
   /** Close the full-screen map overlay */
   closeFullMap() {
-    const scene = this.host.scene;
+    const scene = this.scene;
     if (!this.fullMapOpen) return;
     this.fullMapOpen = false;
     if (this.host.domHud) setDomHudInteractive(this.host.domHud, true);

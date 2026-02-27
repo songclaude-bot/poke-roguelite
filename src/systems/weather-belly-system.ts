@@ -23,9 +23,6 @@ import { RunLog, RunLogEvent } from "../core/run-log";
 // ── Host interface: what WeatherBellySystem needs from DungeonScene ──
 
 export interface WeatherBellyHost {
-  /** Phaser Scene API (for add, tweens, time, cameras) */
-  scene: Phaser.Scene;
-
   // Read-only game state
   readonly player: Entity;
   readonly currentFloor: number;
@@ -83,6 +80,8 @@ export class WeatherBellySystem {
 
   constructor(private host: WeatherBellyHost) {}
 
+  protected get scene(): Phaser.Scene { return this.host as any; }
+
   // ══════════════════════════════════════════
   //  Belly Methods
   // ══════════════════════════════════════════
@@ -97,7 +96,7 @@ export class WeatherBellySystem {
 
   /** Create belly HUD bar graphics (call during create phase) */
   initBellyHUD() {
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     // Belly Bar background (below HP bar)
     this.bellyBarBg = scene.add.graphics().setScrollFactor(0).setDepth(100);
@@ -184,7 +183,7 @@ export class WeatherBellySystem {
 
   /** Initialize weather for a new floor and create weather HUD (call during create phase) */
   initWeatherHUD() {
-    const scene = this.host.scene;
+    const scene = this.scene;
     const host = this.host;
 
     this.currentWeather = rollFloorWeather(host.dungeonDef.id, host.currentFloor);
@@ -300,7 +299,7 @@ export class WeatherBellySystem {
       this.weatherIntensityHudText = null;
     }
     if (this.currentWeather !== WeatherType.None) {
-      const scene = host.scene;
+      const scene = host as any as Phaser.Scene;
       const weatherNames: Record<string, string> = {
         [WeatherType.Rain]: "Rain",
         [WeatherType.Sandstorm]: "Sandstorm",
@@ -339,7 +338,7 @@ export class WeatherBellySystem {
   private setupWeatherVisuals() {
     this.clearWeatherVisuals();
     if (this.currentWeather === WeatherType.None) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     switch (this.currentWeather) {
       case WeatherType.Rain: {

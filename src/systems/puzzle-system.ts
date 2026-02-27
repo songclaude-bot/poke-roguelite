@@ -26,9 +26,6 @@ import { sfxPickup, sfxHit, sfxSkill, sfxLevelUp, sfxVictory, sfxGameOver } from
 // ── Host interface: what PuzzleSystem needs from DungeonScene ──
 
 export interface PuzzleHost {
-  // Phaser Scene API (for add, tweens, time, textures, anims)
-  scene: Phaser.Scene;
-
   // Read-only game state
   readonly player: Entity;
   readonly currentFloor: number;
@@ -101,6 +98,8 @@ export class PuzzleSystem {
 
   constructor(private host: PuzzleHost) {}
 
+  protected get scene(): Phaser.Scene { return this.host as any; }
+
   /** Reset all puzzle state for a new floor */
   reset() {
     this.puzzleRoom = null;
@@ -132,7 +131,7 @@ export class PuzzleSystem {
   setup(room: { x: number; y: number; w: number; h: number }, data: PuzzleRoom) {
     this.puzzleRoom = room;
     this.puzzleData = data;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     // Puzzle room carpet (teal border on inner area)
     this.puzzleCarpet = scene.add.graphics().setDepth(3);
@@ -232,7 +231,7 @@ export class PuzzleSystem {
 
   private showPuzzleIntro() {
     if (!this.puzzleData) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     const overlay = scene.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
       .setScrollFactor(0).setDepth(200).setInteractive();
@@ -331,7 +330,7 @@ export class PuzzleSystem {
   private showPuzzleHud() {
     this.hidePuzzleHud();
     if (!this.puzzleData) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     const pzType = this.puzzleData.type;
     let instructions = "";
@@ -385,7 +384,7 @@ export class PuzzleSystem {
   // ── Tile Sequence ──
 
   private showPuzzleTileSequence() {
-    const scene = this.host.scene;
+    const scene = this.scene;
     this.puzzleShowingSequence = true;
 
     for (const gfx of this.puzzleTileGraphics) { gfx.setVisible(true); gfx.setAlpha(0.3); }
@@ -408,7 +407,7 @@ export class PuzzleSystem {
   // ── Switch Order ──
 
   private showPuzzleSwitchOrder() {
-    const scene = this.host.scene;
+    const scene = this.scene;
     this.puzzleShowingSequence = true;
 
     for (let i = 0; i < this.puzzleTileGraphics.length; i++) {
@@ -444,7 +443,7 @@ export class PuzzleSystem {
   // ── Memory Match ──
 
   private showPuzzleMemoryMatch() {
-    const scene = this.host.scene;
+    const scene = this.scene;
     this.puzzleShowingSequence = true;
 
     for (const gfx of this.puzzleTileGraphics) { gfx.setVisible(true); gfx.setAlpha(0.2); }
@@ -468,7 +467,7 @@ export class PuzzleSystem {
 
   private spawnPuzzleEnemies() {
     if (!this.puzzleRoom || !this.puzzleData) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
     const host = this.host;
     const r = this.puzzleRoom;
     const count = getPuzzleTileCount(PuzzleType.EnemyRush, this.puzzleData.difficulty);
@@ -533,7 +532,7 @@ export class PuzzleSystem {
 
   private showPuzzleAltar() {
     if (this.puzzleTiles.length === 0) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
     const pt = this.puzzleTiles[0];
 
     if (this.puzzleTileGraphics.length > 0) {
@@ -565,7 +564,7 @@ export class PuzzleSystem {
   // ── Tile Flash ──
 
   private flashPuzzleTile(x: number, y: number, color: number, duration: number) {
-    const scene = this.host.scene;
+    const scene = this.scene;
     const flash = scene.add.graphics().setDepth(5);
     flash.fillStyle(color, 0.7);
     flash.fillRect(x * TILE_DISPLAY + 2, y * TILE_DISPLAY + 2, TILE_DISPLAY - 4, TILE_DISPLAY - 4);
@@ -661,7 +660,7 @@ export class PuzzleSystem {
   private solvePuzzle() {
     if (!this.puzzleData) return;
     const host = this.host;
-    const scene = host.scene;
+    const scene = host as any as Phaser.Scene;
     this.puzzleSolved = true;
     this.puzzleActive = false;
 
@@ -717,7 +716,7 @@ export class PuzzleSystem {
   private failPuzzle() {
     if (!this.puzzleData) return;
     const host = this.host;
-    const scene = host.scene;
+    const scene = host as any as Phaser.Scene;
     this.puzzleFailed = true;
     this.puzzleActive = false;
 
@@ -736,7 +735,7 @@ export class PuzzleSystem {
   // ── Visual Effects ──
 
   private showPuzzleResult(title: string, message: string, color: string) {
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     const overlay = scene.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.6)
       .setScrollFactor(0).setDepth(200).setInteractive();
@@ -754,7 +753,7 @@ export class PuzzleSystem {
 
   private puzzleSuccessEffect() {
     if (!this.puzzleRoom) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
     const r = this.puzzleRoom;
     const cx = (r.x + r.w / 2) * TILE_DISPLAY;
     const cy = (r.y + r.h / 2) * TILE_DISPLAY;
@@ -778,7 +777,7 @@ export class PuzzleSystem {
 
   private puzzleFailEffect() {
     if (!this.puzzleRoom) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
     const r = this.puzzleRoom;
 
     const flash = scene.add.graphics().setDepth(15);

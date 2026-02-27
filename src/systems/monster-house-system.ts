@@ -35,9 +35,6 @@ export enum MonsterHouseType {
 // ── Host interface: what MonsterHouseSystem needs from DungeonScene ──
 
 export interface MonsterHouseHost {
-  /** Phaser Scene API (for add, tweens, time, cameras, textures, anims) */
-  scene: Phaser.Scene;
-
   // Read-only game state
   readonly player: Entity;
   readonly currentFloor: number;
@@ -84,6 +81,8 @@ export class MonsterHouseSystem {
   private monsterHouseEnemies: Entity[] = [];
 
   constructor(private host: MonsterHouseHost) {}
+
+  protected get scene(): Phaser.Scene { return this.host as any; }
 
   /** Reset all monster house state for a new floor */
   reset() {
@@ -149,7 +148,7 @@ export class MonsterHouseSystem {
     const py = this.host.player.tileY;
     if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h) {
       this.monsterHouseTriggered = true;
-      const scene = this.host.scene;
+      const scene = this.scene;
 
       // Type-specific warning colors and messages
       const typeConfig: Record<MonsterHouseType, { color: string, hexColor: number, label: string, flashR: number, flashG: number, flashB: number }> = {
@@ -285,7 +284,7 @@ export class MonsterHouseSystem {
     if (!allDefeated) return;
 
     this.monsterHouseCleared = true;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     // "Monster House Cleared!" popup
     const clearColor = this.monsterHouseType === MonsterHouseType.Treasure ? "#ffd700"

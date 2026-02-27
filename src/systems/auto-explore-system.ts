@@ -15,9 +15,6 @@ import { TrapHazardSystem } from "./trap-hazard-system";
 // ── Host interface: what AutoExploreSystem needs from DungeonScene ──
 
 export interface AutoExploreHost {
-  // Phaser Scene API (for add, tweens, time, input)
-  scene: Phaser.Scene;
-
   // Read-only game state
   readonly player: Entity;
   readonly enemies: Entity[];
@@ -70,6 +67,8 @@ export class AutoExploreSystem {
   private autoExploreTween: Phaser.Tweens.Tween | null = null;
 
   constructor(private host: AutoExploreHost) {}
+
+  protected get scene(): Phaser.Scene { return this.host as any; }
 
   /** Reset all auto-explore state for a new floor */
   reset() {
@@ -230,7 +229,7 @@ export class AutoExploreSystem {
     // Show pulsing AUTO indicator
     this.showAutoExploreIndicator();
 
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     // Add global tap-to-cancel listener with a short delay so the current tap doesn't cancel immediately
     scene.time.delayedCall(200, () => {
@@ -246,7 +245,7 @@ export class AutoExploreSystem {
   /** Perform one auto-explore step, then schedule the next */
   private async autoExploreStep() {
     if (!this.autoExploring) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     if (this.host.turnManager.isBusy) {
       // Wait and retry
@@ -357,7 +356,7 @@ export class AutoExploreSystem {
       this.autoExploreTimer = null;
     }
 
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     // Remove the interrupt listener if still active
     scene.input.off("pointerdown", this.onAutoExploreInterrupt, this);
@@ -382,7 +381,7 @@ export class AutoExploreSystem {
     if (this.autoExploreText) this.autoExploreText.destroy();
     if (this.autoExploreTween) this.autoExploreTween.destroy();
 
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     this.autoExploreText = scene.add.text(GAME_WIDTH - 8, 66, "AUTO", {
       fontSize: "11px",

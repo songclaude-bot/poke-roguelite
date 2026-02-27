@@ -23,9 +23,6 @@ import { sfxShop } from "../core/sound-manager";
 // ── Host interface: what ShopSystem needs from DungeonScene ──
 
 export interface ShopHost {
-  /** Phaser Scene API */
-  scene: Phaser.Scene;
-
   // Read-only game state
   readonly player: Entity;
   readonly currentFloor: number;
@@ -67,6 +64,8 @@ export class ShopSystem {
   private shopTheftTriggered = false;
 
   constructor(private host: ShopHost) {}
+
+  protected get scene(): Phaser.Scene { return this.host as any; }
 
   /** Reset all shop state for a new floor */
   reset() {
@@ -111,7 +110,7 @@ export class ShopSystem {
   ): boolean {
     if (isBossFloor || !shouldSpawnShop(this.host.currentFloor, this.host.dungeonDef.floors) || rooms.length <= 2) return false;
 
-    const scene = this.host.scene;
+    const scene = this.scene;
     // Pick a room that isn't the player's or stairs room
     const shopCandidates = rooms.filter(r =>
       // Not the player's room
@@ -238,7 +237,7 @@ export class ShopSystem {
   /** Show prominent gold balance when in shop room */
   showShopGoldHud() {
     this.hideShopGoldHud();
-    this.shopGoldHud = this.host.scene.add.text(GAME_WIDTH / 2, 50, `Gold: ${this.host.gold}G`, {
+    this.shopGoldHud = this.scene.add.text(GAME_WIDTH / 2, 50, `Gold: ${this.host.gold}G`, {
       fontSize: "12px", color: "#fbbf24", fontFamily: "monospace", fontStyle: "bold",
       backgroundColor: "#1a1a2ecc", padding: { x: 8, y: 4 },
     }).setOrigin(0.5).setScrollFactor(0).setDepth(105);
@@ -272,7 +271,7 @@ export class ShopSystem {
     if (this.shopTheftTriggered) return;
     this.shopTheftTriggered = true;
     this.shopClosed = true;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     // Big warning text
     this.host.showLog("Stop, thief!");
@@ -394,7 +393,7 @@ export class ShopSystem {
     if (!si) return;
     const itemDef = ITEM_DB[si.itemId];
     if (!itemDef) return;
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     sfxShop();
     this.shopOpen = true;
@@ -521,7 +520,7 @@ export class ShopSystem {
       this.host.showLog("Shop is empty!");
       return;
     }
-    const scene = this.host.scene;
+    const scene = this.scene;
     sfxShop();
     this.shopOpen = true;
 
@@ -640,7 +639,7 @@ export class ShopSystem {
     const stack = this.host.inventory[inventoryIndex];
     if (!stack) return;
     const sellPrice = getItemSellPrice(stack.item.id, this.host.currentFloor);
-    const scene = this.host.scene;
+    const scene = this.scene;
 
     sfxShop();
     this.shopOpen = true;
