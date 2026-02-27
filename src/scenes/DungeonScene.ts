@@ -42,7 +42,6 @@ import {
   getRunAwayDodgeBonus, getLevitateDodgeBonus,
 } from "../core/ability-upgrade";
 import { WeatherType, WEATHERS, weatherDamageMultiplier, isWeatherImmune, rollFloorWeather, WeatherIntensity, INTENSITY_MULTIPLIER, INTENSITY_COLOR, getWeatherIntensity, shouldWeatherTransition, getWeatherSynergyBonus } from "../core/weather";
-import { generateForecast, forecastToString } from "../core/weather-forecast";
 // dungeon-shop imports moved to ShopSystem
 import { getUpgradeBonus } from "../scenes/UpgradeScene";
 import { HeldItemEffect, getHeldItem } from "../core/held-items";
@@ -201,7 +200,7 @@ export class DungeonScene extends Phaser.Scene {
   private floorText!: Phaser.GameObjects.Text;
   private logText!: Phaser.GameObjects.Text;
   private logMessages: string[] = [];
-  private skillButtons: Phaser.GameObjects.Text[] = [];
+
 
   // Minimap + Fog of War (delegated to MinimapSystem)
   private minimapSys!: MinimapSystem;
@@ -595,7 +594,6 @@ export class DungeonScene extends Phaser.Scene {
     this.miniBossHpBg = null;
     this.miniBossNameText = null;
     this.activeSkillIndex = -1;
-    this.skillButtons = [];
     this.teamPanelOpen = false;
     this.teamPanelUI = [];
     this.enemiesDefeated = 0;
