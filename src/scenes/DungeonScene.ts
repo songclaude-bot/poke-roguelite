@@ -9505,6 +9505,34 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // Revive fainted allies and restore their sprites
+    for (const ally of this.allies) {
+      if (!ally.alive) {
+        ally.alive = true;
+        ally.stats.hp = Math.floor(ally.stats.maxHp * 0.5);
+      }
+      // Stop any death fade tween and ensure sprite is visible
+      if (ally.sprite) {
+        this.tweens.killTweensOf(ally.sprite);
+        ally.sprite.setAlpha(1);
+      } else {
+        // Recreate destroyed sprite
+        const allySp = ally.speciesId ? SPECIES[ally.speciesId] : undefined;
+        if (allySp) {
+          const allyTex = `${allySp.spriteKey}-idle`;
+          if (this.textures.exists(allyTex)) {
+            ally.sprite = this.add.sprite(
+              this.tileToPixelX(ally.tileX), this.tileToPixelY(ally.tileY), allyTex
+            ).setScale(TILE_SCALE).setDepth(10);
+          }
+        }
+        // Re-add to allEntities if missing
+        if (!this.allEntities.includes(ally)) {
+          this.allEntities.push(ally);
+        }
+      }
+    }
+
     // Clear all enemies on the current floor
     for (const enemy of this.enemies) {
       if (enemy.sprite) enemy.sprite.destroy();
@@ -9573,26 +9601,30 @@ export class DungeonScene extends Phaser.Scene {
       }
     }
 
+    // Hide DOM HUD and D-pad behind game over overlay
+    if (this.domHud) setDomHudInteractive(this.domHud, false);
+    for (const obj of this.dpadUI) { if ("setVisible" in obj && typeof (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible === "function") (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible(false); }
+
+    // Full-screen opaque overlay
     this.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,
       GAME_WIDTH, GAME_HEIGHT,
-      0x000000, 0.7
+      0x0a0a1a, 0.95
     ).setScrollFactor(0).setDepth(200);
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, "GAME OVER", {
-      fontSize: "22px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 60, "GAME OVER", {
+      fontSize: "24px", color: "#ef4444", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 5, `Fainted on B${this.currentFloor}F`, {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, `Fainted on B${this.currentFloor}F`, {
       fontSize: "12px", color: "#e0e0e0", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 18, `Salvaged ${gold} Gold`, {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 12, `Salvaged ${gold} Gold`, {
       fontSize: "11px", color: "#fde68a", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    // Speed run timer display on game over (not saved as best)
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 32, `Time: ${this.formatTime(this.runElapsedSeconds)}`, {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 2, `Time: ${this.formatTime(this.runElapsedSeconds)}`, {
       fontSize: "10px", color: "#6b7280", fontFamily: "monospace",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
@@ -9662,21 +9694,31 @@ export class DungeonScene extends Phaser.Scene {
       goChainStr,
       `Score: ${goRunScore}`,
     ].filter(Boolean).join("\n");
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 48, goStats, {
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 22, goStats, {
       fontSize: "9px", color: "#94a3b8", fontFamily: "monospace", align: "center",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(201);
 
     // Performance grade
     const goGrade = calculatePerformanceGrade(this.runLog.getSummaryStats(), false, this.dungeonDef.floors, this.turnManager.turn);
-    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 72, `Grade: ${goGrade}`, {
-      fontSize: "13px", color: gradeColor(goGrade), fontFamily: "monospace", fontStyle: "bold",
+    this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 80, `Grade: ${goGrade}`, {
+      fontSize: "14px", color: gradeColor(goGrade), fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5).setScrollFactor(0).setDepth(201);
 
-    const restartText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 90, "[Return to Town]", {
-      fontSize: "14px", color: "#60a5fa", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
+    // ── Styled buttons ──
+    const btnW = 240;
+    const btnH = 36;
+    const btnBaseY = GAME_HEIGHT / 2 + 108;
+    const btnGap = 44;
 
-    restartText.on("pointerdown", () => {
+    // Return to Town
+    const rtBg = this.add.rectangle(GAME_WIDTH / 2, btnBaseY, btnW, btnH, 0x1e3a5f, 0.95)
+      .setStrokeStyle(1, 0x3b82f6).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
+    this.add.text(GAME_WIDTH / 2, btnBaseY, "Return to Town", {
+      fontSize: "13px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+    rtBg.on("pointerover", () => rtBg.setFillStyle(0x2a4a6f, 1));
+    rtBg.on("pointerout", () => rtBg.setFillStyle(0x1e3a5f, 0.95));
+    rtBg.on("pointerdown", () => {
       this.scene.start("HubScene", {
         gold,
         cleared: false,
@@ -9692,20 +9734,27 @@ export class DungeonScene extends Phaser.Scene {
       });
     });
 
-    // Quick Retry button
-    const retryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 112, "[Quick Retry]", {
-      fontSize: "14px", color: "#f59e0b", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
-
-    retryText.on("pointerdown", () => {
+    // Quick Retry
+    const qrBg = this.add.rectangle(GAME_WIDTH / 2, btnBaseY + btnGap, btnW, btnH, 0x3a2a1a, 0.95)
+      .setStrokeStyle(1, 0xf59e0b).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
+    this.add.text(GAME_WIDTH / 2, btnBaseY + btnGap, "Quick Retry", {
+      fontSize: "13px", color: "#f59e0b", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+    qrBg.on("pointerover", () => qrBg.setFillStyle(0x4a3a2a, 1));
+    qrBg.on("pointerout", () => qrBg.setFillStyle(0x3a2a1a, 0.95));
+    qrBg.on("pointerdown", () => {
       this.quickRetry(gold, false);
     });
 
-    // Run Summary button
-    const goSummaryBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 134, "[Run Summary]", {
-      fontSize: "11px", color: "#a855f7", fontFamily: "monospace",
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(201).setInteractive();
-    goSummaryBtn.on("pointerdown", () => {
+    // Run Summary
+    const rsBg = this.add.rectangle(GAME_WIDTH / 2, btnBaseY + btnGap * 2, btnW, btnH, 0x1a0a2a, 0.95)
+      .setStrokeStyle(1, 0xa855f7).setScrollFactor(0).setDepth(201).setInteractive({ useHandCursor: true });
+    this.add.text(GAME_WIDTH / 2, btnBaseY + btnGap * 2, "Run Summary", {
+      fontSize: "13px", color: "#a855f7", fontFamily: "monospace", fontStyle: "bold",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(202);
+    rsBg.on("pointerover", () => rsBg.setFillStyle(0x2a1a3a, 1));
+    rsBg.on("pointerout", () => rsBg.setFillStyle(0x1a0a2a, 0.95));
+    rsBg.on("pointerdown", () => {
       this.showRunSummary(false, this.dungeonDef.floors);
     });
   }

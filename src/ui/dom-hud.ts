@@ -105,7 +105,7 @@ export function createDomHud(): DomHudElements {
     font-size: 10px;
     color: #fbbf24;
     font-family: ${FONT};
-    background: rgba(0,0,0,0.8);
+    background: rgba(0,0,0,0.45);
     padding: 4px 6px;
     border-radius: 3px;
     line-height: 1.4;
