@@ -360,6 +360,8 @@ export class HubScene extends Phaser.Scene {
     this.tabContent.push(cardBg);
 
     // Load and show starter sprite with idle animation
+    // Batch all sprite loads to avoid multiple load.start() calls
+    const pendingLoads: Array<() => void> = [];
     const dexNum = SPRITE_DEX[currentStarter];
     if (dexNum && sp) {
       const textureKey = `${currentStarter}-idle`;
@@ -389,8 +391,7 @@ export class HubScene extends Phaser.Scene {
         this.load.spritesheet(textureKey, `sprites/${dexNum}/Idle-Anim.png`, {
           frameWidth: sp.idleFrameWidth, frameHeight: sp.idleFrameHeight,
         });
-        this.load.once("complete", addStarterSprite);
-        this.load.start();
+        pendingLoads.push(addStarterSprite);
       }
     }
 
@@ -489,8 +490,7 @@ export class HubScene extends Phaser.Scene {
             frameWidth: npcSp.idleFrameWidth, frameHeight: npcSp.idleFrameHeight,
           });
           const npcRef = npc;
-          this.load.once("complete", () => addNpcSprite(npcRef));
-          this.load.start();
+          pendingLoads.push(() => addNpcSprite(npcRef));
         }
       }
 
@@ -512,6 +512,14 @@ export class HubScene extends Phaser.Scene {
         fontSize: "7px", color: "#64748b", fontFamily: "monospace",
       }).setOrigin(0.5);
       this.tabContent.push(nameLabel);
+    }
+
+    // Batch load all pending sprites with a single load.start()
+    if (pendingLoads.length > 0) {
+      this.load.once("complete", () => {
+        for (const cb of pendingLoads) cb();
+      });
+      this.load.start();
     }
 
     // ── Quick Actions ──
