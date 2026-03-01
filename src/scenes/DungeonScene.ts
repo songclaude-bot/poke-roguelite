@@ -4696,6 +4696,16 @@ export class DungeonScene extends Phaser.Scene {
               this.cameras.main.flash(800, 255, 255, 255);
               this.cameras.main.shake(400, 0.01);
               if (this.player.sprite) {
+                // Update sprite texture to new species
+                const newSp = SPECIES[evo.to];
+                if (newSp) {
+                  const newIdleTex = `${newSp.spriteKey}-idle`;
+                  if (this.textures.exists(newIdleTex)) {
+                    this.player.sprite.setTexture(newIdleTex);
+                    const newIdleAnim = `${newSp.spriteKey}-idle-${this.player.facing}`;
+                    if (this.anims.exists(newIdleAnim)) this.player.sprite.play(newIdleAnim);
+                  }
+                }
                 this.tweens.add({
                   targets: this.player.sprite,
                   scaleX: TILE_SCALE * 1.5, scaleY: TILE_SCALE * 1.5,

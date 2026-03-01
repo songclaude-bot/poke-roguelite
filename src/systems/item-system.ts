@@ -200,18 +200,24 @@ export class ItemSystem {
       host.dungeonDef.itemsPerFloor * host.difficultyMods.itemDropMult * ngItemDropMult * enchItemMult * mutItemMult * talentItemMult
     ));
 
+    const occupied = new Set<string>();
+    occupied.add(`${stairsPos.x},${stairsPos.y}`);
+    occupied.add(`${playerStart.x},${playerStart.y}`);
+    for (const fi of this.floorItems) occupied.add(`${fi.x},${fi.y}`);
+
     let placed = 0;
     for (let i = 0; i < itemCount; i++) {
       const room = rooms[Math.floor(Math.random() * rooms.length)];
       const ix = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
       const iy = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
       if (terrain[iy][ix] !== TerrainType.GROUND) continue;
-      if (ix === stairsPos.x && iy === stairsPos.y) continue;
-      if (ix === playerStart.x && iy === playerStart.y) continue;
+      const key = `${ix},${iy}`;
+      if (occupied.has(key)) continue;
 
       const item = rollFloorItem();
       const sprite = this.createFloorItemSprite(ix, iy, item);
       this.floorItems.push({ x: ix, y: iy, item, sprite });
+      occupied.add(key);
       placed++;
     }
     return placed;
@@ -227,16 +233,21 @@ export class ItemSystem {
     stairsPos: { x: number; y: number },
     count: number,
   ) {
+    const occupied = this.getOccupiedPositions();
+    occupied.add(`${stairsPos.x},${stairsPos.y}`);
+
     for (let i = 0; i < count; i++) {
       const room = rooms[Math.floor(Math.random() * rooms.length)];
       const ix = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
       const iy = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
       if (terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
-      if (ix === stairsPos.x && iy === stairsPos.y) continue;
+      const key = `${ix},${iy}`;
+      if (occupied.has(key)) continue;
 
       const item = rollFloorItem();
       const sprite = this.createFloorItemSprite(ix, iy, item, "#fde68a");
       this.floorItems.push({ x: ix, y: iy, item, sprite });
+      occupied.add(key);
     }
   }
 
@@ -249,25 +260,34 @@ export class ItemSystem {
     room: { x: number; y: number; w: number; h: number },
     count: number,
   ) {
+    const occupied = this.getOccupiedPositions();
+    occupied.add(`${stairsPos.x},${stairsPos.y}`);
+
     for (let ti = 0; ti < count; ti++) {
       const ix = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
       const iy = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
       if (terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
-      if (ix === stairsPos.x && iy === stairsPos.y) continue;
+      const key = `${ix},${iy}`;
+      if (occupied.has(key)) continue;
 
       const item = rollFloorItem();
       const sprite = this.createFloorItemSprite(ix, iy, item);
       this.floorItems.push({ x: ix, y: iy, item, sprite });
+      occupied.add(key);
     }
   }
 
   /** Spawn reward items on the floor with pop-in animation */
   spawnMonsterHouseRewardItems(room: { x: number; y: number; w: number; h: number }, terrain: TerrainType[][], count: number) {
     const scene = this.scene;
+    const occupied = this.getOccupiedPositions();
+
     for (let i = 0; i < count; i++) {
       const ix = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
       const iy = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
       if (terrain[iy]?.[ix] !== TerrainType.GROUND) continue;
+      const key = `${ix},${iy}`;
+      if (occupied.has(key)) continue;
 
       const item = rollFloorItem();
       const sprite = this.createFloorItemSprite(ix, iy, item);
@@ -283,6 +303,7 @@ export class ItemSystem {
       });
 
       this.floorItems.push({ x: ix, y: iy, item, sprite });
+      occupied.add(key);
     }
   }
 
