@@ -38,7 +38,7 @@ export class QuestBoardScene extends Phaser.Scene {
   private dragStartY = 0;
 
   private readonly SCROLL_TOP = 90;
-  private readonly SCROLL_BOTTOM = GAME_HEIGHT - 40;
+  private readonly SCROLL_BOTTOM = GAME_HEIGHT - 60;
 
   constructor() {
     super({ key: "QuestBoardScene" });

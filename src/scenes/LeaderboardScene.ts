@@ -62,7 +62,7 @@ export class LeaderboardScene extends Phaser.Scene {
 
     // Mask for scrollable area
     const scrollTop = 110;
-    const scrollBottom = GAME_HEIGHT - 45;
+    const scrollBottom = GAME_HEIGHT - 60;
     const maskShape = this.make.graphics({ x: 0, y: 0 });
     maskShape.fillRect(0, scrollTop, GAME_WIDTH, scrollBottom - scrollTop);
     const geoMask = maskShape.createGeometryMask();
@@ -88,7 +88,7 @@ export class LeaderboardScene extends Phaser.Scene {
     // Scroll handling
     let dragStartY = 0;
     const scrollTop2 = 110;
-    const scrollBottom2 = GAME_HEIGHT - 45;
+    const scrollBottom2 = GAME_HEIGHT - 60;
 
     this.input.on("pointerdown", (ptr: Phaser.Input.Pointer) => {
       if (ptr.y >= scrollTop2 && ptr.y <= scrollBottom2) {
@@ -171,7 +171,7 @@ export class LeaderboardScene extends Phaser.Scene {
 
   private renderDungeonTab() {
     const scrollTop = 110;
-    const scrollH = GAME_HEIGHT - 45 - scrollTop;
+    const scrollH = GAME_HEIGHT - 60 - scrollTop;
     let cy = scrollTop + 5;
 
     // Dungeon selector
@@ -260,7 +260,7 @@ export class LeaderboardScene extends Phaser.Scene {
 
   private renderAllTimeTab() {
     const scrollTop = 110;
-    const scrollH = GAME_HEIGHT - 45 - scrollTop;
+    const scrollH = GAME_HEIGHT - 60 - scrollTop;
     let cy = scrollTop + 5;
 
     const scores = getAllTimeTopScores(10);
@@ -290,7 +290,7 @@ export class LeaderboardScene extends Phaser.Scene {
 
   private renderRecentTab() {
     const scrollTop = 110;
-    const scrollH = GAME_HEIGHT - 45 - scrollTop;
+    const scrollH = GAME_HEIGHT - 60 - scrollTop;
     let cy = scrollTop + 5;
 
     const runs = getRecentRuns(10);
@@ -442,7 +442,7 @@ export class LeaderboardScene extends Phaser.Scene {
 
   private updateIndicator() {
     const scrollTop = 110;
-    const scrollH = GAME_HEIGHT - 45 - scrollTop;
+    const scrollH = GAME_HEIGHT - 60 - scrollTop;
 
     if (this.maxScroll <= 0) {
       this.indicator.setVisible(false);

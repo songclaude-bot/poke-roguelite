@@ -731,7 +731,7 @@ export class HubScene extends Phaser.Scene {
 
     // Scrollable container
     const scrollTop = y + 6;
-    const scrollBottom = CONTENT_BOTTOM - 4;
+    const scrollBottom = CONTENT_BOTTOM - 8;
     const scrollH = scrollBottom - scrollTop;
 
     const container = this.add.container(0, 0).setDepth(10);

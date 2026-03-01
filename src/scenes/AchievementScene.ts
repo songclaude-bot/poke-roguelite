@@ -34,7 +34,7 @@ export class AchievementScene extends Phaser.Scene {
 
   // Scroll area bounds
   private readonly SCROLL_TOP = 90;
-  private readonly SCROLL_BOTTOM = GAME_HEIGHT - 40;
+  private readonly SCROLL_BOTTOM = GAME_HEIGHT - 60;
 
   constructor() {
     super({ key: "AchievementScene" });
