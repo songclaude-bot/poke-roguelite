@@ -64,7 +64,7 @@ export class TalentTreeScene extends Phaser.Scene {
 
     // Scrollable container
     const scrollTop = 78;
-    const scrollBottom = GAME_HEIGHT - 55;
+    const scrollBottom = GAME_HEIGHT - 60;
     const scrollH = scrollBottom - scrollTop;
 
     const container = this.add.container(0, 0).setDepth(10);

@@ -60,7 +60,7 @@ export class CraftingScene extends Phaser.Scene {
 
   create() {
     this.meta = loadMeta();
-    this.scrollBottom = GAME_HEIGHT - 55;
+    this.scrollBottom = GAME_HEIGHT - 60;
     this.scrollH = this.scrollBottom - this.scrollTop;
 
     // Background

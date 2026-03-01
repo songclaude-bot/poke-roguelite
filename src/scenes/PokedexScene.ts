@@ -130,7 +130,7 @@ export class PokedexScene extends Phaser.Scene {
 
     // ── Virtual scroll setup ──
     const scrollTop = 82;
-    const scrollBottom = GAME_HEIGHT - 35;
+    const scrollBottom = GAME_HEIGHT - 60;
     const scrollH = scrollBottom - scrollTop;
     const ITEM_H = 32;
     const POOL_SIZE = Math.ceil(scrollH / ITEM_H) + 2;

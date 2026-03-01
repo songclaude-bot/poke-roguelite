@@ -64,7 +64,7 @@ export class HeldItemScene extends Phaser.Scene {
 
     // Scrollable item list
     const scrollTop = 100;
-    const scrollBottom = GAME_HEIGHT - 55;
+    const scrollBottom = GAME_HEIGHT - 60;
     const scrollH = scrollBottom - scrollTop;
 
     this.listContainer = this.add.container(0, 0).setDepth(10);

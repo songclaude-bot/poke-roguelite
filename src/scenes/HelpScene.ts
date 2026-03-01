@@ -154,7 +154,7 @@ export class HelpScene extends Phaser.Scene {
 
     // ── Scrollable content ──
     const scrollTop = 60;
-    const scrollBottom = GAME_HEIGHT - 40;
+    const scrollBottom = GAME_HEIGHT - 60;
     const scrollH = scrollBottom - scrollTop;
     const container = this.add.container(0, 0);
 
