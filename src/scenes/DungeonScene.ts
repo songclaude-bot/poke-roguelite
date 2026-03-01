@@ -3272,7 +3272,7 @@ export class DungeonScene extends Phaser.Scene {
 
     // Build display text with color hints via effectiveness keywords
     const displayText = this.logMessages.join("\n");
-    this.logText.setText(displayText);
+    if (this.logText?.active) this.logText.setText(displayText);
 
     // Sync to DOM log box
     if (this.domHud) {
@@ -3287,7 +3287,7 @@ export class DungeonScene extends Phaser.Scene {
       if (this.logMessages.length > 0 && this.logMessages[0] === snapshot[0]) {
         this.logMessages.shift();
         const txt = this.logMessages.join("\n");
-        this.logText.setText(txt);
+        if (this.logText?.active) this.logText.setText(txt);
         if (this.domHud) {
           if (txt) {
             this.domHud.logBox.textContent = txt;
