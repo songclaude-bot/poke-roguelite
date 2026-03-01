@@ -415,6 +415,11 @@ export class DeathRescueSystem {
     }
     for (const obj of h.dpadUI) { if ("setVisible" in obj && typeof (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible === "function") (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible(true); }
 
+    // Re-attach camera to player sprite (may have been recreated)
+    if (h.player.sprite) {
+      scene.cameras.main.startFollow(h.player.sprite, true, 0.15, 0.15);
+    }
+
     // Visual feedback: rescue flash
     scene.cameras.main.flash(600, 100, 200, 255);
     if (h.player.sprite) {
