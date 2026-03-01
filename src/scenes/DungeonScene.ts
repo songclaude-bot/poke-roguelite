@@ -1410,8 +1410,11 @@ export class DungeonScene extends Phaser.Scene {
           if (this.anims.exists(bossAnim)) boss.sprite.play(bossAnim);
         }
         // Red tint aura for boss
-        if (boss.sprite) boss.sprite.setTint(0xff6666);
-        this.time.delayedCall(800, () => { if (boss.sprite) boss.sprite.clearTint(); });
+        if (boss.sprite) {
+          const spr = boss.sprite;
+          spr.setTint(0xff6666);
+          this.time.delayedCall(800, () => { if (spr.active) spr.clearTint(); });
+        }
 
         this.bossEntity = boss;
         this.enemies.push(boss);
@@ -1466,8 +1469,11 @@ export class DungeonScene extends Phaser.Scene {
           if (this.anims.exists(bossAnim)) boss.sprite.play(bossAnim);
         }
         // Purple tint aura for endless boss
-        if (boss.sprite) boss.sprite.setTint(0xaa66ff);
-        this.time.delayedCall(800, () => { if (boss.sprite) boss.sprite.clearTint(); });
+        if (boss.sprite) {
+          const spr = boss.sprite;
+          spr.setTint(0xaa66ff);
+          this.time.delayedCall(800, () => { if (spr.active) spr.clearTint(); });
+        }
 
         this.bossEntity = boss;
         this.enemies.push(boss);
@@ -1528,8 +1534,11 @@ export class DungeonScene extends Phaser.Scene {
           if (this.anims.exists(bossAnim)) boss.sprite.play(bossAnim);
         }
         // Crimson tint aura for Boss Rush bosses
-        if (boss.sprite) boss.sprite.setTint(0xff2222);
-        this.time.delayedCall(800, () => { if (boss.sprite) boss.sprite.clearTint(); });
+        if (boss.sprite) {
+          const spr = boss.sprite;
+          spr.setTint(0xff2222);
+          this.time.delayedCall(800, () => { if (spr.active) spr.clearTint(); });
+        }
 
         this.bossEntity = boss;
         this.enemies.push(boss);

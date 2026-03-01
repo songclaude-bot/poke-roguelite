@@ -637,6 +637,7 @@ export class MinimapSystem {
       ease: "Back.easeOut",
       onComplete: () => {
         scene.time.delayedCall(1800, () => {
+          if (!bannerBg.active) return; // Guard: objects may be destroyed on scene restart
           scene.tweens.add({
             targets: [bannerBg, labelText, detailText],
             alpha: 0,
@@ -644,9 +645,9 @@ export class MinimapSystem {
             duration: 400,
             ease: "Sine.easeIn",
             onComplete: () => {
-              bannerBg.destroy();
-              labelText.destroy();
-              detailText.destroy();
+              if (bannerBg.active) bannerBg.destroy();
+              if (labelText.active) labelText.destroy();
+              if (detailText.active) detailText.destroy();
             },
           });
         });

@@ -976,14 +976,16 @@ export class CombatSystem {
   showCritFlash(entity: Entity) {
     const scene = this.scene;
     if (!entity.sprite) return;
-    // Bright gold flash
-    entity.sprite.setTint(0xffd700);
+    const spr = entity.sprite; // Capture reference
+    spr.setTint(0xffd700);
     scene.time.delayedCall(100, () => {
-      if (entity.sprite) entity.sprite.setTint(0xffffff);
+      if (!spr.active) return;
+      spr.setTint(0xffffff);
       scene.time.delayedCall(80, () => {
-        if (entity.sprite) entity.sprite.setTint(0xffd700);
+        if (!spr.active) return;
+        spr.setTint(0xffd700);
         scene.time.delayedCall(100, () => {
-          if (entity.sprite) entity.sprite.clearTint();
+          if (spr.active) spr.clearTint();
         });
       });
     });

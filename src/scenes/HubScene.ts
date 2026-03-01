@@ -234,7 +234,10 @@ export class HubScene extends Phaser.Scene {
   }
 
   private switchTab(tabId: TabId) {
-    // Destroy old tab content
+    // Stop any active tweens targeting tab content BEFORE destroying
+    for (const obj of this.tabContent) {
+      this.tweens.killTweensOf(obj);
+    }
     this.tabContent.forEach(o => o.destroy());
     this.tabContent = [];
     this.activeTab = tabId;

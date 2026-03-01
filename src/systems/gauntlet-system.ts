@@ -302,8 +302,11 @@ export class GauntletSystem {
       }
 
       // Orange-red tint aura for gauntlet bosses
-      if (boss.sprite) boss.sprite.setTint(0xff8833);
-      scene.time.delayedCall(800, () => { if (boss.sprite) boss.sprite.clearTint(); });
+      if (boss.sprite) {
+        const spr = boss.sprite;
+        spr.setTint(0xff8833);
+        scene.time.delayedCall(800, () => { if (spr.active) spr.clearTint(); });
+      }
 
       // Track as the main boss entity for HP bar display (first boss of wave)
       if (i === 0) {

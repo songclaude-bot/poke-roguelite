@@ -200,15 +200,24 @@ export class QuestBoardScene extends Phaser.Scene {
   // ── Build Tab Contents ──
 
   private buildDailyTab() {
+    this.killContainerTweens(this.dailyContainer);
     this.dailyContainer.removeAll(true);
     const quests = this.meta.activeQuests ?? [];
     this.renderQuestList(this.dailyContainer, quests, true);
   }
 
   private buildChallengeTab() {
+    this.killContainerTweens(this.challengeContainer);
     this.challengeContainer.removeAll(true);
     const quests = this.meta.challengeQuests ?? [];
     this.renderQuestList(this.challengeContainer, quests, false);
+  }
+
+  /** Stop all tweens targeting children of a container before destroying them */
+  private killContainerTweens(container: Phaser.GameObjects.Container) {
+    for (const child of container.list) {
+      this.tweens.killTweensOf(child);
+    }
   }
 
   private renderQuestList(container: Phaser.GameObjects.Container, quests: Quest[], isDaily: boolean) {
