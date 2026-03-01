@@ -896,12 +896,12 @@ export class HubScene extends Phaser.Scene {
     const storedItemCount = getStorageItemCount(this.meta.storage);
     const talentPoints = getTotalTalentPoints(this.meta.talentLevels ?? {});
 
-    const title = this.add.text(GAME_WIDTH / 2, 16, "Prepare", {
+    const title = this.add.text(GAME_WIDTH / 2, 20, "Prepare", {
       fontSize: "16px", color: "#f59e0b", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5);
     this.tabContent.push(title);
 
-    const goldT = this.add.text(GAME_WIDTH / 2, 36, `Gold: ${this.meta.gold}`, {
+    const goldT = this.add.text(GAME_WIDTH / 2, 40, `Gold: ${this.meta.gold}`, {
       fontSize: "11px", color: "#fde68a", fontFamily: "monospace",
     }).setOrigin(0.5);
     this.tabContent.push(goldT);
@@ -923,7 +923,7 @@ export class HubScene extends Phaser.Scene {
 
     const btnH = 42;
     const gap = 12;
-    let iy = 60;
+    let iy = 68;
     for (const item of items) {
       const bgColor = item.bgColor;
       const strokeColor = parseInt(item.color.replace("#", ""), 16);
@@ -944,7 +944,7 @@ export class HubScene extends Phaser.Scene {
     const allQuests = [...(this.meta.activeQuests ?? []), ...(this.meta.challengeQuests ?? [])];
     const claimableCount = allQuests.filter(q => q.completed && !q.claimed).length;
 
-    const title = this.add.text(GAME_WIDTH / 2, 16, "Info", {
+    const title = this.add.text(GAME_WIDTH / 2, 20, "Info", {
       fontSize: "16px", color: "#e879f9", fontFamily: "monospace", fontStyle: "bold",
     }).setOrigin(0.5);
     this.tabContent.push(title);
@@ -959,7 +959,7 @@ export class HubScene extends Phaser.Scene {
 
     const infoBtnH = 48;
     const infoGap = 12;
-    let iy = 50;
+    let iy = 58;
     for (const item of items) {
       const bgColor = item.bgColor;
       const strokeColor = parseInt(item.color.replace("#", ""), 16);
