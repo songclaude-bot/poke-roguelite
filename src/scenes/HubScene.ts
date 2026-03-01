@@ -1057,12 +1057,12 @@ export class HubScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(302);
     uiItems.push(goldDisplay);
 
-    this.tweens.addCounter({
+    const counterTween = this.tweens.addCounter({
       from: 0, to: gold,
       duration: Math.max(300, Math.min(1500, gold * 20)),
       ease: "Cubic.easeOut",
-      onUpdate: (tween) => goldDisplay.setText(`+${Math.floor(tween.getValue() ?? 0)} Gold`),
-      onComplete: () => goldDisplay.setText(`+${gold} Gold`),
+      onUpdate: (tween) => { if (goldDisplay.active) goldDisplay.setText(`+${Math.floor(tween.getValue() ?? 0)} Gold`); },
+      onComplete: () => { if (goldDisplay.active) goldDisplay.setText(`+${gold} Gold`); },
     });
 
     uiItems.push(this.add.text(panelX, panelY + 25, `Income rate: ${rate}G/hr`, {
@@ -1083,7 +1083,11 @@ export class HubScene extends Phaser.Scene {
       this.meta.gold += gold;
       this.meta.totalGold += gold;
       saveMeta(this.meta);
+      // Stop the counter tween before destroying its target
+      if (counterTween && counterTween.isPlaying()) counterTween.stop();
       uiItems.forEach(o => o.destroy());
+      // Refresh gold display on Home tab
+      this.switchTab("home");
     };
     collectBg.on("pointerdown", collect);
     overlay.on("pointerdown", collect);
