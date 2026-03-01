@@ -35,8 +35,28 @@ const TYPE_COLORS: Record<string, string> = {
  * position-only updates on sub-row scroll for smooth 60fps on mobile.
  */
 export class PokedexScene extends Phaser.Scene {
+  private scrollDirty = false;
+  private renderVisibleFn: (() => void) | null = null;
+  private velocity = 0;
+  private isDragging = false;
+
   constructor() {
     super({ key: "PokedexScene" });
+  }
+
+  update() {
+    // Momentum scroll when not dragging
+    if (!this.isDragging && Math.abs(this.velocity) > 0.5) {
+      this.velocity *= 0.92; // friction
+      this.scrollDirty = true;
+    } else if (!this.isDragging) {
+      this.velocity = 0;
+    }
+
+    if (this.scrollDirty && this.renderVisibleFn) {
+      this.scrollDirty = false;
+      this.renderVisibleFn();
+    }
   }
 
   create() {
@@ -131,7 +151,7 @@ export class PokedexScene extends Phaser.Scene {
     updateTabs();
 
     // ── Virtual scroll setup ──
-    const scrollTop = 82;
+    const scrollTop = 94;
     const scrollBottom = GAME_HEIGHT - 62;
     const scrollH = scrollBottom - scrollTop;
     const ITEM_H = 32;
@@ -294,13 +314,21 @@ export class PokedexScene extends Phaser.Scene {
       GAME_WIDTH - 4, scrollTop, 3, 20, 0x667eea, 0.5
     ).setOrigin(0.5, 0).setVisible(false);
 
+    // Expose renderVisible to update() loop
+    this.renderVisibleFn = () => {
+      // Apply momentum velocity
+      if (!this.isDragging && Math.abs(this.velocity) > 0.5) {
+        scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset - this.velocity));
+      }
+      renderVisible();
+    };
+
     // Initial render
     renderVisible();
 
     // ── Scroll handling (with tap detection) ──
     let dragStartY = 0;
     let dragStartX = 0;
-    let isDragging = false;
     let dragDistance = 0;
     const TAP_THRESHOLD = 6;
 
@@ -309,28 +337,31 @@ export class PokedexScene extends Phaser.Scene {
       if (ptr.y >= scrollTop && ptr.y <= scrollBottom) {
         dragStartY = ptr.y;
         dragStartX = ptr.x;
-        isDragging = true;
+        this.isDragging = true;
+        this.velocity = 0;
         dragDistance = 0;
       }
     });
 
     this.input.on("pointermove", (ptr: Phaser.Input.Pointer) => {
       if (detailOpen) return;
-      if (!ptr.isDown || !isDragging) return;
+      if (!ptr.isDown || !this.isDragging) return;
       const dy = ptr.y - dragStartY;
       dragDistance += Math.abs(dy) + Math.abs(ptr.x - dragStartX);
       dragStartY = ptr.y;
       dragStartX = ptr.x;
+      this.velocity = dy; // track velocity for momentum
       scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset - dy));
-      renderVisible();
+      this.scrollDirty = true; // defer to update()
     });
 
     this.input.on("pointerup", (ptr: Phaser.Input.Pointer) => {
       if (detailOpen) return;
-      if (isDragging && dragDistance < TAP_THRESHOLD) {
+      if (this.isDragging && dragDistance < TAP_THRESHOLD) {
         handleRowTap(ptr.y);
       }
-      isDragging = false;
+      this.isDragging = false;
+      // velocity already set from last pointermove — momentum continues in update()
     });
 
     // ── Row tap handler ──
