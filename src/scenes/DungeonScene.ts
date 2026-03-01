@@ -5143,6 +5143,31 @@ export class DungeonScene extends Phaser.Scene {
   private stopAutoExplore(reason?: string) { this.autoExploreSys.stopAutoExplore(reason); }
   private startAutoExplore() { this.autoExploreSys.startAutoExplore(); }
 
+  // ── Forwarding methods for system Host interfaces ──
+
+  /** AutoExploreHost: forward shop check to ShopSystem */
+  checkShop() { this.shopSys.checkShop(); }
+  /** AutoExploreHost: forward monster house check to MonsterHouseSystem */
+  checkMonsterHouse() { this.monsterHouseSys.checkMonsterHouse(); }
+  /** AutoExploreHost: forward event room check to EventRoomSystem */
+  checkEventRoom() { this.eventRoomSys.checkEventRoom(); }
+  /** AutoExploreHost: forward shrine check to ShrineSystem */
+  checkShrine() { this.shrineSys.checkShrine(); }
+  /** ShrineHost / EventRoomHost: forward updateMinimap to MinimapSystem */
+  updateMinimap() { this.minimapSys.updateMinimap(); }
+  /** ShrineHost / EventRoomHost: forward setDomHudInteractive to dom-hud utility */
+  setDomHudInteractive(enabled: boolean) { if (this.domHud) setDomHudInteractive(this.domHud, enabled); }
+  /** MonsterHouseHost: forward getEnemyStats to module-level function */
+  getEnemyStats(floor: number, difficulty: number, species?: PokemonSpecies, ngPlusBonus?: number) {
+    return getEnemyStats(floor, difficulty, species, ngPlusBonus);
+  }
+  /** ItemHost: method form for eventOpen getter */
+  isEventOpen(): boolean { return this.eventRoomSys?.eventOpen ?? false; }
+  /** ItemHost: method form for fullMapOpen getter */
+  isFullMapOpen(): boolean { return this.minimapSys?.fullMapOpen ?? false; }
+  /** ItemHost: method form for shrineOpen getter */
+  isShrineOpen(): boolean { return this.shrineSys?.shrineOpen ?? false; }
+
   // ── Relic Artifact System ──
   private tryRelicDrop(dropType: "boss" | "gauntlet" | "legendary") {
     const relic = rollRelicDrop(this.currentFloor, this.dungeonDef.difficulty, dropType);
