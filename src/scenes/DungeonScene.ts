@@ -22,12 +22,13 @@ import { getAllyMoveDirection, tryRecruit, directionTo, getFollowDist, selectAll
 import { PokemonType, getEffectiveness, effectivenessText } from "../core/type-chart";
 import { Skill, SkillRange, SkillEffect, SKILL_DB, createSkill } from "../core/skill";
 import { getSkillTargetTiles } from "../core/skill-targeting";
-import { getEvolution } from "../core/evolution";
+import { getEvolution, EVOLUTIONS } from "../core/evolution";
 import { distributeAllyExp, AllyLevelUpResult } from "../core/ally-evolution";
 import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY, ITEM_DB, ItemCategory } from "../core/item";
 import { getAffinityMultiplier, getItemAffinity } from "../core/item-affinity";
 import { getTypeGem, TypeGem } from "../core/type-gems";
 import { SPECIES, PokemonSpecies, createSpeciesSkills, getLearnableSkill } from "../core/pokemon-data";
+import { SPRITE_DEX } from "../core/sprite-map";
 import { DungeonDef, BossDef, getDungeon, getDungeonFloorEnemies, CHALLENGE_MODES } from "../core/dungeon-data";
 import { expFromEnemy, processLevelUp } from "../core/leveling";
 import {
@@ -780,266 +781,17 @@ export class DungeonScene extends Phaser.Scene {
     // Load dungeon tileset
     this.load.image(this.dungeonDef.tilesetKey, this.dungeonDef.tilesetPath);
 
-    const spriteMap: Record<string, string> = {
-      mudkip: "0258", zubat: "0041", shellos: "0422", corsola: "0222", geodude: "0074",
-      pikachu: "0025", voltorb: "0100", magnemite: "0081",
-      caterpie: "0010", pidgey: "0016",
-      aron: "0304", meditite: "0307", machop: "0066",
-      gastly: "0092", drowzee: "0096", snorunt: "0361",
-      charmander: "0004", eevee: "0133",
-      numel: "0322", slugma: "0218", torkoal: "0324",
-      murkrow: "0198", sableye: "0302", absol: "0359",
-      chikorita: "0152", bellsprout: "0069", shroomish: "0285",
-      grimer: "0088", nidoranM: "0032", tentacool: "0072",
-      clefairy: "0035", jigglypuff: "0039", ralts: "0280",
-      dratini: "0147", bagon: "0371", gible: "0443",
-      poochyena: "0261",
-      beldum: "0374", skarmory: "0227",
-      sandshrew: "0027", trapinch: "0328", phanpy: "0231",
-      horsea: "0116", lotad: "0270", carvanha: "0318",
-      elekid: "0239", mareep: "0179",
-      wurmple: "0265", spinarak: "0167",
-      abra: "0063", natu: "0177",
-      houndour: "0228", sneasel: "0215",
-      taillow: "0276", starly: "0396",
-      makuhita: "0296", riolu: "0447",
-      larvitar: "0246", nosepass: "0299",
-      swinub: "0220", spheal: "0363",
-      zigzagoon: "0263", whismur: "0293",
-      oddish: "0043", budew: "0406",
-      vulpix: "0037", ponyta: "0077",
-      staryu: "0120", clamperl: "0366",
-      shinx: "0403", electrike: "0309",
-      gulpin: "0316", ekans: "0023",
-      cubone: "0104", diglett: "0050",
-      paras: "0046", venonat: "0048",
-      shieldon: "0410", bronzor: "0436",
-      misdreavus: "0200", duskull: "0355",
-      axew: "0610", deino: "0633",
-      snubbull: "0209", togepi: "0175",
-      snover: "0459", bergmite: "0712",
-      spoink: "0325",
-      stunky: "0434", purrloin: "0509",
-      pidove: "0519", rufflet: "0627",
-      tyrogue: "0236", crabrawler: "0739",
-      roggenrola: "0524", rockruff: "0744",
-      lillipup: "0506", minccino: "0572",
-      foongus: "0590", petilil: "0548",
-      feebas: "0349", wailmer: "0320",
-      litwick: "0607", growlithe: "0058",
-      joltik: "0595", tynamo: "0602",
-      trubbish: "0568", skorupi: "0451",
-      mudbray: "0749", hippopotas: "0449",
-      dwebble: "0557", binacle: "0688",
-      nincada: "0290", venipede: "0543",
-      mienfoo: "0619", timburr: "0532",
-      klink: "0599", ferroseed: "0597",
-      phantump: "0708", honedge: "0679",
-      solosis: "0577", elgyem: "0605",
-      cryogonal: "0615", cubchoo: "0613",
-      sandile: "0551", inkay: "0686",
-      spritzee: "0682", swirlix: "0684",
-      goomy: "0704", jangmoo: "0782",
-      noibat: "0714", vullaby: "0629",
-      stufful: "0759", furfrou: "0676",
-      wimpod: "0767", tympole: "0535",
-      salandit: "0757", larvesta: "0636",
-      fomantis: "0753", morelull: "0755",
-      charjabug: "0737", helioptile: "0694",
-      mareanie: "0747", croagunk: "0453",
-      sandygast: "0769", silicobra: "0843",
-      carbink: "0703", minior: "0774",
-      dewpider: "0751", sizzlipede: "0850",
-      pancham: "0674", hawlucha: "0701",
-      // Phase 106-108: Steel/Ghost/Psychic 4th
-      durant: "0632", togedemaru: "0777",
-      drifloon: "0425", golett: "0622",
-      hatenna: "0856", indeedee: "0876",
-      // Phase 109-111: Ice/Dark/Fairy 4th
-      vanillite: "0582", snom: "0872",
-      nickit: "0827", impidimp: "0859",
-      milcery: "0868", comfey: "0764",
-      // Phase 112-114: Dragon/Flying/Normal 4th
-      turtonator: "0776", drampa: "0780",
-      rookidee: "0821", archen: "0566",
-      wooloo: "0831", skwovet: "0819",
-      // Phase 118-120: Water/Fire/Grass 5th
-      bruxish: "0779", chewtle: "0833",
-      litleo: "0667", torchic: "0255",
-      gossifleur: "0829", bounsweet: "0761",
-      // Phase 121-123: Electric/Poison/Ground 5th
-      yamper: "0835", pincurchin: "0871",
-      skrelp: "0690", toxel: "0848",
-      drilbur: "0529", barboach: "0339",
-      // Phase 124-126: Rock/Bug/Fighting 5th
-      nacli: "0932", tyrunt: "0696", blipbug: "0824",
-      cutiefly: "0742", clobbopus: "0852", passimian: "0766",
-      // Phase 127-129: Steel/Ghost/Psychic 5th
-      tinkatink: "0957", varoom: "0965",
-      greavard: "0971", sinistea: "0854",
-      flittle: "0955", espurr: "0677",
-      // Phase 130-132: Ice/Dark/Fairy 5th
-      cetoddle: "0974", frigibax: "0996",
-      zorua: "0570", pawniard: "0624",
-      fidough: "0926", dedenne: "0702",
-      // Phase 133-135: Dragon/Flying/Normal 5th
-      cyclizar: "0967", tatsugiri: "0978",
-      wingull: "0278", swablu: "0333",
-      lechonk: "0915", tandemaus: "0921",
-      // Phase 137-139: Water/Fire/Grass/Electric/Poison/Ground 6th
-      buizel: "0418", finizen: "0963",
-      fletchinder: "0662", heatmor: "0631",
-      smoliv: "0928", deerling: "0585",
-      pachirisu: "0417", emolga: "0587",
-      glimmet: "0969", koffing: "0109",
-      wooper: "0194", baltoy: "0343",
-      // Phase 140-142: Rock/Bug/Fighting/Steel/Ghost/Psychic 6th
-      anorith: "0347", lunatone: "0337",
-      surskit: "0283", volbeat: "0313",
-      scraggy: "0559", mankey: "0056",
-      klefki: "0707", mawile: "0303",
-      rotom: "0479", dreepy: "0885",
-      munna: "0517", chingling: "0433",
-      // Phase 143-145: Ice/Dark/Fairy/Dragon/Flying/Normal 6th
-      smoochum: "0238", delibird: "0225",
-      nuzleaf: "0274", spiritomb: "0442",
-      marill: "0183", cleffa: "0173",
-      druddigon: "0621", applin: "0840",
-      hoppip: "0187", tropius: "0357",
-      aipom: "0190", smeargle: "0235",
-      // Phase 148-150: Water/Fire/Grass/Electric/Poison/Ground 7th
-      poliwag: "0060", corphish: "0341",
-      magby: "0240", darumaka: "0554",
-      sewaddle: "0540", pumpkaboo: "0710",
-      plusle: "0311", minun: "0312",
-      nidoranF: "0029", seviper: "0336",
-      gligar: "0207", rhyhorn: "0111",
-      // Phase 151-153: Rock/Bug/Fighting/Steel/Ghost/Psychic 7th
-      sudowoodo: "0185", boldore: "0525",
-      pineco: "0204", heracross: "0214",
-      hitmonlee: "0106", hitmonchan: "0107",
-      steelix: "0208", scizor: "0212",
-      banette: "0354", shedinja: "0292",
-      slowpoke: "0079", girafarig: "0203",
-      // Phase 154-156: Ice/Dark/Fairy/Dragon/Flying/Normal 7th
-      glaceon: "0471", beartic: "0614",
-      umbreon: "0197", cacturne: "0332",
-      granbull: "0210", togekiss: "0468",
-      shelgon: "0372", gabite: "0444",
-      noctowl: "0164", xatu: "0178",
-      kangaskhan: "0115", tauros: "0128",
-      // Phase 158-160: 8th Tier
-      psyduck: "0054", seel: "0086",
-      cyndaquil: "0155", fennekin: "0653",
-      sunkern: "0191", cacnea: "0331",
-      pichu: "0172", chinchou: "0170",
-      weedle: "0013", qwilfish: "0211",
-      donphan: "0232", marowak: "0105",
-      // Phase 161-163: 8th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
-      onix: "0095", omanyte: "0138",
-      scyther: "0123", pinsir: "0127",
-      medicham: "0308", lucario: "0448",
-      metang: "0375", lairon: "0305",
-      gengar: "0094", chandelure: "0609",
-      alakazam: "0065", gardevoir: "0282",
-      // Phase 164-166: 8th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
-      lapras: "0131", weavile: "0461",
-      honchkrow: "0430", houndoom: "0229",
-      florges: "0671", mimikyu: "0778",
-      dragonite: "0149", flygon: "0330",
-      staraptor: "0398", braviary: "0628",
-      snorlax: "0143", zangoose: "0335",
-      // Phase 168-170: 9th Tier Water/Fire/Grass/Electric/Poison/Ground
-      gyarados: "0130", kingdra: "0230",
-      blaziken: "0257", typhlosion: "0157",
-      venusaur: "0003", sceptile: "0254",
-      jolteon: "0135", ampharos: "0181",
-      nidoking: "0034", crobat: "0169",
-      krookodile: "0553", nidoqueen: "0031",
-      // Phase 171-173: 9th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
-      tyranitar: "0248", aerodactyl: "0142",
-      yanmega: "0469", scolipede: "0545",
-      conkeldurr: "0534", machamp: "0068",
-      magnezone: "0462", empoleon: "0395",
-      dusknoir: "0477", cofagrigus: "0563",
-      reuniclus: "0579", gothitelle: "0576",
-      // Phase 174-176: 9th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
-      mamoswine: "0473", walrein: "0365",
-      darkrai: "0491", hydreigon: "0635",
-      sylveon: "0700", hatterene: "0858",
-      haxorus: "0612", goodra: "0706",
-      pidgeot: "0018", noivern: "0715",
-      blissey: "0242", porygonZ: "0474",
-      // Phase 178-180: 10th Tier Water/Fire/Grass/Electric/Poison/Ground
-      blastoise: "0009", feraligatr: "0160",
-      charizard: "0006", delphox: "0655",
-      torterra: "0389", serperior: "0497",
-      electivire: "0466", luxray: "0405",
-      roserade: "0407", vileplume: "0045",
-      rhyperior: "0464", dugtrio: "0051",
-      // Phase 181-183: 10th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
-      golem: "0076", terrakion: "0639",
-      pheromosa: "0795", escavalier: "0589",
-      kommoo: "0784", gallade: "0475",
-      corviknight: "0823", bastiodon: "0411",
-      aegislash: "0681", jellicent: "0593",
-      slowking: "0199", bronzong: "0437",
-      // Phase 184-186: 10th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
-      froslass: "0478", abomasnow: "0460",
-      sharpedo: "0319", zoroark: "0571",
-      primarina: "0730", diancie: "0719",
-      dragapult: "0887", duraludon: "0884",
-      swellow: "0277", talonflame: "0663",
-      slaking: "0289", lopunny: "0428",
-      // Phase 188-190: 11th Tier Water/Fire/Grass/Electric/Poison/Ground
-      suicune: "0245", lugia: "0249",
-      hooh: "0250", entei: "0244",
-      celebi: "0251", virizion: "0640",
-      raikou: "0243", zekrom: "0644",
-      nihilego: "0793", naganadel: "0804",
-      groudon: "0383", landorus: "0645",
-      // Phase 191-193: 11th Tier Rock/Bug/Fighting/Steel/Ghost/Psychic
-      regirock: "0377", stakataka: "0805",
-      genesect: "0649", buzzwole: "0794",
-      cobalion: "0638", marshadow: "0802",
-      registeel: "0379", solgaleo: "0791",
-      giratina: "0487", lunala: "0792",
-      mewtwo: "0150", deoxys: "0386",
-      // Phase 194-196: 11th Tier Ice/Dark/Fairy/Dragon/Flying/Normal
-      regice: "0378", kyurem: "0646",
-      yveltal: "0717", hoopa: "0720",
-      xerneas: "0716", magearna: "0801",
-      rayquaza: "0384", dialga: "0483",
-      tornadus: "0641", articuno: "0144",
-      arceus: "0493", regigigas: "0486",
-      // Phase 198-200: 12th Tier (FINAL) Water/Fire/Grass/Electric/Poison/Ground
-      kyogre: "0382", palkia: "0484",
-      reshiram: "0643", victini: "0494",
-      shaymin: "0492", tapuBulu: "0787",
-      thundurus: "0642", zeraora: "0807",
-      eternatus: "0890", poipole: "0803",
-      zygarde: "0718", excadrill: "0530",
-      // Phase 201-203: 12th Tier (FINAL) Rock/Bug/Fighting/Steel/Ghost/Psychic
-      lycanroc: "0745", gigalith: "0526",
-      volcarona: "0637", golisopod: "0768",
-      urshifu: "0892", keldeo: "0647",
-      heatran: "0485", kartana: "0798",
-      spectrier: "0897", polteageist: "0855",
-      mew: "0151", cresselia: "0488",
-      // Phase 204-206: 12th Tier (FINAL) Ice/Dark/Fairy/Dragon/Flying/Normal
-      calyrexIce: "0898", cloyster: "0091",
-      grimmsnarl: "0861", incineroar: "0727",
-      zacian: "0888", tapuLele: "0786",
-      garchomp: "0445", latios: "0381",
-      zapdos: "0145", moltres: "0146",
-      silvally: "0773", meloetta: "0648",
-    };
-
-    // Load player + all enemy species + ally species for this dungeon
+    // Load player + all enemy species + ally species + their evolution targets
     const allySpeciesIds = (this.persistentAllies ?? []).map(a => a.speciesId);
     const neededKeys = new Set<string>([this.starterId, ...this.dungeonDef.enemySpeciesIds, ...allySpeciesIds]);
+    // Also preload evolution target sprites so evolution can update textures at runtime
+    for (const key of [...neededKeys]) {
+      for (const evo of EVOLUTIONS) {
+        if (evo.from === key) neededKeys.add(evo.to);
+      }
+    }
     for (const key of neededKeys) {
-      const dexNum = spriteMap[key];
+      const dexNum = SPRITE_DEX[key];
       const sp = SPECIES[key];
       if (!sp || !dexNum) continue;
       this.load.spritesheet(`${key}-walk`, `sprites/${dexNum}/Walk-Anim.png`, {
