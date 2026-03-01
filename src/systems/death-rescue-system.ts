@@ -50,7 +50,7 @@ import {
 import {
   MutationType, hasMutation, getMutationEffect, DungeonMutation,
 } from "../core/dungeon-mutations";
-import { DomHudElements, setDomHudInteractive } from "../ui/dom-hud";
+import { DomHudElements, setDomHudInteractive, setDomHudVisible } from "../ui/dom-hud";
 import {
   stopBgm, startBgm,
   sfxVictory, sfxGameOver,
@@ -224,8 +224,9 @@ export class DeathRescueSystem {
   private showRescuePrompt(options: RescueOption[], availableGold: number) {
     const scene = this.scene;
     const rescueUI: Phaser.GameObjects.GameObject[] = [];
-    // Disable DOM HUD buttons while rescue prompt is open
-    if (this.host.domHud) setDomHudInteractive(this.host.domHud, false);
+    // Hide DOM HUD and D-pad completely while rescue prompt is open
+    if (this.host.domHud) setDomHudVisible(this.host.domHud, false);
+    for (const obj of this.host.dpadUI) { if ("setVisible" in obj && typeof (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible === "function") (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible(false); }
 
     // Dark overlay
     const bg = scene.add.rectangle(
@@ -264,7 +265,7 @@ export class DeathRescueSystem {
       ).setScrollFactor(0).setDepth(201).setInteractive();
       rescueUI.push(btnBg);
 
-      // Option label
+      // Option label — interactive so taps on text also trigger rescue
       const labelColor = option.hpPercent >= 100 ? "#34d399" : "#60a5fa";
       const labelText = scene.add.text(GAME_WIDTH / 2, yOffset + 4, option.label, {
         fontSize: "13px", color: labelColor, fontFamily: "monospace", fontStyle: "bold",
@@ -281,12 +282,15 @@ export class DeathRescueSystem {
       btnBg.on("pointerover", () => btnBg.setStrokeStyle(1, 0x60a5fa));
       btnBg.on("pointerout", () => btnBg.setStrokeStyle(0));
 
-      // Handle rescue selection
+      // Handle rescue selection — attach to bg, label, and desc so tap anywhere works
       const selectedOption = option;
-      btnBg.on("pointerdown", () => {
+      const doRescue = () => {
         for (const el of rescueUI) el.destroy();
         this.executeRescue(selectedOption);
-      });
+      };
+      btnBg.on("pointerdown", doRescue);
+      labelText.setInteractive(); labelText.on("pointerdown", doRescue);
+      descText.setInteractive(); descText.on("pointerdown", doRescue);
 
       yOffset += 52;
     }
@@ -303,10 +307,12 @@ export class DeathRescueSystem {
 
     giveUpBg.on("pointerover", () => { giveUpBg.setStrokeStyle(1, 0xef4444); giveUpLabel.setColor("#ef4444"); });
     giveUpBg.on("pointerout", () => { giveUpBg.setStrokeStyle(1, 0x6b7280); giveUpLabel.setColor("#6b7280"); });
-    giveUpBg.on("pointerdown", () => {
+    const doGiveUp = () => {
       for (const el of rescueUI) el.destroy();
       this.showGameOverScreen();
-    });
+    };
+    giveUpBg.on("pointerdown", doGiveUp);
+    giveUpLabel.setInteractive(); giveUpLabel.on("pointerdown", doGiveUp);
   }
 
   // ── Execute Rescue ──
@@ -402,8 +408,12 @@ export class DeathRescueSystem {
     // Ensure gameOver stays false (was not set since we intercepted before showGameOverScreen)
     this.gameOver = false;
 
-    // Re-enable DOM HUD buttons (rescue overlay may have blocked them)
-    if (h.domHud) setDomHudInteractive(h.domHud, true);
+    // Re-show and re-enable DOM HUD buttons and D-pad after rescue
+    if (h.domHud) {
+      setDomHudVisible(h.domHud, true);
+      setDomHudInteractive(h.domHud, true);
+    }
+    for (const obj of h.dpadUI) { if ("setVisible" in obj && typeof (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible === "function") (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible(true); }
 
     // Visual feedback: rescue flash
     scene.cameras.main.flash(600, 100, 200, 255);
@@ -460,8 +470,8 @@ export class DeathRescueSystem {
       }
     }
 
-    // Hide DOM HUD and D-pad behind game over overlay
-    if (h.domHud) setDomHudInteractive(h.domHud, false);
+    // Hide DOM HUD completely and D-pad behind game over overlay
+    if (h.domHud) setDomHudVisible(h.domHud, false);
     for (const obj of h.dpadUI) { if ("setVisible" in obj && typeof (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible === "function") (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible(false); }
 
     // Full-screen opaque overlay
@@ -643,6 +653,10 @@ export class DeathRescueSystem {
     const clearRelicGoldMult = 1 + (h.relicEffects.goldMult ?? 0);
     const clearBlessingGoldMult = 1 + getBlessingEffect(h.activeBlessings, "goldMult");
     const gold = Math.floor((hasBoss ? baseGold * 1.5 : baseGold) * ngGoldBonus * challengeGoldMultiplier * modGoldMult * clearHeldGoldMult * h.difficultyMods.goldMult * clearEnchGoldMult * clearMutGoldMult * clearTalentGoldMult * clearRelicGoldMult * clearBlessingGoldMult);
+
+    // Hide DOM HUD completely and D-pad behind clear overlay
+    if (h.domHud) setDomHudVisible(h.domHud, false);
+    for (const obj of h.dpadUI) { if ("setVisible" in obj && typeof (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible === "function") (obj as Phaser.GameObjects.GameObject & {setVisible:(v:boolean)=>void}).setVisible(false); }
 
     scene.add.rectangle(
       GAME_WIDTH / 2, GAME_HEIGHT / 2,

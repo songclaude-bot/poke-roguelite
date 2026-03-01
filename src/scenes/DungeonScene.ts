@@ -6,7 +6,7 @@ import {
   TILE_SCALE,
   TILE_DISPLAY,
 } from "../config";
-import { createDomHud, layoutHudButtons, setDomHudInteractive, setDomSkillsVisible, DomHudElements } from "../ui/dom-hud";
+import { createDomHud, layoutHudButtons, setDomHudInteractive, setDomHudVisible, setDomSkillsVisible, DomHudElements } from "../ui/dom-hud";
 import { generateDungeon, DungeonData, TerrainType } from "../core/dungeon-generator";
 import { getTileIndex } from "../core/autotiler";
 import { Direction, DIR_DX, DIR_DY, angleToDirection } from "../core/direction";
@@ -2936,7 +2936,7 @@ export class DungeonScene extends Phaser.Scene {
       this.gameOver = true;
       stopBgm();
       clearDungeonSave();
-      if (this.domHud) setDomHudInteractive(this.domHud, false);
+      if (this.domHud) setDomHudVisible(this.domHud, false);
 
       let transitioned = false;
       const doTransition = () => {
@@ -5393,28 +5393,30 @@ export class DungeonScene extends Phaser.Scene {
     switch (relic.rarity) {
       case RelicRarity.Common:
         for (let i = 0; i < 8; i++) {
-          const g = this.add.graphics().setDepth(300);
+          const ox = (Math.random() - 0.5) * 30;
+          const oy = (Math.random() - 0.5) * 20;
+          const g = this.add.graphics().setPosition(px + ox, py + oy).setDepth(300);
           g.fillStyle(0x4ade80, 0.9);
-          g.fillCircle(px + (Math.random() - 0.5) * 30, py + (Math.random() - 0.5) * 20, 2 + Math.random() * 2);
-          this.tweens.add({ targets: g, y: -30 - Math.random() * 40, alpha: { from: 1, to: 0 }, duration: 600 + Math.random() * 400, ease: "Quad.easeOut", onComplete: () => g.destroy() });
+          g.fillCircle(0, 0, 2 + Math.random() * 2);
+          this.tweens.add({ targets: g, y: py + oy - 30 - Math.random() * 40, alpha: { from: 1, to: 0 }, duration: 600 + Math.random() * 400, ease: "Quad.easeOut", onComplete: () => g.destroy() });
         }
         break;
       case RelicRarity.Rare:
         for (let i = 0; i < 12; i++) {
           const angle = (Math.PI * 2 / 12) * i;
-          const g = this.add.graphics().setDepth(300);
-          g.fillStyle(0x60a5fa, 1); g.fillCircle(px, py, 2);
-          this.tweens.add({ targets: g, x: Math.cos(angle) * 40, y: Math.sin(angle) * 40, alpha: { from: 1, to: 0 }, scaleX: { from: 1, to: 0.3 }, scaleY: { from: 1, to: 0.3 }, duration: 500 + Math.random() * 300, ease: "Quad.easeOut", onComplete: () => g.destroy() });
+          const g = this.add.graphics().setPosition(px, py).setDepth(300);
+          g.fillStyle(0x60a5fa, 1); g.fillCircle(0, 0, 2);
+          this.tweens.add({ targets: g, x: px + Math.cos(angle) * 40, y: py + Math.sin(angle) * 40, alpha: { from: 1, to: 0 }, scaleX: { from: 1, to: 0.3 }, scaleY: { from: 1, to: 0.3 }, duration: 500 + Math.random() * 300, ease: "Quad.easeOut", onComplete: () => g.destroy() });
         }
         break;
       case RelicRarity.Epic:
         for (let i = 0; i < 15; i++) {
-          const g = this.add.graphics().setDepth(300);
           const angle = (Math.PI * 2 / 15) * i;
           const rd = 5 + Math.random() * 15;
+          const g = this.add.graphics().setPosition(px + Math.cos(angle) * rd, py + Math.sin(angle) * rd).setDepth(300);
           g.fillStyle(0xa855f7, 0.9);
-          g.fillCircle(px + Math.cos(angle) * rd, py + Math.sin(angle) * rd, 2 + Math.random() * 2);
-          this.tweens.add({ targets: g, x: Math.cos(angle + Math.PI) * 20, y: -50 - Math.random() * 30, alpha: { from: 1, to: 0 }, duration: 800 + Math.random() * 400, ease: "Cubic.easeOut", onComplete: () => g.destroy() });
+          g.fillCircle(0, 0, 2 + Math.random() * 2);
+          this.tweens.add({ targets: g, x: px + Math.cos(angle + Math.PI) * 20, y: py - 50 - Math.random() * 30, alpha: { from: 1, to: 0 }, duration: 800 + Math.random() * 400, ease: "Cubic.easeOut", onComplete: () => g.destroy() });
         }
         this.cameras.main.flash(300, 168, 85, 247);
         break;
@@ -5424,11 +5426,11 @@ export class DungeonScene extends Phaser.Scene {
         const vfxColors = [0xfbbf24, 0xfde68a, 0xffffff, 0xf59e0b];
         for (let i = 0; i < 25; i++) {
           const c = vfxColors[Math.floor(Math.random() * vfxColors.length)];
-          const g = this.add.graphics().setDepth(300);
-          g.fillStyle(c, 1); g.fillCircle(px, py, 2 + Math.random() * 3);
+          const g = this.add.graphics().setPosition(px, py).setDepth(300);
+          g.fillStyle(c, 1); g.fillCircle(0, 0, 2 + Math.random() * 3);
           const angle = Math.random() * Math.PI * 2;
           const dist = 30 + Math.random() * 60;
-          this.tweens.add({ targets: g, x: Math.cos(angle) * dist, y: Math.sin(angle) * dist - 20, alpha: { from: 1, to: 0 }, scaleX: { from: 1.2, to: 0.2 }, scaleY: { from: 1.2, to: 0.2 }, duration: 700 + Math.random() * 500, ease: "Quad.easeOut", onComplete: () => g.destroy() });
+          this.tweens.add({ targets: g, x: px + Math.cos(angle) * dist, y: py + Math.sin(angle) * dist - 20, alpha: { from: 1, to: 0 }, scaleX: { from: 1.2, to: 0.2 }, scaleY: { from: 1.2, to: 0.2 }, duration: 700 + Math.random() * 500, ease: "Quad.easeOut", onComplete: () => g.destroy() });
         }
         break;
     }

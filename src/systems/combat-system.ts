@@ -954,12 +954,12 @@ export class CombatSystem {
     };
     const sparkColor = (attackType && sparkColors[attackType]) ? sparkColors[attackType]! : 0xffffff;
 
-    const spark = scene.add.graphics().setDepth(49);
+    const spark = scene.add.graphics().setPosition(x, y).setDepth(49);
     spark.fillStyle(sparkColor, 0.9);
-    spark.fillCircle(x, y, 8);
+    spark.fillCircle(0, 0, 8);
     // Outer glow ring
     spark.fillStyle(sparkColor, 0.4);
-    spark.fillCircle(x, y, 14);
+    spark.fillCircle(0, 0, 14);
 
     scene.tweens.add({
       targets: spark,

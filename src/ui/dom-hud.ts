@@ -303,3 +303,14 @@ export function setDomSkillsVisible(hud: DomHudElements, visible: boolean): void
     btn.style.display = display;
   }
 }
+
+/** Hide or show the entire DOM HUD (skills + pickup + quickslot + team). */
+export function setDomHudVisible(hud: DomHudElements, visible: boolean): void {
+  const display = visible ? "block" : "none";
+  for (const btn of hud.skillBtns) {
+    btn.style.display = display;
+  }
+  hud.pickupBtn.style.display = display;
+  hud.quickSlotBtn.style.display = display;
+  hud.teamBtn.style.display = display;
+}
