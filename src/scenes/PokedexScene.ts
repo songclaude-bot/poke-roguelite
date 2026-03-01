@@ -31,9 +31,8 @@ const TYPE_COLORS: Record<string, string> = {
 
 /**
  * PokedexScene — shows all Pokemon species in the game.
- * Displays discovered/undiscovered status based on player encounters.
- * Uses virtual scrolling (object pool) for performance with 460+ species.
- * Tapping a seen Pokemon opens a detail panel with evolution chain.
+ * Uses optimized virtual scrolling: data binding only on row boundary change,
+ * position-only updates on sub-row scroll for smooth 60fps on mobile.
  */
 export class PokedexScene extends Phaser.Scene {
   constructor() {
@@ -114,6 +113,9 @@ export class PokedexScene extends Phaser.Scene {
         if (detailOpen) return;
         filterMode = mode;
         updateTabs();
+        rebuildFilteredList();
+        scrollOffset = 0;
+        lastStartIdx = -1;
         renderVisible();
       });
     }
@@ -130,7 +132,7 @@ export class PokedexScene extends Phaser.Scene {
 
     // ── Virtual scroll setup ──
     const scrollTop = 82;
-    const scrollBottom = GAME_HEIGHT - 60;
+    const scrollBottom = GAME_HEIGHT - 62;
     const scrollH = scrollBottom - scrollTop;
     const ITEM_H = 32;
     const POOL_SIZE = Math.ceil(scrollH / ITEM_H) + 2;
@@ -140,17 +142,20 @@ export class PokedexScene extends Phaser.Scene {
     maskShape.fillRect(0, scrollTop, GAME_WIDTH, scrollH);
     const mask = maskShape.createGeometryMask();
 
-    // Object pool
+    // Object pool — each row has fixed game objects, rebound on visible range change
     const poolContainer = this.add.container(0, 0).setMask(mask);
-    const pool: {
+
+    interface PoolRow {
       bg: Phaser.GameObjects.Rectangle;
       idxText: Phaser.GameObjects.Text;
       nameText: Phaser.GameObjects.Text;
       typeText: Phaser.GameObjects.Text;
       statsText: Phaser.GameObjects.Text;
       starIcon: Phaser.GameObjects.Text;
-      idx: number;
-    }[] = [];
+      boundIdx: number; // currently bound data index (-1 = unbound)
+    }
+
+    const pool: PoolRow[] = [];
 
     for (let i = 0; i < POOL_SIZE; i++) {
       const bg = this.add.rectangle(GAME_WIDTH / 2, 0, 340, ITEM_H - 2, 0x1a1a2e, 0.9)
@@ -171,30 +176,34 @@ export class PokedexScene extends Phaser.Scene {
         fontSize: "9px", color: "#fbbf24", fontFamily: "monospace",
       });
       poolContainer.add([bg, idxText, nameText, typeText, statsText, starIcon]);
-      pool.push({ bg, idxText, nameText, typeText, statsText, starIcon, idx: -1 });
+      pool.push({ bg, idxText, nameText, typeText, statsText, starIcon, boundIdx: -1 });
     }
 
-    // Filtered list
-    let filteredList: PokemonSpecies[] = [];
+    // Cached filtered list — only rebuilt on filter change
+    let filteredList: PokemonSpecies[] = allSpecies;
 
-    const getFilteredList = (): PokemonSpecies[] => {
+    const rebuildFilteredList = () => {
       switch (filterMode) {
         case "seen":
-          return allSpecies.filter(sp => seenSet.has(sp.id));
+          filteredList = allSpecies.filter(sp => seenSet.has(sp.id));
+          break;
         case "used":
-          return allSpecies.filter(sp => usedSet.has(sp.id));
+          filteredList = allSpecies.filter(sp => usedSet.has(sp.id));
+          break;
         default:
-          return allSpecies;
+          filteredList = allSpecies;
+          break;
       }
     };
 
     let scrollOffset = 0;
     let maxScroll = 0;
+    let lastStartIdx = -1;
 
-    const bindRow = (row: typeof pool[0], dataIdx: number, yPos: number) => {
-      row.idx = dataIdx;
-      const centerY = yPos;
-      row.bg.setY(centerY);
+    /** Bind data to a pool row (expensive — calls setText). Only when dataIdx changes. */
+    const bindRowData = (row: PoolRow, dataIdx: number) => {
+      if (row.boundIdx === dataIdx) return; // already bound to this data
+      row.boundIdx = dataIdx;
 
       if (dataIdx < 0 || dataIdx >= filteredList.length) {
         row.bg.setVisible(false);
@@ -218,51 +227,55 @@ export class PokedexScene extends Phaser.Scene {
       row.starIcon.setVisible(true);
 
       if (isSeen) {
-        // Seen Pokemon - show full info
         const dexNum = SPRITE_DEX[sp.id] ?? "????";
-        const dexStr = dexNum;
-        row.idxText.setText(dexStr).setColor("#555570").setY(centerY - 4);
-
-        row.nameText.setText(sp.name).setColor("#e0e0e0").setY(centerY - 6);
-
-        // Type display with color
-        const typeStr = sp.types.map(t => t).join("/");
+        row.idxText.setText(dexNum).setColor("#555570");
+        row.nameText.setText(sp.name).setColor("#e0e0e0");
+        const typeStr = sp.types.join("/");
         const primaryTypeColor = TYPE_COLORS[sp.types[0]] ?? "#94a3b8";
-        row.typeText.setText(typeStr).setColor(primaryTypeColor).setY(centerY - 6);
-
-        // Stats
+        row.typeText.setText(typeStr).setColor(primaryTypeColor);
         const bs = sp.baseStats;
-        row.statsText.setText(`${bs.hp}/${bs.atk}/${bs.def}`)
-          .setColor("#777790").setY(centerY - 6);
-
-        // Type label under name
+        row.statsText.setText(`${bs.hp}/${bs.atk}/${bs.def}`).setColor("#777790");
         row.bg.setStrokeStyle(1, isUsed ? 0x4ade80 : 0x222233);
-
-        // Star icon for used
-        row.starIcon.setText(isUsed ? "\u2605" : "").setY(centerY - 5);
+        row.starIcon.setText(isUsed ? "\u2605" : "");
       } else {
-        // Unseen Pokemon - show as ???
-        row.idxText.setText("????").setColor("#333350").setY(centerY - 4);
-        row.nameText.setText("???").setColor("#333350").setY(centerY - 6);
-        row.typeText.setText("???").setColor("#333350").setY(centerY - 6);
-        row.statsText.setText("??/??/??").setColor("#333350").setY(centerY - 6);
+        row.idxText.setText("????").setColor("#333350");
+        row.nameText.setText("???").setColor("#333350");
+        row.typeText.setText("???").setColor("#333350");
+        row.statsText.setText("??/??/??").setColor("#333350");
         row.bg.setStrokeStyle(1, 0x222233);
-        row.starIcon.setText("").setY(centerY - 5);
+        row.starIcon.setText("");
       }
     };
 
+    /** Update Y positions of a pool row (cheap — no setText). */
+    const updateRowY = (row: PoolRow, centerY: number) => {
+      row.bg.setY(centerY);
+      row.idxText.setY(centerY - 4);
+      row.nameText.setY(centerY - 6);
+      row.typeText.setY(centerY - 6);
+      row.statsText.setY(centerY - 6);
+      row.starIcon.setY(centerY - 5);
+    };
+
     const renderVisible = () => {
-      filteredList = getFilteredList();
       const totalH = filteredList.length * ITEM_H;
       maxScroll = Math.max(0, totalH - scrollH);
       scrollOffset = Math.min(scrollOffset, maxScroll);
 
       const startIdx = Math.floor(scrollOffset / ITEM_H);
+      const rangeChanged = startIdx !== lastStartIdx;
+
       for (let i = 0; i < POOL_SIZE; i++) {
         const dataIdx = startIdx + i;
         const yPos = scrollTop + 10 + dataIdx * ITEM_H - scrollOffset;
-        bindRow(pool[i], dataIdx, yPos);
+
+        if (rangeChanged) {
+          bindRowData(pool[i], dataIdx);
+        }
+        updateRowY(pool[i], yPos);
       }
+
+      lastStartIdx = startIdx;
 
       // Update scroll indicator
       if (maxScroll > 0) {
@@ -289,7 +302,7 @@ export class PokedexScene extends Phaser.Scene {
     let dragStartX = 0;
     let isDragging = false;
     let dragDistance = 0;
-    const TAP_THRESHOLD = 6; // pixels — below this is considered a tap
+    const TAP_THRESHOLD = 6;
 
     this.input.on("pointerdown", (ptr: Phaser.Input.Pointer) => {
       if (detailOpen) return;
@@ -315,7 +328,6 @@ export class PokedexScene extends Phaser.Scene {
     this.input.on("pointerup", (ptr: Phaser.Input.Pointer) => {
       if (detailOpen) return;
       if (isDragging && dragDistance < TAP_THRESHOLD) {
-        // This was a tap, not a drag — find which row was tapped
         handleRowTap(ptr.y);
       }
       isDragging = false;
@@ -324,20 +336,16 @@ export class PokedexScene extends Phaser.Scene {
     // ── Row tap handler ──
     const handleRowTap = (tapY: number) => {
       if (tapY < scrollTop || tapY > scrollBottom) return;
-
-      // Calculate which data index was tapped
       const relY = tapY - scrollTop + scrollOffset - 10;
       const dataIdx = Math.floor(relY / ITEM_H);
       if (dataIdx < 0 || dataIdx >= filteredList.length) return;
-
       const sp = filteredList[dataIdx];
-      if (!seenSet.has(sp.id)) return; // Can't view unseen Pokemon
-
+      if (!seenSet.has(sp.id)) return;
       openDetailPanel(sp);
     };
 
     // ── Column header ──
-    const headerBg = this.add.rectangle(GAME_WIDTH / 2, scrollTop - 4, 340, 12, 0x0a0a1a);
+    this.add.rectangle(GAME_WIDTH / 2, scrollTop - 4, 340, 12, 0x0a0a1a);
     this.add.text(12, scrollTop - 8, "#", {
       fontSize: "7px", color: "#555570", fontFamily: "monospace",
     });
@@ -351,9 +359,10 @@ export class PokedexScene extends Phaser.Scene {
       fontSize: "7px", color: "#555570", fontFamily: "monospace",
     });
 
-    // ── Back button ──
+    // ── Back button (above scroll area, with bg to prevent bleed-through) ──
+    this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 30, GAME_WIDTH, 50, 0x0a0a1a).setDepth(50);
     const backBg = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT - 30, 180, 34, 0x1a1a2e, 0.95)
-      .setStrokeStyle(1, 0x334155).setInteractive({ useHandCursor: true });
+      .setStrokeStyle(1, 0x334155).setInteractive({ useHandCursor: true }).setDepth(51);
     backBg.on("pointerover", () => backBg.setFillStyle(0x2a2a4e, 1));
     backBg.on("pointerout", () => backBg.setFillStyle(0x1a1a2e, 0.95));
     backBg.on("pointerdown", () => {
@@ -362,7 +371,7 @@ export class PokedexScene extends Phaser.Scene {
     });
     this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 30, "Back to Town", {
       fontSize: "13px", color: "#60a5fa", fontFamily: "monospace", fontStyle: "bold",
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(52);
 
     // ═══════════════════════════════════════════════════════
     // ── Detail Panel (overlay) ──
@@ -411,11 +420,7 @@ export class PokedexScene extends Phaser.Scene {
       curY += 24;
 
       // ── Types with colors ──
-      const typeStrs: string[] = [];
-      for (const t of sp.types) {
-        typeStrs.push(t);
-      }
-      const typeStr = typeStrs.join(" / ");
+      const typeStr = sp.types.join(" / ");
       const primaryColor = TYPE_COLORS[sp.types[0]] ?? "#94a3b8";
       const typeLabel = this.add.text(centerX, curY, typeStr, {
         fontSize: "11px", color: primaryColor, fontFamily: "monospace", fontStyle: "bold",
@@ -446,9 +451,9 @@ export class PokedexScene extends Phaser.Scene {
         detailObjects.push(lbl);
 
         const barStartX = leftX + 30;
-        const barBg = this.add.rectangle(barStartX + barMaxW / 2, curY + 3, barMaxW, barH, 0x222244)
+        const barBg2 = this.add.rectangle(barStartX + barMaxW / 2, curY + 3, barMaxW, barH, 0x222244)
           .setDepth(102);
-        detailObjects.push(barBg);
+        detailObjects.push(barBg2);
 
         const ratio = Math.min(1, stat.value / stat.max);
         if (ratio > 0) {
@@ -473,7 +478,6 @@ export class PokedexScene extends Phaser.Scene {
       detailObjects.push(sectionLabel1);
       curY += 14;
 
-      // Base skills from species
       const shownSkills = new Set<string>();
       for (const skillId of sp.skillIds) {
         const skillDef = SKILL_DB[skillId];
@@ -544,39 +548,30 @@ export class PokedexScene extends Phaser.Scene {
     const renderEvolutionTree = (node: EvolutionNode, cx: number, startY: number, depth: number): number => {
       let curY = startY;
 
-      // Determine visibility status
       const isSeen = seenSet.has(node.speciesId);
       const isUsed = usedSet.has(node.speciesId);
 
-      // Name color based on status
-      let nameColor = "#555570";  // gray for unseen
+      let nameColor = "#555570";
       if (isUsed) {
-        nameColor = "#4ade80"; // green for used
+        nameColor = "#4ade80";
       } else if (isSeen) {
-        nameColor = "#e0e0e0"; // white for seen
+        nameColor = "#e0e0e0";
       }
 
-      // For evolved forms not in SPECIES, check if we've seen them indirectly
-      // (they don't have SPECIES entries, so they won't be in seenSet)
-      // Show them dimmed unless the base form is seen
       if (!node.inSpecies && !isSeen) {
-        // Check if the base form in this chain is seen
-        const baseInChainSeen = depth === 0 ? false : true; // parent already rendered
+        const baseInChainSeen = depth === 0 ? false : true;
         nameColor = baseInChainSeen ? "#777790" : "#555570";
       }
 
       const displayName = isSeen || node.inSpecies ? node.name : "???";
 
-      // Build the line
       let prefix = "";
       if (depth > 0) {
         prefix = "  ".repeat(depth);
       }
 
-      // Level requirement
       const lvlStr = node.evolveLevel ? ` (Lv.${node.evolveLevel})` : "";
 
-      // Arrow for evolutions
       if (depth > 0) {
         const arrowY = curY - 6;
         const arrowText = this.add.text(cx, arrowY, `${prefix}-> ${displayName}${lvlStr}`, {
@@ -584,7 +579,6 @@ export class PokedexScene extends Phaser.Scene {
         }).setOrigin(0.5).setDepth(102);
         detailObjects.push(arrowText);
 
-        // Status indicator
         if (isUsed) {
           const star = this.add.text(cx + arrowText.width / 2 + 6, arrowY, "\u2605", {
             fontSize: "8px", color: "#fbbf24", fontFamily: "monospace",
@@ -592,7 +586,6 @@ export class PokedexScene extends Phaser.Scene {
           detailObjects.push(star);
         }
       } else {
-        // Base form (root)
         const baseText = this.add.text(cx, curY - 6, `${displayName}`, {
           fontSize: "10px", color: nameColor, fontFamily: "monospace", fontStyle: "bold",
         }).setOrigin(0.5).setDepth(102);
@@ -606,11 +599,10 @@ export class PokedexScene extends Phaser.Scene {
         }
       }
 
-      // Type pills for this node (small, below the name)
       if ((isSeen || node.inSpecies) && node.types.length > 0) {
-        const typeStr = node.types.join("/");
+        const typeStr2 = node.types.join("/");
         const tColor = TYPE_COLORS[node.types[0]] ?? "#94a3b8";
-        const typeSmall = this.add.text(cx, curY + 4, typeStr, {
+        const typeSmall = this.add.text(cx, curY + 4, typeStr2, {
           fontSize: "7px", color: tColor, fontFamily: "monospace",
         }).setOrigin(0.5).setDepth(102);
         detailObjects.push(typeSmall);
@@ -619,12 +611,9 @@ export class PokedexScene extends Phaser.Scene {
         curY += 14;
       }
 
-      // Render children
       if (node.evolvesTo.length === 1) {
-        // Linear chain — render inline
         curY = renderEvolutionTree(node.evolvesTo[0], cx, curY, depth + 1);
       } else if (node.evolvesTo.length > 1) {
-        // Branching — render each branch
         for (const child of node.evolvesTo) {
           curY = renderEvolutionTree(child, cx, curY, depth + 1);
         }
