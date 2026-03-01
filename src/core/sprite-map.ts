@@ -281,15 +281,15 @@ export const SPRITE_DEX: Record<string, string> = {
   fraxure: "0611",
   zweilous: "0634",
   togetic: "0176",
-  avalugg: "0713",
+  // avalugg: "0713", // no PMDCollab sprite
   grumpig: "0326",
   skuntank: "0435",
   liepard: "0510",
-  tranquill: "0520",
+  // tranquill: "0520", // no PMDCollab sprite
   crabominable: "0740",
   herdier: "0507",
   cinccino: "0573",
-  amoonguss: "0591",
+  // amoonguss: "0591", // no PMDCollab sprite
   lilligant: "0549",
   milotic: "0350",
   wailord: "0321",
@@ -301,7 +301,7 @@ export const SPRITE_DEX: Record<string, string> = {
   drapion: "0452",
   mudsdale: "0750",
   hippowdon: "0450",
-  crustle: "0558",
+  // crustle: "0558", // no PMDCollab sprite
   barbaracle: "0689",
   ninjask: "0291",
   whirlipede: "0544",
@@ -324,10 +324,10 @@ export const SPRITE_DEX: Record<string, string> = {
   palpitoad: "0536",
   salazzle: "0758",
   lurantis: "0754",
-  shiinotic: "0756",
+  // shiinotic: "0756", // no PMDCollab sprite
   vikavolt: "0738",
   heliolisk: "0695",
-  toxapex: "0748",
+  // toxapex: "0748", // no PMDCollab sprite
   toxicroak: "0454",
   palossand: "0770",
   sandaconda: "0844",
@@ -347,11 +347,11 @@ export const SPRITE_DEX: Record<string, string> = {
   dubwool: "0832",
   greedent: "0820",
   drednaw: "0834",
-  pyroar: "0668",
+  // pyroar: "0668", // no PMDCollab sprite
   combusken: "0256",
   eldegoss: "0830",
   steenee: "0762",
-  boltund: "0836",
+  // boltund: "0836", // no PMDCollab sprite
   toxtricity: "0849",
   dragalge: "0691",
   naclstack: "0933",
@@ -362,7 +362,7 @@ export const SPRITE_DEX: Record<string, string> = {
   tinkatuff: "0958",
   revavroom: "0966",
   houndstone: "0972",
-  espathra: "0956",
+  // espathra: "0956", // no PMDCollab sprite
   meowstic: "0678",
   cetitan: "0975",
   arctibax: "0997",
