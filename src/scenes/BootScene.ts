@@ -32,7 +32,7 @@ export class BootScene extends Phaser.Scene {
       fontSize: "14px", color: hasSave ? "#4ade80" : "#667eea", fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    this.add.text(cx, cy + 60, "v5.4.0 — Item Affinity + Journal", {
+    this.add.text(cx, cy + 60, "v5.2.1", {
       fontSize: "9px", color: "#444460", fontFamily: "monospace",
     }).setOrigin(0.5);
 
