@@ -177,6 +177,7 @@ export function createDomHud(): DomHudElements {
     position: absolute;
     left: 10px; top: 68px;
     width: ${GAME_WIDTH - 20}px;
+    box-sizing: border-box;
     font-size: 10px;
     font-family: ${FONT};
     color: #e0e0e0;
