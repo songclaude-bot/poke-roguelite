@@ -3032,13 +3032,20 @@ export class DungeonScene extends Phaser.Scene {
       const skill = skills[i];
       const btn = hud.skillBtns[i];
       if (!skill) {
-        btn.textContent = "---";
-        btn.style.color = "#444460";
+        btn.innerHTML = `<div style="color:#444460;text-align:center;line-height:36px">---</div>`;
+        btn.style.borderLeftColor = "#333355";
       } else {
         const haspp = skill.currentPp > 0;
-        btn.textContent = `${skill.name} ${skill.currentPp}/${skill.pp}`;
-        btn.style.color = haspp ? "#c0c8e0" : "#444460";
+        const typeColor = getTypeColorHex(skill.type);
+        const powTxt = skill.power > 0 ? `${skill.power}` : "-";
+        btn.innerHTML =
+          `<div style="font-size:10px;color:${haspp ? "#e0e0e0" : "#444460"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${skill.name}</div>` +
+          `<div style="font-size:8px;color:${haspp ? "#9ca3af" : "#333355"}">` +
+          `<span style="color:${haspp ? typeColor : "#444460"}">${skill.type}</span> ` +
+          `P:${powTxt} ${skill.currentPp}/${skill.pp}</div>`;
+        btn.style.borderLeftColor = haspp ? typeColor : "#222240";
         btn.style.borderColor = haspp ? "#333355" : "#222240";
+        btn.style.borderLeftColor = haspp ? typeColor : "#222240";
       }
     }
 

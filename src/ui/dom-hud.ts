@@ -131,21 +131,20 @@ export function createDomHud(): DomHudElements {
     const btn = document.createElement("button");
     btn.style.cssText = `
       position: absolute;
-      width: 82px; height: 28px;
+      width: 82px; height: 36px;
       font-size: 10px;
       font-family: ${FONT};
       color: #c0c8e0;
       background: rgba(26,26,46,0.85);
       border: 1px solid #333355;
+      border-left: 3px solid #333355;
       border-radius: 4px;
       pointer-events: auto;
       cursor: pointer;
-      padding: 0 4px;
-      text-align: center;
-      line-height: 28px;
+      padding: 1px 4px;
+      text-align: left;
+      line-height: 1.3;
       overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
     `;
     skillBtns.push(btn);
     c.appendChild(btn);
@@ -252,13 +251,13 @@ export function layoutHudButtons(
 
   // ── Skill buttons: 2x2 grid on the OPPOSITE side of D-pad ──
   const skillBaseX = dpadSide === "right" ? 8 : gameWidth - 172;
-  const skillBaseY = gameHeight - 95;
+  const skillBaseY = gameHeight - 105;
   for (let i = 0; i < 4; i++) {
     const col = i % 2;
     const row = Math.floor(i / 2);
     const btn = hud.skillBtns[i];
     btn.style.left = `${skillBaseX + col * 84}px`;
-    btn.style.top = `${skillBaseY + row * 30}px`;
+    btn.style.top = `${skillBaseY + row * 38}px`;
   }
 
   // ── Action buttons: centered as a group above D-pad ──
