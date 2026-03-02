@@ -62,6 +62,7 @@ export class ShopSystem {
   private playerInShopRoom = false;
   private shopGoldHud: Phaser.GameObjects.Text | null = null;
   private shopTheftTriggered = false;
+  private lastPromptedTile: { x: number; y: number } | null = null;
 
   constructor(private host: ShopHost) {}
 
@@ -81,6 +82,7 @@ export class ShopSystem {
     this.shopGoldHud = null;
     this.shopTheftTriggered = false;
     this.shopClosed = false;
+    this.lastPromptedTile = null;
   }
 
   // ── Convenience: read-only accessors for menu conditions ──
@@ -211,21 +213,26 @@ export class ShopSystem {
     } else if (!inShop && this.playerInShopRoom) {
       // Player just left the shop room -- check for theft
       this.playerInShopRoom = false;
+      this.lastPromptedTile = null;
       this.hideShopGoldHud();
       this.checkShopTheft();
     }
 
-    // Step-on-item buy prompt
+    // Step-on-item buy prompt — only trigger once per tile (until player moves away)
     if (inShop) {
       const shopTile = this.shopTiles.find(st => st.x === px && st.y === py);
       if (shopTile) {
         const si = this.shopItems[shopTile.shopIdx];
         if (si) {
           const itemDef = ITEM_DB[si.itemId];
-          if (itemDef) {
+          if (itemDef && (!this.lastPromptedTile || this.lastPromptedTile.x !== px || this.lastPromptedTile.y !== py)) {
+            this.lastPromptedTile = { x: px, y: py };
             this.showShopBuyPrompt(shopTile.shopIdx);
           }
         }
+      } else {
+        // Player moved to a non-item tile in shop — clear prompt tracker
+        this.lastPromptedTile = null;
       }
       // Update gold HUD
       this.updateShopGoldHud();

@@ -2911,9 +2911,9 @@ export class DungeonScene extends Phaser.Scene {
           this.showLog("No PP left!");
           return;
         }
-        // Show skill description tooltip
-        this.showSkillDescTooltip(skill);
+        // Show skill preview (range highlight + OK/Cancel), then tooltip on top
         this.showSkillPreview(i);
+        this.showSkillDescTooltip(skill);
       });
     }
 
@@ -2971,8 +2971,8 @@ export class DungeonScene extends Phaser.Scene {
       : "";
 
     box.innerHTML = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">` +
-      `<b style="color:#fbbf24;font-size:11px">${skill.name}</b>` +
       `<span style="background:${typeColor};color:#000;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:bold">${skill.type}</span>` +
+      `<span style="color:#e0e0e0;font-size:10px">${skill.name}</span>` +
       `</div>` +
       `<div style="display:flex;gap:10px;font-size:10px;color:#d1d5db">` +
       `<span>Pow <b style="color:#fbbf24">${powTxt}</b></span>` +
@@ -4484,15 +4484,12 @@ export class DungeonScene extends Phaser.Scene {
               this.cameras.main.flash(800, 255, 255, 255);
               this.cameras.main.shake(400, 0.01);
               if (this.player.sprite) {
-                // Update sprite texture to new species
-                const newSp = SPECIES[evo.to];
-                if (newSp) {
-                  const newIdleTex = `${newSp.spriteKey}-idle`;
-                  if (this.textures.exists(newIdleTex)) {
-                    this.player.sprite.setTexture(newIdleTex);
-                    const newIdleAnim = `${newSp.spriteKey}-idle-${this.player.facing}`;
-                    if (this.anims.exists(newIdleAnim)) this.player.sprite.play(newIdleAnim);
-                  }
+                // Update sprite texture to new species (use speciesId, not spriteKey — textures are keyed by speciesId)
+                const newIdleTex = `${evo.to}-idle`;
+                if (this.textures.exists(newIdleTex)) {
+                  this.player.sprite.setTexture(newIdleTex);
+                  const newIdleAnim = `${evo.to}-idle-${this.player.facing}`;
+                  if (this.anims.exists(newIdleAnim)) this.player.sprite.play(newIdleAnim);
                 }
                 this.tweens.add({
                   targets: this.player.sprite,
@@ -4542,13 +4539,12 @@ export class DungeonScene extends Phaser.Scene {
               if (evo.newSkill) {
                 this.showLog(`${evo.newName} learned ${evo.newSkill}!`);
               }
-              // Update sprite to new species
-              const newSp = SPECIES[evo.newSpeciesId];
-              if (ally.sprite && newSp) {
-                const newIdleTex = `${newSp.spriteKey}-idle`;
+              // Update sprite to new species (use speciesId, not spriteKey — textures keyed by speciesId)
+              if (ally.sprite && evo.newSpeciesId) {
+                const newIdleTex = `${evo.newSpeciesId}-idle`;
                 if (this.textures.exists(newIdleTex)) {
                   ally.sprite.setTexture(newIdleTex);
-                  const newIdleAnim = `${newSp.spriteKey}-idle-${ally.facing}`;
+                  const newIdleAnim = `${evo.newSpeciesId}-idle-${ally.facing}`;
                   if (this.anims.exists(newIdleAnim)) ally.sprite.play(newIdleAnim);
                 }
                 // Evolution scale bounce
