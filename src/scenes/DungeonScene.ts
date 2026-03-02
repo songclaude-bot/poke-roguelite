@@ -896,13 +896,20 @@ export class DungeonScene extends Phaser.Scene {
     // Stairs marker (drawn by StairsSystem)
     this.stairsSys.drawStairsMarker();
 
-    // ── Create animations for needed species (wrapped in try/catch to protect UI) ──
-    const neededKeys = new Set<string>([this.starterId, ...this.dungeonDef.enemySpeciesIds]);
-    for (const key of neededKeys) {
+    // ── Create animations for needed species + their evolution targets ──
+    const animKeys = new Set<string>([this.starterId, ...this.dungeonDef.enemySpeciesIds]);
+    const allyIds = (this.persistentAllies ?? []).map(a => a.speciesId);
+    for (const id of allyIds) animKeys.add(id);
+    for (const key of [...animKeys]) {
+      for (const evo of EVOLUTIONS) {
+        if (evo.from === key) animKeys.add(evo.to);
+      }
+    }
+    for (const key of animKeys) {
       try {
         const sp = SPECIES[key];
         if (!sp || this.anims.exists(`${key}-walk-0`)) continue;
-        this.createAnimations(sp.spriteKey, sp.walkFrames, sp.idleFrames);
+        this.createAnimations(key, sp.walkFrames, sp.idleFrames);
       } catch (e) {
         console.warn(`[DungeonScene] Failed to create animations for "${key}":`, e);
       }

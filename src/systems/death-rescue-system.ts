@@ -52,7 +52,7 @@ import {
 } from "../core/dungeon-mutations";
 import { DomHudElements, setDomHudInteractive, setDomHudVisible } from "../ui/dom-hud";
 import {
-  stopBgm, startBgm,
+  stopBgm, startBgm, switchToBossTheme, getCurrentBgmTheme,
   sfxVictory, sfxGameOver,
 } from "../core/sound-manager";
 import { LegendaryEncounter } from "../core/legendary-encounters";
@@ -435,8 +435,12 @@ export class DeathRescueSystem {
     // Run log entry
     h.runLog.add(RunLogEvent.PlayerDied, `Rescued on B${h.currentFloor}F (${option.label})`, h.currentFloor, h.turnManager.turn);
 
-    // Resume BGM
+    // Resume BGM — restore boss theme if we were on a boss floor
     startBgm(h.dungeonDef.id);
+    const isBossFloor = (h.dungeonDef.boss && h.currentFloor === h.dungeonDef.floors) || (h as any).isBossRush;
+    if (isBossFloor) {
+      switchToBossTheme();
+    }
 
     // Update HUD to reflect HP/inventory changes
     h.updateHUD();
