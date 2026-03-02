@@ -26,6 +26,7 @@ import { getEvolution, EVOLUTIONS } from "../core/evolution";
 import { distributeAllyExp, AllyLevelUpResult } from "../core/ally-evolution";
 import { ItemDef, ItemStack, rollFloorItem, MAX_INVENTORY, ITEM_DB, ItemCategory } from "../core/item";
 import { getAffinityMultiplier, getItemAffinity } from "../core/item-affinity";
+import { getTypeColorHex } from "../core/ally-skill-display";
 import { getTypeGem, TypeGem } from "../core/type-gems";
 import { SPECIES, PokemonSpecies, createSpeciesSkills, getLearnableSkill } from "../core/pokemon-data";
 import { SPRITE_DEX } from "../core/sprite-map";
@@ -2122,13 +2123,6 @@ export class DungeonScene extends Phaser.Scene {
       });
     }
 
-    // Show info text
-    const infoText = this.add.text(GAME_WIDTH / 2, 42, `${skill.name} (${skill.type}) Pow:${skill.power} PP:${skill.currentPp}/${skill.pp}`, {
-      fontSize: "10px", color: "#fbbf24", fontFamily: "monospace", backgroundColor: "#000000cc",
-      padding: { x: 6, y: 3 },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
-    this.skillPreviewUI.push(infoText);
-
     // Replace skill buttons with Confirm/Cancel (same side as skill buttons, opposite D-Pad)
     const isRight = this.dpadSide === "right";
     const baseX = isRight ? 10 : GAME_WIDTH - 120;
@@ -2160,8 +2154,11 @@ export class DungeonScene extends Phaser.Scene {
     for (const obj of this.skillPreviewUI) obj.destroy();
     this.skillPreviewUI = [];
     this.skillPreviewActive = false;
-    // Restore DOM skill buttons
-    if (this.domHud) setDomSkillsVisible(this.domHud, true);
+    // Restore DOM skill buttons and hide skill tooltip
+    if (this.domHud) {
+      setDomSkillsVisible(this.domHud, true);
+      this.domHud.skillDescBox.style.display = "none";
+    }
   }
 
   /** Skill button updates are now handled by syncDomHud — this is a no-op */
@@ -2949,20 +2946,45 @@ export class DungeonScene extends Phaser.Scene {
     // Phaser skill buttons & action buttons are no longer created — DOM HUD handles them
   }
 
-  /** Show skill description tooltip at top of screen, auto-dismiss */
+  /** Show detailed skill info tooltip — stays visible until clearSkillPreview */
   private showSkillDescTooltip(skill: Skill) {
     if (!this.domHud) return;
     const box = this.domHud.skillDescBox;
-    const typeStr = skill.type ? ` [${skill.type}]` : "";
-    const rangeStr = skill.range !== "front1" ? ` Range:${skill.range}` : "";
-    const effectStr = skill.effect ? ` (${skill.effect})` : "";
-    box.innerHTML = `<b style="color:#fbbf24">${skill.name}</b>${typeStr} — Pow:${skill.power} PP:${skill.currentPp}/${skill.pp}${rangeStr}${effectStr}<br><span style="color:#94a3b8">${skill.description ?? ""}</span>`;
+    const typeColor = getTypeColorHex(skill.type);
+
+    const rangeLabels: Record<string, string> = {
+      front1: "Front 1", front2: "Front 2", frontLine: "Straight line",
+      around: "Around 8", room: "Room", self: "Self",
+    };
+    const effectLabels: Record<string, string> = {
+      atkUp: "ATK +50%", defUp: "DEF +50%", heal: "Heal HP",
+      burn: "Burn", paralyze: "Paralyze", frozen: "Freeze",
+      badlyPoisoned: "Badly Poison", flinch: "Flinch", drowsy: "Drowsy",
+      cursed: "Curse",
+    };
+
+    const rangeTxt = rangeLabels[skill.range] ?? skill.range;
+    const powTxt = skill.power > 0 ? `${skill.power}` : "-";
+    const accTxt = `${skill.accuracy}%`;
+    const effectTxt = skill.effect && skill.effect !== "none"
+      ? `${effectLabels[skill.effect] ?? skill.effect}${skill.effectChance && skill.effectChance < 100 ? ` (${skill.effectChance}%)` : ""}`
+      : "";
+
+    box.innerHTML = `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">` +
+      `<b style="color:#fbbf24;font-size:11px">${skill.name}</b>` +
+      `<span style="background:${typeColor};color:#000;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:bold">${skill.type}</span>` +
+      `</div>` +
+      `<div style="display:flex;gap:10px;font-size:10px;color:#d1d5db">` +
+      `<span>Pow <b style="color:#fbbf24">${powTxt}</b></span>` +
+      `<span>Acc <b style="color:#93c5fd">${accTxt}</b></span>` +
+      `<span>PP <b style="color:#86efac">${skill.currentPp}/${skill.pp}</b></span>` +
+      `<span>Range <b style="color:#c4b5fd">${rangeTxt}</b></span>` +
+      `</div>` +
+      (effectTxt ? `<div style="font-size:9px;color:#fca5a5;margin-top:2px">Effect: ${effectTxt}</div>` : "") +
+      (skill.description ? `<div style="font-size:9px;color:#94a3b8;margin-top:2px">${skill.description}</div>` : "");
     box.style.display = "block";
-    // Auto-hide after 3 seconds
-    if (this.skillDescTimer) clearTimeout(this.skillDescTimer);
-    this.skillDescTimer = window.setTimeout(() => {
-      box.style.display = "none";
-    }, 3000);
+    // Clear any previous auto-hide timer — tooltip stays until skill preview is cleared
+    if (this.skillDescTimer) { clearTimeout(this.skillDescTimer); this.skillDescTimer = null; }
   }
   private skillDescTimer: number | null = null;
 
