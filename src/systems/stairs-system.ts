@@ -72,6 +72,9 @@ export interface StairsHost {
   // Flags
   gameOver: boolean;
 
+  // Rescue
+  readonly rescueCount: number;
+
   // DOM HUD
   domHud: DomHudElements | null;
   domHudElement: Phaser.GameObjects.DOMElement | null;
@@ -228,6 +231,7 @@ export class StairsSystem {
         relics: this.host.activeRelics,
         runLogEntries: this.host.runLog.serialize(),
         blessings: serializeBlessings(this.host.activeBlessings),
+        rescueCount: this.host.rescueCount,
       });
     };
 

@@ -247,6 +247,7 @@ export class DungeonScene extends Phaser.Scene {
   /** Public getter: gameOver flag (lives in DeathRescueSystem) */
   get gameOver() { return this.deathRescueSys?.gameOver ?? false; }
   set gameOver(v: boolean) { if (this.deathRescueSys) this.deathRescueSys.gameOver = v; }
+  get rescueCount() { return this.deathRescueSys?.rescueCount ?? 0; }
   private enemiesDefeated = 0;
   // Quest tracking
   private questItemsCollected = 0;
@@ -467,7 +468,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private persistentAllies: AllyData[] | null = null;
 
-  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number; scoreChain?: ScoreChain; legendaryEncountered?: boolean; questItemsCollected?: number; questItemsUsed?: boolean; relics?: Relic[]; runLogEntries?: RunLogEntry[]; blessings?: { id: string; remaining: number }[] }) {
+  init(data?: { floor?: number; hp?: number; maxHp?: number; skills?: Skill[]; inventory?: ItemStack[]; level?: number; atk?: number; def?: number; exp?: number; fromHub?: boolean; dungeonId?: string; allies?: AllyData[] | null; belly?: number; starter?: string; challengeMode?: string; modifiers?: string[]; runElapsedTime?: number; scoreChain?: ScoreChain; legendaryEncountered?: boolean; questItemsCollected?: number; questItemsUsed?: boolean; relics?: Relic[]; runLogEntries?: RunLogEntry[]; blessings?: { id: string; remaining: number }[]; rescueCount?: number }) {
     // Load D-Pad side preference
     try {
       const side = localStorage.getItem("poke-roguelite-dpadSide");
@@ -589,6 +590,7 @@ export class DungeonScene extends Phaser.Scene {
     // Construct deathRescueSys early so gameOver getter/setter works
     this.deathRescueSys = new DeathRescueSystem(this as any);
     this.deathRescueSys.reset();
+    if (data?.rescueCount) this.deathRescueSys.rescueCount = data.rescueCount;
     this.gameOver = false;
     this.bossEntity = null;
     this.bossHpBar = null;
@@ -3251,11 +3253,8 @@ export class DungeonScene extends Phaser.Scene {
       this.domHud.chainLabel.style.display = "block";
     }
 
-    // Background box
-    const bounds = this.chainHudText.getBounds();
+    // Clear Phaser background box — DOM chainLabel handles display now
     this.chainHudBg.clear();
-    this.chainHudBg.fillStyle(0x000000, 0.7);
-    this.chainHudBg.fillRoundedRect(bounds.x - 4, bounds.y - 2, bounds.width + 8, bounds.height + 4, 3);
 
     // Tier-up animation: brief scale pop + flash when tier changes
     if (tier !== this.lastChainTier && this.lastChainTier !== "") {
