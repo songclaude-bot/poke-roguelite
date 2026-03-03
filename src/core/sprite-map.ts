@@ -131,7 +131,7 @@ export const SPRITE_DEX: Record<string, string> = {
   granbull: "0210", togekiss: "0468",
   shelgon: "0372", gabite: "0444",
   noctowl: "0164", xatu: "0178",
-  kangaskhan: "0115", tauros: "0128",
+  kangaskhan: "0115", tauros: "0128", chansey: "0113", kecleon: "0352",
   psyduck: "0054", seel: "0086",
   cyndaquil: "0155", fennekin: "0653",
   sunkern: "0191", cacnea: "0331",
