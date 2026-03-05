@@ -2067,3 +2067,19 @@ export function setBgmVolume(v: number) {
 export function initAudio() {
   getCtx();
 }
+
+// ── Pause/resume BGM when browser tab is backgrounded ──
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    if (bgmAudio && bgmPlaying) bgmAudio.pause();
+    if (synthBgmActive && bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; }
+  } else {
+    if (bgmAudio && bgmPlaying) bgmAudio.play().catch(() => {});
+    if (synthBgmActive && bgmPlaying && !bgmTimer) {
+      // Resume synth from where it left off
+      const savedIdx = bgmNoteIdx;
+      startSynthBgm(currentBgmTheme || "cave");
+      bgmNoteIdx = savedIdx;
+    }
+  }
+});
