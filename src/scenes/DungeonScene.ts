@@ -4476,6 +4476,13 @@ export class DungeonScene extends Phaser.Scene {
               this.player.stats.atk += evo.atkBonus;
               this.player.stats.def += evo.defBonus;
               this.player.speciesId = evo.to;
+              // Update spriteKey, types, attackType from new species data
+              const newSp = SPECIES[evo.to];
+              if (newSp) {
+                this.player.spriteKey = newSp.spriteKey;
+                this.player.types = newSp.types;
+                this.player.attackType = newSp.attackType;
+              }
               if (evo.newSkillId && SKILL_DB[evo.newSkillId] && this.player.skills.length < 4) {
                 this.player.skills.push(createSkill(SKILL_DB[evo.newSkillId]));
               }
