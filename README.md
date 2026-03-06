@@ -7,7 +7,19 @@ Pokemon Mystery Dungeon 시리즈에서 영감을 받은 턴제 로그라이트 
 
 ---
 
-## 게임 규모 (v5.4.0)
+## Screenshots
+
+| Boot | Hub | Dungeon Select | Gameplay |
+|:----:|:---:|:--------------:|:--------:|
+| ![Boot](screenshots/boot.png) | ![Hub](screenshots/hub.png) | ![Dungeons](screenshots/dungeon-select.png) | ![Gameplay](screenshots/gameplay.png) |
+
+| Dungeon Preview |
+|:---------------:|
+| ![Preview](screenshots/dungeon-preview.png) |
+
+---
+
+## 게임 규모 (v5.6.0)
 
 | 항목 | 수치 |
 |------|------|
