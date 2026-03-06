@@ -607,7 +607,7 @@ export class HubScene extends Phaser.Scene {
     this.tabContent.push(helpT);
     helpBtn.on("pointerdown", () => this.scene.start("HelpScene"));
 
-    const verT = this.add.text(GAME_WIDTH / 2, settingsY + 16, "v5.5.0", {
+    const verT = this.add.text(GAME_WIDTH / 2, settingsY + 16, "v5.6.0", {
       fontSize: "7px", color: "#334155", fontFamily: "monospace",
     }).setOrigin(0.5);
     this.tabContent.push(verT);

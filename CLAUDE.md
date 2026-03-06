@@ -51,6 +51,13 @@
 - **유한상태머신(FSM)**: Follow → Chase → Attack → Evade 등 상태 기반 행동
 - 리쉬 범위 밖이면 무조건 플레이어에게 복귀
 
+## 버전 관리 규칙
+- **작업 후 반드시 버전 올리기**: 버그 수정/기능 추가 작업을 커밋할 때 반드시 버전을 올린다
+- 버전 표시 위치: `src/scenes/HubScene.ts`, `src/scenes/BootScene.ts` 두 곳
+- 버저닝: semver (major.minor.patch). 기능 추가는 minor, 버그 수정은 patch
+- git tag도 같이 생성: `git tag v{버전}`
+- **현재 버전: v5.6.0**
+
 ## 기술적 참고
 - t3.micro EC2 (914MB RAM) — Playwright/Chrome 동시 실행 시 메모리 부족 주의
 - `npx tsc` 대신 `node node_modules/.bin/tsc --noEmit` 사용
